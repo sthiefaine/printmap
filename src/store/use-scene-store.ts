@@ -8,6 +8,8 @@ import type {
 } from "@/types/osm";
 import { validateElevationGrid } from "@/lib/elevation/validate-grid";
 import { validateBbox } from "@/lib/data/bbox";
+import { validateRoofData } from "@/lib/data/validate-roofs";
+import { validateImportedElements } from "@/lib/data/validate-imported-elements";
 import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
 
 export interface FrameSettings {
@@ -148,7 +150,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
   base: {
     basePlateThicknessMm: 3,
     baseColor: "#e8e3d7",
-    topographyEnabled: false,
+    topographyEnabled: true,
     elevationExaggeration: 1,
     dataSource: "osm",
     frame: {
@@ -184,7 +186,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
     roads: {
       enabled: true,
       color: "#807a6c",
-      heightMm: 0.4,
+      heightMm: 0,
       widthMultiplier: 1,
       filter: "minor",
       roadDepthMm: 0,
@@ -195,7 +197,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
     water: {
       enabled: true,
       color: "#479cad",
-      heightMm: 0.24,
+      heightMm: 0,
       minAreaM2: 0,
       waterCutout: false,
       oceanEnabled: true,
@@ -203,8 +205,8 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
       waterBaseHeightMm: 0.2,
       waterDepthMm: 0,
     },
-    parks: { enabled: true, color: "#8ca16d", heightMm: 0.28 },
-    sand: { enabled: true, color: "#d7be8c", heightMm: 0.2 },
+    parks: { enabled: true, color: "#8ca16d", heightMm: 0 },
+    sand: { enabled: true, color: "#d7be8c", heightMm: 0 },
     piers: { enabled: true, color: "#a6876d", heightMm: 0.4 },
     gpx: {
       enabled: false,
@@ -311,6 +313,15 @@ export function normalizeSettings(value: unknown): ModelSettings {
     throw new Error("Couleur du projet invalide.");
   if (!["all", "minor", "major"].includes(normalized.features.roads.filter))
     throw new Error("Filtre routier invalide.");
+  const roadTypes = normalized.features.roads.roadTypeEnabled;
+  if (
+    !roadTypes ||
+    typeof roadTypes !== "object" ||
+    Array.isArray(roadTypes) ||
+    Object.values(roadTypes).some((enabled) => typeof enabled !== "boolean") ||
+    typeof normalized.features.roads.footpathsEnabled !== "boolean"
+  )
+    throw new Error("Options des voies du projet invalides.");
   for (const [layer, settings] of Object.entries(normalized.features)) {
     if (
       typeof settings.enabled !== "boolean" ||
@@ -320,7 +331,12 @@ export function normalizeSettings(value: unknown): ModelSettings {
     if (
       "heightMm" in settings &&
       (!Number.isFinite(settings.heightMm) ||
-        settings.heightMm < 0.1 ||
+        settings.heightMm <
+          (layer === "roads"
+            ? -1.2
+            : ["water", "parks", "sand"].includes(layer)
+              ? -0.8
+              : 0.1) ||
         settings.heightMm > 5)
     )
       throw new Error(`Hauteur ${layer} invalide.`);
@@ -467,8 +483,24 @@ export const useSceneStore = create<SceneState>((set, get) => ({
         throw new Error("Données du projet invalides ou trop volumineuses.");
       if (snapshot.osmData && !snapshot.bbox)
         throw new Error("Les données ne sont associées à aucune zone.");
-      if (snapshot.elevationGrid)
-        snapshot.elevationGrid = validateElevationGrid(snapshot.elevationGrid);
+      if (snapshot.osmData) {
+        validateImportedElements(snapshot.osmData.elements);
+        validateRoofData(snapshot.osmData.elements);
+      }
+      if (snapshot.elevationGrid) {
+        const grid = validateElevationGrid(snapshot.elevationGrid);
+        const bounds = [grid.south, grid.west, grid.north, grid.east];
+        if (
+          !snapshot.bbox ||
+          bounds.some(
+            (value, index) => Math.abs(value - snapshot.bbox![index]) > 1e-8,
+          )
+        )
+          throw new Error(
+            "Le relief du projet ne correspond pas à la zone enregistrée.",
+          );
+        snapshot.elevationGrid = grid;
+      }
       if (
         snapshot.report &&
         (!Array.isArray(snapshot.report.sources) ||
@@ -476,7 +508,11 @@ export const useSceneStore = create<SceneState>((set, get) => ({
           !Array.isArray(snapshot.report.warnings) ||
           !snapshot.report.warnings.every((v) => typeof v === "string") ||
           typeof snapshot.report.fetchedAt !== "string" ||
-          !Number.isFinite(Date.parse(snapshot.report.fetchedAt)))
+          !Number.isFinite(Date.parse(snapshot.report.fetchedAt)) ||
+          (snapshot.report.lod2Year !== undefined &&
+            (!Number.isInteger(snapshot.report.lod2Year) ||
+              snapshot.report.lod2Year < 1900 ||
+              snapshot.report.lod2Year > 2100)))
       )
         throw new Error("Rapport du projet invalide.");
     }

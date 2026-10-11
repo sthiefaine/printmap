@@ -1,0 +1,2656 @@
+<!-- Montpellier Méditerranée Métropole, CityGML LoD2.2 2020, ODbL. Official Arc de Triomphe/Porte du Peyrou, B137169, Batch5_bati_2020.gml. Source: https://data.montpellier3m.fr/sites/default/files/ressources/MMM_MMM_Bat3D.zip ; EPSG:2154, IGN69. -->
+<cityObjectMember>
+    <bldg:Building gml:id="B137169">
+      <creationDate>2022-09-23</creationDate>
+      <gen:doubleAttribute name="Volume">
+        <gen:value>1251.688</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="prec_plani">
+        <gen:value>0.100000</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="TotalRoofArea">
+        <gen:value>85.26</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="TotalWallArea">
+        <gen:value>789.77</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="prec_alti">
+        <gen:value>0.200000</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="surfacesol">
+        <gen:value>126.203469</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="ZMIN">
+        <gen:value>51.280000</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="TEXTURE">
+        <gen:value>1.000000</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="THICKNESS">
+        <gen:value>0.000000</gen:value>
+      </gen:doubleAttribute>
+      <gen:doubleAttribute name="OVERHANG">
+        <gen:value>0.000000</gen:value>
+      </gen:doubleAttribute>
+      <gen:intAttribute name="BUILDINGID">
+        <gen:value>137169</gen:value>
+      </gen:intAttribute>
+      <gen:intAttribute name="bld_id">
+        <gen:value>137169</gen:value>
+      </gen:intAttribute>
+      <gen:stringAttribute name="id_parc">
+        <gen:value> </gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="Authoring_Software">
+        <gen:value>RhinoCity</gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="producteur">
+        <gen:value>Avineon</gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="date_appa">
+        <gen:value>2017-01-01</gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="date_dispa">
+        <gen:value>2100-01-01</gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="action">
+        <gen:value> </gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="date_acq">
+        <gen:value>2022-06-15</gen:value>
+      </gen:stringAttribute>
+      <gen:stringAttribute name="methode">
+        <gen:value>stereorestitution</gen:value>
+      </gen:stringAttribute>
+      <bldg:measuredHeight uom="#m">17.655</bldg:measuredHeight>
+      <bldg:lod2Solid>
+        <gml:Solid>
+          <gml:exterior>
+            <gml:CompositeSurface>
+              <gml:surfaceMember xlink:href="#ID_f178dcb6-bd50-4752-aed0-fa07e4896d9e"/>
+              <gml:surfaceMember xlink:href="#ID_5fd8efea-c4d0-4b3e-813a-91e9c532fc9c"/>
+              <gml:surfaceMember xlink:href="#ID_6559554d-607e-4660-9388-9a06e8a6a6be"/>
+              <gml:surfaceMember xlink:href="#ID_1799e42c-1369-425e-88a2-a5a9dddcc7e5"/>
+              <gml:surfaceMember xlink:href="#ID_aef30298-1943-4bb4-8e83-9a4a48c210e8"/>
+              <gml:surfaceMember xlink:href="#ID_7d863e8b-290f-47ca-a396-949cfa4467ee"/>
+              <gml:surfaceMember xlink:href="#ID_ae635052-c29a-4aae-8bd0-f85f2007a4e0"/>
+              <gml:surfaceMember xlink:href="#ID_f1cd9994-6ace-410c-9379-64bea94d238c"/>
+              <gml:surfaceMember xlink:href="#ID_4c32a782-352f-4084-af58-8cdc6ff3e94c"/>
+              <gml:surfaceMember xlink:href="#ID_31f0f970-6fe7-4b2f-a9ff-94e374eeec97"/>
+              <gml:surfaceMember xlink:href="#ID_fd02575d-4674-46e1-8f3a-c95c5f370fb8"/>
+              <gml:surfaceMember xlink:href="#ID_f22a4eed-e029-4639-9cf9-155a294f23f6"/>
+              <gml:surfaceMember xlink:href="#ID_22e42e22-28aa-4521-9e37-3e5bd2159f19"/>
+              <gml:surfaceMember xlink:href="#ID_9a615326-51c3-4ff2-a5a5-c1f2a13f5642"/>
+              <gml:surfaceMember xlink:href="#ID_af0f16c5-f686-494f-aaf0-b7fd3459a767"/>
+              <gml:surfaceMember xlink:href="#ID_c2b4bb65-5e8d-4b77-92ea-9aaa0a24b0fe"/>
+              <gml:surfaceMember xlink:href="#ID_f0d8e331-f1d8-4c92-b05d-334d93e3c694"/>
+              <gml:surfaceMember xlink:href="#ID_96ff3f47-78f6-4a9b-ac22-f6e4f05c3f6d"/>
+              <gml:surfaceMember xlink:href="#ID_584ec268-6f37-4394-9e83-115970821a84"/>
+              <gml:surfaceMember xlink:href="#ID_021ab09c-28ee-45e7-a4c6-26747a67a48a"/>
+              <gml:surfaceMember xlink:href="#ID_d5c092b0-b269-4c13-b168-7caab0373dbe"/>
+              <gml:surfaceMember xlink:href="#ID_77584b9f-775b-442e-bf11-72d8a842a77e"/>
+              <gml:surfaceMember xlink:href="#ID_9d2572f2-b180-4a9f-aefd-87d5a6ff62a6"/>
+              <gml:surfaceMember xlink:href="#ID_44655efd-b060-45da-91b9-cb8109e8a65e"/>
+              <gml:surfaceMember xlink:href="#ID_3d2ac41c-b137-4200-b509-c2240a6c4f7e"/>
+              <gml:surfaceMember xlink:href="#ID_c8eb6dc3-4656-4c36-9960-5e7213f3addd"/>
+              <gml:surfaceMember xlink:href="#ID_cb5c7f22-29dd-42be-bcc9-144db70e0bbb"/>
+              <gml:surfaceMember xlink:href="#ID_850793b0-f9f7-416c-8e58-94e5ad752da1"/>
+              <gml:surfaceMember xlink:href="#ID_39b5b662-3079-464a-9449-81aa5813d340"/>
+              <gml:surfaceMember xlink:href="#ID_ce2303e9-6ad6-4d35-8a7c-4653457c581c"/>
+              <gml:surfaceMember xlink:href="#ID_dc47267f-41d1-460e-a169-3ba0663ce6a7"/>
+              <gml:surfaceMember xlink:href="#ID_c0df1678-761d-4abb-bf3e-86ea92f71881"/>
+              <gml:surfaceMember xlink:href="#ID_e4e2fcae-bc40-438d-b3cb-f6089bfc8e40"/>
+              <gml:surfaceMember xlink:href="#ID_3a69975d-f8cb-48ea-ac69-684cf41bc8c0"/>
+              <gml:surfaceMember xlink:href="#ID_eb376773-4784-403d-8616-9761d98e9539"/>
+              <gml:surfaceMember xlink:href="#ID_d9020c5d-6c98-4b91-9c7a-aa14b3726381"/>
+              <gml:surfaceMember xlink:href="#ID_e90d614d-f1fc-4401-a0cf-8b9258451700"/>
+              <gml:surfaceMember xlink:href="#ID_bfe594fc-3985-4e46-b4d6-a76630a44a36"/>
+              <gml:surfaceMember xlink:href="#ID_64f9504a-98ed-49fa-9a24-5d9fa21fa79e"/>
+              <gml:surfaceMember xlink:href="#ID_80936f46-cb54-47bd-acf5-ed032b5cad00"/>
+              <gml:surfaceMember xlink:href="#ID_26f1bf41-b104-4b39-a9b3-77267343aeaa"/>
+              <gml:surfaceMember xlink:href="#ID_127b5107-d8a2-4655-9e12-a611beabb9fb"/>
+              <gml:surfaceMember xlink:href="#ID_6eb844f8-1e53-4375-bcee-ce1877ecced8"/>
+              <gml:surfaceMember xlink:href="#ID_56702119-7adb-4f59-8d57-d06b8c23f717"/>
+              <gml:surfaceMember xlink:href="#ID_f40e242f-d552-4b4f-be45-c6864815f4d9"/>
+              <gml:surfaceMember xlink:href="#ID_3bd403a6-b631-4ccb-8cef-2f7e7ebe60af"/>
+              <gml:surfaceMember xlink:href="#ID_ca0f8d69-ccc9-4364-bdbf-e88301f5c707"/>
+              <gml:surfaceMember xlink:href="#ID_b3af55aa-0028-4600-97a0-86de22cc968b"/>
+              <gml:surfaceMember xlink:href="#ID_eb5db984-69fe-4e81-845f-fc69a5e6ca1c"/>
+              <gml:surfaceMember xlink:href="#ID_4b9926ef-510d-40b5-9369-1090530a332f"/>
+              <gml:surfaceMember xlink:href="#ID_42f865d7-f6b7-45d3-8e14-d834462bf3b7"/>
+              <gml:surfaceMember xlink:href="#ID_c34019c0-c0f6-4426-8653-cae58f9445a1"/>
+              <gml:surfaceMember xlink:href="#ID_74125c1c-0f51-4df5-93cc-10090b27ffc3"/>
+              <gml:surfaceMember xlink:href="#ID_791c6ff7-8ea3-44ae-b9de-3f8707c729a7"/>
+              <gml:surfaceMember xlink:href="#ID_b2bd384b-e476-406c-8141-85227235edb9"/>
+              <gml:surfaceMember xlink:href="#ID_fb80662a-4b80-4537-9cbc-ea6ae87a1211"/>
+              <gml:surfaceMember xlink:href="#ID_fd66a2bd-6455-450c-aa18-fbbf631bfef2"/>
+              <gml:surfaceMember xlink:href="#ID_22aff992-6ec6-4021-bb1f-2d746a6e2418"/>
+              <gml:surfaceMember xlink:href="#ID_c6d1cca5-ba7f-4162-83af-3b1e2f25e46b"/>
+              <gml:surfaceMember xlink:href="#ID_9dec0f3b-4b69-4fdc-862a-56d9986ca47c"/>
+              <gml:surfaceMember xlink:href="#ID_ffae505d-2a08-498a-a930-12c525bb58ae"/>
+              <gml:surfaceMember xlink:href="#ID_a8832aa7-e96c-4c71-acec-e1c0d8cf91f7"/>
+              <gml:surfaceMember xlink:href="#ID_2002f580-5f86-42e7-8fa9-92585122437c"/>
+              <gml:surfaceMember xlink:href="#ID_70a4f1a4-106b-487c-8fdb-fd65a3d6bc0b"/>
+              <gml:surfaceMember xlink:href="#ID_27efa9c8-1623-45ca-8108-93cdb5099c37"/>
+              <gml:surfaceMember xlink:href="#ID_6c69d22d-7d30-4aa1-9043-7589e96489e7"/>
+              <gml:surfaceMember xlink:href="#ID_9eea3b47-d64e-45c4-844a-9b24342e3a98"/>
+              <gml:surfaceMember xlink:href="#ID_0c58133c-cf89-4d29-8e97-7b9259921224"/>
+              <gml:surfaceMember xlink:href="#ID_f88e1d7a-297b-47cd-81c7-ae726800698a"/>
+              <gml:surfaceMember xlink:href="#ID_8fafa26e-0e51-44d0-a27d-c05489649002"/>
+              <gml:surfaceMember xlink:href="#ID_28981e17-a6db-4035-a674-88203ccf68a5"/>
+              <gml:surfaceMember xlink:href="#ID_63edfc2d-f0a3-421e-ab57-db0c48d62e43"/>
+              <gml:surfaceMember xlink:href="#ID_38800f4e-de4d-4d85-915c-2bae6fc70211"/>
+              <gml:surfaceMember xlink:href="#ID_d970d97f-8ec6-49aa-8651-309091f12826"/>
+              <gml:surfaceMember xlink:href="#ID_11f74158-133b-4498-9449-788f48753573"/>
+              <gml:surfaceMember xlink:href="#ID_5bef4396-8fe4-4944-8bd3-048dc16ea448"/>
+              <gml:surfaceMember xlink:href="#ID_570b63c3-ecad-4ce4-8e09-bc5400254723"/>
+              <gml:surfaceMember xlink:href="#ID_da0af807-14a1-4993-971c-9d07217b82fe"/>
+              <gml:surfaceMember xlink:href="#ID_343e18ab-238c-4754-8b7f-8c3a61818eb6"/>
+              <gml:surfaceMember xlink:href="#ID_97590c05-0039-4622-9acb-4a31b6e51e56"/>
+              <gml:surfaceMember xlink:href="#ID_24a78683-3756-42ad-8b38-aaa31d191158"/>
+              <gml:surfaceMember xlink:href="#ID_5476f219-cc22-4e17-bfb5-70e5590ed5d8"/>
+              <gml:surfaceMember xlink:href="#ID_2df3a6e5-5d9f-4a7c-918c-8d2b23c39155"/>
+              <gml:surfaceMember xlink:href="#ID_8d7b87ac-af55-46d2-abee-77663a72ef0b"/>
+              <gml:surfaceMember xlink:href="#ID_0e0e413c-e6be-45fa-8a18-4e5beb254196"/>
+              <gml:surfaceMember xlink:href="#ID_6fafed1e-4ece-4a8c-a6a1-3e79c3963e6c"/>
+              <gml:surfaceMember xlink:href="#ID_1e1c4be4-fdf4-453e-85c6-acec92d786bd"/>
+              <gml:surfaceMember xlink:href="#ID_61903974-0a5a-4a74-bad3-caa47be2e7fb"/>
+              <gml:surfaceMember xlink:href="#ID_cbc7429c-5984-4c7a-8a7c-6ef13f607018"/>
+              <gml:surfaceMember xlink:href="#ID_7fac24d7-c58d-48f3-82e9-47aec9dafda3"/>
+            </gml:CompositeSurface>
+          </gml:exterior>
+        </gml:Solid>
+      </bldg:lod2Solid>
+      <bldg:boundedBy>
+        <bldg:RoofSurface gml:id="ID_8da9391a-f482-4c0c-9756-ef157bd28ce9">
+          <gen:stringAttribute name="Index">
+            <gen:value>MR_P:137169_C:5454</gen:value>
+          </gen:stringAttribute>
+          <gen:stringAttribute name="Type">
+            <gen:value>MainRoof</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>18.36</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_5fd8efea-c4d0-4b3e-813a-91e9c532fc9c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_5fd8efea-c4d0-4b3e-813a-91e9c532fc9c_E_1_1">
+                      <gml:posList srsDimension="3">770450.089679044210000000 6279499.686137118400000000 64.421208409613556000 770445.176664570810000000 6279500.150118627600000000 64.421208409613556000 770446.029012106360000000 6279509.175469202900000000 64.421208409613570000 770445.236356319160000000 6279509.250129923200000000 64.421208409613556000 770444.314419571310000000 6279499.462138447900000000 64.421208409613556000 770450.704579123300000000 6279498.860245511900000000 64.421208409613556000 770451.626515871380000000 6279508.648236988100000000 64.421208409613556000 770450.942140943370000000 6279508.712698671000000000 64.421208409613556000 770450.089679044210000000 6279499.686137118400000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:RoofSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:RoofSurface gml:id="ID_470b70fd-8b11-4711-9717-0f946c951f2b">
+          <gen:stringAttribute name="Index">
+            <gen:value>MR_P:137169_C:57754</gen:value>
+          </gen:stringAttribute>
+          <gen:stringAttribute name="Type">
+            <gen:value>MainRoof</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.63</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_6559554d-607e-4660-9388-9a06e8a6a6be" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_6559554d-607e-4660-9388-9a06e8a6a6be_E_1_1">
+                      <gml:posList srsDimension="3">770451.649553134570000000 6279517.711006602300000000 64.421208409613556000 770446.905966217160000000 6279518.157807880100000000 64.421208409613556000 770446.893709710330000000 6279518.027683354000000000 64.421208409613556000 770451.637186498850000000 6279517.579712859400000000 64.421208409613570000 770451.649553134570000000 6279517.711006602300000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:RoofSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:RoofSurface gml:id="ID_55019fe4-5768-4ca6-b3b6-e138052c43f5">
+          <gen:stringAttribute name="Index">
+            <gen:value>MR_P:137169_C:7147714</gen:value>
+          </gen:stringAttribute>
+          <gen:stringAttribute name="Type">
+            <gen:value>MainRoof</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>18.59</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_1799e42c-1369-425e-88a2-a5a9dddcc7e5" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_1799e42c-1369-425e-88a2-a5a9dddcc7e5_E_1_1">
+                      <gml:posList srsDimension="3">770451.778276951980000000 6279517.566388379800000000 64.421208409613556000 770450.942140943370000000 6279508.712698671000000000 64.421208409613556000 770451.626515871380000000 6279508.648236988100000000 64.421208409613556000 770452.548452619000000000 6279518.436228464400000000 64.421208409613570000 770446.158293067010000000 6279519.038121398500000000 64.421208409613556000 770445.236356319160000000 6279509.250129923200000000 64.421208409613556000 770446.029012106360000000 6279509.175469202900000000 64.421208409613570000 770446.865262478820000000 6279518.030369890900000000 64.421208409613556000 770446.893709710330000000 6279518.027683354000000000 64.421208409613556000 770446.905966217160000000 6279518.157807880100000000 64.421208409613556000 770451.649553134570000000 6279517.711006602300000000 64.421208409613556000 770451.637186498850000000 6279517.579712859400000000 64.421208409613570000 770451.778276951980000000 6279517.566388379800000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:RoofSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_095833e7-4077-495a-844a-62ebac4db66b">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>33.15</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_aef30298-1943-4bb4-8e83-9a4a48c210e8" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_aef30298-1943-4bb4-8e83-9a4a48c210e8_E_1_1">
+                      <gml:posList srsDimension="3">770450.640406941060000000 6279505.517693067900000000 51.280000000000001000 770445.727278104280000000 6279505.980463600700000000 51.280000000000001000 770445.727278104280000000 6279505.980463602600000000 57.997694784015991000 770450.640406941060000000 6279505.517693067900000000 57.997694784015991000 770450.640406941060000000 6279505.517693067900000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_864e49f6-d31c-4e0b-8303-493d5fe4762a">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>33.15</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>185.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_7d863e8b-290f-47ca-a396-949cfa4467ee" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_7d863e8b-290f-47ca-a396-949cfa4467ee_E_1_1">
+                      <gml:posList srsDimension="3">770451.243874944980000000 6279511.907704263000000000 57.997694784016005000 770446.330746107970000000 6279512.370474797700000000 57.997694784015991000 770446.330746108200000000 6279512.370474797700000000 51.280000000000001000 770451.243874944750000000 6279511.907704263000000000 51.280000000000001000 770451.243874944980000000 6279511.907704263000000000 57.997694784016005000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_8f28da3f-de5f-4b43-8b45-5f617a3221b8">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>62.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>185.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_ae635052-c29a-4aae-8bd0-f85f2007a4e0" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_ae635052-c29a-4aae-8bd0-f85f2007a4e0_E_1_1">
+                      <gml:posList srsDimension="3">770450.089679043970000000 6279499.686137118400000000 63.921208409613556000 770445.176664570810000000 6279500.150118627600000000 63.921208409613556000 770445.176664570810000000 6279500.150118627600000000 51.280000000000001000 770450.089679043970000000 6279499.686137118400000000 51.280000000000001000 770450.089679043970000000 6279499.686137118400000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_183a6f98-fac2-4f18-bbea-40f63eec15fe">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>20.45</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>185.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f1cd9994-6ace-410c-9379-64bea94d238c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f1cd9994-6ace-410c-9379-64bea94d238c_E_1_1">
+                      <gml:posList srsDimension="3">770450.089679044210000000 6279499.686137117400000000 68.565208409613760000 770445.176664570810000000 6279500.150118626700000000 68.565208409613760000 770445.176664570810000000 6279500.150118627600000000 64.421208409613556000 770450.089679044210000000 6279499.686137118400000000 64.421208409613556000 770450.089679044210000000 6279499.686137117400000000 68.565208409613760000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_7d621682-5abe-4f80-90f3-3a6448c18704">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>74.43</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_4c32a782-352f-4084-af58-8cdc6ff3e94c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_4c32a782-352f-4084-af58-8cdc6ff3e94c_E_1_1">
+                      <gml:posList srsDimension="3">770446.865262478820000000 6279518.030369890900000000 64.421208409613556000 770446.029012106360000000 6279509.175469202900000000 64.421208409613570000 770445.176664570810000000 6279500.150118627600000000 64.421208409613556000 770445.176664570810000000 6279500.150118626700000000 68.565208409613760000 770446.865262478820000000 6279518.030369890900000000 68.565208409613760000 770446.865262478820000000 6279518.030369890900000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_6535400a-2b90-4ca2-8595-29f317bfc2a2">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>168.45</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_31f0f970-6fe7-4b2f-a9ff-94e374eeec97" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_31f0f970-6fe7-4b2f-a9ff-94e374eeec97_E_1_1">
+                      <gml:posList srsDimension="3">770446.075269688390000000 6279509.665282192600000000 61.066399298653415000 770446.029012106360000000 6279509.175469199200000000 61.104315923403334000 770445.982754523870000000 6279508.685656207600000000 61.066399298653415000 770445.937589421870000000 6279508.207411288300000000 60.953544913712619000 770445.894583479500000000 6279507.752029309000000000 60.768418087444083000 770445.854752381800000000 6279507.330265176500000000 60.515391020559335000 770445.819036833240000000 6279506.952079827900000000 60.200439535926172000 770445.788280338750000000 6279506.626404992300000000 59.831001945608620000 770445.763209285210000000 6279506.360932239300000000 59.415803377821732000 770445.744415783790000000 6279506.161931324800000000 58.964649712729326000 770445.732343686510000000 6279506.034102116700000000 58.488195993769850000 770445.727278104280000000 6279505.980463602600000000 57.997694784015991000 770445.727278104280000000 6279505.980463600700000000 51.280000000000001000 770445.176664570810000000 6279500.150118627600000000 51.280000000000001000 770445.176664570810000000 6279500.150118627600000000 63.921208409613556000 770446.029012106360000000 6279509.175469202900000000 63.921208409613556000 770446.865262478590000000 6279518.030369891800000000 63.921208409613556000 770446.865262478820000000 6279518.030369890900000000 51.280000000000001000 770446.330746108200000000 6279512.370474797700000000 51.280000000000001000 770446.330746107970000000 6279512.370474797700000000 57.997694784015991000 770446.325680525740000000 6279512.316836283500000000 58.488195993769850000 770446.313608428460000000 6279512.189007076400000000 58.964649712729326000 770446.294814927040000000 6279511.990006160900000000 59.415803377821732000 770446.269743873270000000 6279511.724533407900000000 59.831001945608620000 770446.238987379240000000 6279511.398858572400000000 60.200439535926179000 770446.203271830450000000 6279511.020673224700000000 60.515391020559335000 770446.163440732750000000 6279510.598909090300000000 60.768418087444083000 770446.120434790380000000 6279510.143527111000000000 60.953544913712619000 770446.075269688390000000 6279509.665282192600000000 61.066399298653415000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_c5963e71-e606-4560-ab3a-df354946f53a">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>168.45</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_fd02575d-4674-46e1-8f3a-c95c5f370fb8" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_fd02575d-4674-46e1-8f3a-c95c5f370fb8_E_1_1">
+                      <gml:posList srsDimension="3">770451.033563627400000000 6279509.680756577300000000 60.953544913712634000 770451.076569569760000000 6279510.136138555600000000 60.768418087444090000 770451.116400667470000000 6279510.557902690000000000 60.515391020559335000 770451.152116216250000000 6279510.936088037700000000 60.200439535926179000 770451.182872710750000000 6279511.261762873300000000 59.831001945608620000 770451.207943764050000000 6279511.527235626200000000 59.415803377821746000 770451.226737265480000000 6279511.726236541800000000 58.964649712729326000 770451.238809362990000000 6279511.854065747900000000 58.488195993769850000 770451.243874944980000000 6279511.907704263000000000 57.997694784016005000 770451.243874944750000000 6279511.907704263000000000 51.280000000000001000 770451.778276951750000000 6279517.566388379800000000 51.280000000000001000 770451.778276951980000000 6279517.566388379800000000 63.921208409613556000 770450.942140943840000000 6279508.712698671000000000 63.921208409613556000 770450.089679043970000000 6279499.686137118400000000 63.921208409613556000 770450.089679043970000000 6279499.686137118400000000 51.280000000000001000 770450.640406941060000000 6279505.517693067900000000 51.280000000000001000 770450.640406941060000000 6279505.517693067900000000 57.997694784015991000 770450.645472523290000000 6279505.571331582000000000 58.488195993769850000 770450.657544620800000000 6279505.699160789100000000 58.964649712729326000 770450.676338122230000000 6279505.898161704700000000 59.415803377821732000 770450.701409175530000000 6279506.163634457600000000 59.831001945608620000 770450.732165670020000000 6279506.489309293200000000 60.200439535926179000 770450.767881218810000000 6279506.867494641800000000 60.515391020559335000 770450.807712316510000000 6279507.289258775300000000 60.768418087444090000 770450.850718259110000000 6279507.744640754500000000 60.953544913712634000 770450.895883360640000000 6279508.222885672900000000 61.066399298653437000 770450.942140943140000000 6279508.712698665400000000 61.104315923403334000 770450.988398525400000000 6279509.202511658000000000 61.066399298653437000 770451.033563627400000000 6279509.680756577300000000 60.953544913712634000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_88b1c50e-3f33-4aca-8732-7f6b834413e3">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>74.43</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f22a4eed-e029-4639-9cf9-155a294f23f6" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f22a4eed-e029-4639-9cf9-155a294f23f6_E_1_1">
+                      <gml:posList srsDimension="3">770451.778276951980000000 6279517.566388379800000000 64.421208409613556000 770451.778276951980000000 6279517.566388379800000000 68.565208409613760000 770450.089679044210000000 6279499.686137117400000000 68.565208409613760000 770450.089679044210000000 6279499.686137118400000000 64.421208409613556000 770450.942140943370000000 6279508.712698671000000000 64.421208409613556000 770451.778276951980000000 6279517.566388379800000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_bb28a0ba-dfdf-441f-a0c3-c6e6a7b98478">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.36</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_22e42e22-28aa-4521-9e37-3e5bd2159f19" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_22e42e22-28aa-4521-9e37-3e5bd2159f19_E_1_1">
+                      <gml:posList srsDimension="3">770446.893709710330000000 6279518.027683355800000000 51.280000000000001000 770446.865262478820000000 6279518.030369890900000000 51.280000000000001000 770446.865262478590000000 6279518.030369891800000000 63.921208409613556000 770446.893709710570000000 6279518.027683354000000000 63.921208409613556000 770446.893709710330000000 6279518.027683355800000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_c36ed48f-2adb-4743-aaca-284557f128d1">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>1.79</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_9a615326-51c3-4ff2-a5a5-c1f2a13f5642" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_9a615326-51c3-4ff2-a5a5-c1f2a13f5642_E_1_1">
+                      <gml:posList srsDimension="3">770451.778276951750000000 6279517.566388379800000000 51.280000000000001000 770451.637186498850000000 6279517.579712859400000000 51.280000000000001000 770451.637186498850000000 6279517.579712859400000000 63.921208409613548000 770451.778276951980000000 6279517.566388379800000000 63.921208409613556000 770451.778276951750000000 6279517.566388379800000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_9b5c938c-7a52-45c9-a835-d414de320af2">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>20.45</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_af0f16c5-f686-494f-aaf0-b7fd3459a767" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_af0f16c5-f686-494f-aaf0-b7fd3459a767_E_1_1">
+                      <gml:posList srsDimension="3">770451.637186498850000000 6279517.579712859400000000 64.421208409613570000 770446.893709710330000000 6279518.027683354000000000 64.421208409613556000 770446.865262478820000000 6279518.030369890900000000 64.421208409613556000 770446.865262478820000000 6279518.030369890900000000 68.565208409613760000 770451.778276951980000000 6279517.566388379800000000 68.565208409613760000 770451.778276951980000000 6279517.566388379800000000 64.421208409613556000 770451.637186498850000000 6279517.579712859400000000 64.421208409613570000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_9c6dd34a-8b65-4a06-ab37-e5f82cd40b97">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>1.67</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_c2b4bb65-5e8d-4b77-92ea-9aaa0a24b0fe" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_c2b4bb65-5e8d-4b77-92ea-9aaa0a24b0fe_E_1_1">
+                      <gml:posList srsDimension="3">770451.649553134570000000 6279517.711006602300000000 63.921208409613556000 770451.637186498850000000 6279517.579712859400000000 63.921208409613548000 770451.637186498850000000 6279517.579712859400000000 51.280000000000001000 770451.649553134570000000 6279517.711006602300000000 51.280000000000001000 770451.649553134570000000 6279517.711006602300000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_67ad8330-e3f7-414f-96d6-dd62d1a7630b">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>60.23</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f0d8e331-f1d8-4c92-b05d-334d93e3c694" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f0d8e331-f1d8-4c92-b05d-334d93e3c694_E_1_1">
+                      <gml:posList srsDimension="3">770451.649553134570000000 6279517.711006602300000000 51.280000000000001000 770446.905966217160000000 6279518.157807880100000000 51.280000000000001000 770446.905966217160000000 6279518.157807880100000000 63.921208409613556000 770451.649553134570000000 6279517.711006602300000000 63.921208409613556000 770451.649553134570000000 6279517.711006602300000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_7576b330-1976-44ca-b2f4-76ab89f1ba77">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>1.65</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_96ff3f47-78f6-4a9b-ac22-f6e4f05c3f6d" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_96ff3f47-78f6-4a9b-ac22-f6e4f05c3f6d_E_1_1">
+                      <gml:posList srsDimension="3">770446.905966217160000000 6279518.157807880100000000 51.280000000000001000 770446.893709710330000000 6279518.027683355800000000 51.280000000000001000 770446.893709710570000000 6279518.027683354000000000 63.921208409613556000 770446.905966217160000000 6279518.157807880100000000 63.921208409613556000 770446.905966217160000000 6279518.157807880100000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_3723b147-a942-44d4-82d2-7835cb0cd893">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.49</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_584ec268-6f37-4394-9e83-115970821a84" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_584ec268-6f37-4394-9e83-115970821a84_E_1_1">
+                      <gml:posList srsDimension="3">770449.143428444860000000 6279500.823366642000000000 67.714208409613605000 770446.229448996720000000 6279501.098560739300000000 67.714208409613605000 770446.229448996720000000 6279501.098560739300000000 68.565208409613760000 770449.143428444860000000 6279500.823366642000000000 68.565208409613760000 770449.143428444860000000 6279500.823366642000000000 67.714208409613605000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_68c12dd8-7300-4c73-ae12-8de623ffb921">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>13.60</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_021ab09c-28ee-45e7-a4c6-26747a67a48a" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_021ab09c-28ee-45e7-a4c6-26747a67a48a_E_1_1">
+                      <gml:posList srsDimension="3">770447.732086778850000000 6279517.009714590400000000 68.565208409613760000 770446.229448996720000000 6279501.098560739300000000 68.565208409613760000 770446.229448996720000000 6279501.098560739300000000 67.714208409613605000 770447.732086778850000000 6279517.009714590400000000 67.714208409613605000 770447.732086778850000000 6279517.009714590400000000 68.565208409613760000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_3bdd9926-84a7-4eaf-af38-15baa4e92de6">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.49</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>185.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_d5c092b0-b269-4c13-b168-7caab0373dbe" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_d5c092b0-b269-4c13-b168-7caab0373dbe_E_1_1">
+                      <gml:posList srsDimension="3">770450.646066227000000000 6279516.734520494900000000 68.565208409613760000 770447.732086778850000000 6279517.009714590400000000 68.565208409613760000 770447.732086778850000000 6279517.009714590400000000 67.714208409613605000 770450.646066227000000000 6279516.734520494900000000 67.714208409613605000 770450.646066227000000000 6279516.734520494900000000 68.565208409613760000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_08b6ba19-6443-4513-b00d-c761b8a73f8f">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>13.60</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.39</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_77584b9f-775b-442e-bf11-72d8a842a77e" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_77584b9f-775b-442e-bf11-72d8a842a77e_E_1_1">
+                      <gml:posList srsDimension="3">770450.646066227000000000 6279516.734520494900000000 67.714208409613605000 770449.143428444860000000 6279500.823366642000000000 67.714208409613605000 770449.143428444860000000 6279500.823366642000000000 68.565208409613760000 770450.646066227000000000 6279516.734520494900000000 68.565208409613760000 770450.646066227000000000 6279516.734520494900000000 67.714208409613605000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_440f6c7e-8aa8-4050-b7f5-b8e42f60ab15">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>4.92</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_9d2572f2-b180-4a9f-aefd-87d5a6ff62a6" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_9d2572f2-b180-4a9f-aefd-87d5a6ff62a6_E_1_1">
+                      <gml:posList srsDimension="3">770445.236356319160000000 6279509.250129923200000000 63.921208409613556000 770444.314419571310000000 6279499.462138447900000000 63.921208409613556000 770444.314419571310000000 6279499.462138447900000000 64.421208409613556000 770445.236356319160000000 6279509.250129923200000000 64.421208409613556000 770445.236356319160000000 6279509.250129923200000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_24f1bf62-ea3a-4df0-9e85-ff6d08267b04">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>3.21</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>185.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_44655efd-b060-45da-91b9-cb8109e8a65e" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_44655efd-b060-45da-91b9-cb8109e8a65e_E_1_1">
+                      <gml:posList srsDimension="3">770450.704579123300000000 6279498.860245511900000000 64.421208409613556000 770444.314419571310000000 6279499.462138447900000000 64.421208409613556000 770444.314419571310000000 6279499.462138447900000000 63.921208409613556000 770450.704579123300000000 6279498.860245511900000000 63.921208409613556000 770450.704579123300000000 6279498.860245511900000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_8d9ed650-945c-4332-a801-23dca46c1e14">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>4.92</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_3d2ac41c-b137-4200-b509-c2240a6c4f7e" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_3d2ac41c-b137-4200-b509-c2240a6c4f7e_E_1_1">
+                      <gml:posList srsDimension="3">770451.626515871380000000 6279508.648236988100000000 64.421208409613556000 770450.704579123300000000 6279498.860245511900000000 64.421208409613556000 770450.704579123300000000 6279498.860245511900000000 63.921208409613556000 770451.626515871380000000 6279508.648236988100000000 63.921208409613556000 770451.626515871380000000 6279508.648236988100000000 64.421208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_43fa22cc-8e44-4690-a3d6-acf83fbc765f">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>4.92</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>95.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_c8eb6dc3-4656-4c36-9960-5e7213f3addd" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_c8eb6dc3-4656-4c36-9960-5e7213f3addd_E_1_1">
+                      <gml:posList srsDimension="3">770452.548452619000000000 6279518.436228464400000000 64.421208409613570000 770451.626515871380000000 6279508.648236988100000000 64.421208409613556000 770451.626515871380000000 6279508.648236988100000000 63.921208409613556000 770452.548452619000000000 6279518.436228464400000000 63.921208409613570000 770452.548452619000000000 6279518.436228464400000000 64.421208409613570000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_cdc89fd3-6c9d-4f03-96d4-c9c8d19e6883">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>3.21</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>5.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_cb5c7f22-29dd-42be-bcc9-144db70e0bbb" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_cb5c7f22-29dd-42be-bcc9-144db70e0bbb_E_1_1">
+                      <gml:posList srsDimension="3">770452.548452619000000000 6279518.436228464400000000 63.921208409613570000 770446.158293067010000000 6279519.038121398500000000 63.921208409613556000 770446.158293067010000000 6279519.038121398500000000 64.421208409613556000 770452.548452619000000000 6279518.436228464400000000 64.421208409613570000 770452.548452619000000000 6279518.436228464400000000 63.921208409613570000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_843ce565-22a9-4f78-908a-71d41ba0c20a">
+          <gen:stringAttribute name="Type">
+            <gen:value>MainWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>4.92</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>275.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_850793b0-f9f7-416c-8e58-94e5ad752da1" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_850793b0-f9f7-416c-8e58-94e5ad752da1_E_1_1">
+                      <gml:posList srsDimension="3">770446.158293067010000000 6279519.038121398500000000 63.921208409613556000 770445.236356319160000000 6279509.250129923200000000 63.921208409613556000 770445.236356319160000000 6279509.250129923200000000 64.421208409613556000 770446.158293067010000000 6279519.038121398500000000 64.421208409613556000 770446.158293067010000000 6279519.038121398500000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterFloorSurface gml:id="ID_31c8564a-ebba-4f47-8151-6ab1b182ca71">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterFloor</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>46.78</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_39b5b662-3079-464a-9449-81aa5813d340" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_39b5b662-3079-464a-9449-81aa5813d340_E_1_1">
+                      <gml:posList srsDimension="3">770450.646066227000000000 6279516.734520494900000000 67.714208409613605000 770447.732086778850000000 6279517.009714590400000000 67.714208409613605000 770446.229448996720000000 6279501.098560739300000000 67.714208409613605000 770449.143428444860000000 6279500.823366642000000000 67.714208409613605000 770450.646066227000000000 6279516.734520494900000000 67.714208409613605000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterFloorSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_905fdc1b-0d10-471a-aff1-58371bbc99f6">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_ce2303e9-6ad6-4d35-8a7c-4653457c581c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_ce2303e9-6ad6-4d35-8a7c-4653457c581c_E_1_1">
+                      <gml:posList srsDimension="3">770450.640406941060000000 6279505.517693067900000000 57.997694784015991000 770445.727278104280000000 6279505.980463602600000000 57.997694784015991000 770445.732343686510000000 6279506.034102116700000000 58.488195993769850000 770450.645472523290000000 6279505.571331582000000000 58.488195993769850000 770450.640406941060000000 6279505.517693067900000000 57.997694784015991000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_df7ffdf2-221f-4801-8a89-c57ef0bbcec3">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_dc47267f-41d1-460e-a169-3ba0663ce6a7" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_dc47267f-41d1-460e-a169-3ba0663ce6a7_E_1_1">
+                      <gml:posList srsDimension="3">770450.645472523290000000 6279505.571331582000000000 58.488195993769850000 770445.732343686510000000 6279506.034102116700000000 58.488195993769850000 770445.744415783790000000 6279506.161931324800000000 58.964649712729326000 770450.657544620800000000 6279505.699160789100000000 58.964649712729326000 770450.645472523290000000 6279505.571331582000000000 58.488195993769850000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_1c18746b-fb9e-4167-bd40-981e9db845bd">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_c0df1678-761d-4abb-bf3e-86ea92f71881" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_c0df1678-761d-4abb-bf3e-86ea92f71881_E_1_1">
+                      <gml:posList srsDimension="3">770450.657544620800000000 6279505.699160789100000000 58.964649712729326000 770445.744415783790000000 6279506.161931324800000000 58.964649712729326000 770445.763209285210000000 6279506.360932239300000000 59.415803377821732000 770450.676338122230000000 6279505.898161704700000000 59.415803377821732000 770450.657544620800000000 6279505.699160789100000000 58.964649712729326000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_fc7d4a3a-78d3-4cbf-a66e-174fff3d86ae">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_e4e2fcae-bc40-438d-b3cb-f6089bfc8e40" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_e4e2fcae-bc40-438d-b3cb-f6089bfc8e40_E_1_1">
+                      <gml:posList srsDimension="3">770450.676338122230000000 6279505.898161704700000000 59.415803377821732000 770445.763209285210000000 6279506.360932239300000000 59.415803377821732000 770445.788280338750000000 6279506.626404992300000000 59.831001945608620000 770450.701409175530000000 6279506.163634457600000000 59.831001945608620000 770450.676338122230000000 6279505.898161704700000000 59.415803377821732000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_e3f26e38-b925-4463-bdd2-39b71bbd5df7">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_3a69975d-f8cb-48ea-ac69-684cf41bc8c0" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_3a69975d-f8cb-48ea-ac69-684cf41bc8c0_E_1_1">
+                      <gml:posList srsDimension="3">770450.701409175530000000 6279506.163634457600000000 59.831001945608620000 770445.788280338750000000 6279506.626404992300000000 59.831001945608620000 770445.819036833240000000 6279506.952079827900000000 60.200439535926172000 770450.732165670020000000 6279506.489309293200000000 60.200439535926179000 770450.701409175530000000 6279506.163634457600000000 59.831001945608620000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:RoofSurface gml:id="ID_28a478a9-bd9b-4bff-8ef4-cef6f109810e">
+          <gen:stringAttribute name="Index">
+            <gen:value>MR_P:137169_C:3</gen:value>
+          </gen:stringAttribute>
+          <gen:stringAttribute name="Type">
+            <gen:value>MainRoof</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>41.85</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f178dcb6-bd50-4752-aed0-fa07e4896d9e" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f178dcb6-bd50-4752-aed0-fa07e4896d9e_E_1_2">
+                      <gml:posList srsDimension="3">770451.778276951980000000 6279517.566388379800000000 68.565208409613760000 770446.865262478820000000 6279518.030369890900000000 68.565208409613760000 770445.176664570810000000 6279500.150118626700000000 68.565208409613760000 770450.089679044210000000 6279499.686137117400000000 68.565208409613760000 770451.778276951980000000 6279517.566388379800000000 68.565208409613760000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                  <gml:interior>
+                    <gml:LinearRing gml:id="ID_f178dcb6-bd50-4752-aed0-fa07e4896d9e_I_2_2">
+                      <gml:posList srsDimension="3">770449.143428444860000000 6279500.823366642000000000 68.565208409613760000 770446.229448996720000000 6279501.098560739300000000 68.565208409613760000 770447.732086778850000000 6279517.009714590400000000 68.565208409613760000 770450.646066227000000000 6279516.734520494900000000 68.565208409613760000 770449.143428444860000000 6279500.823366642000000000 68.565208409613760000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:interior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:RoofSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_3bd01db8-7c2d-47da-94e2-84fa5d510a34">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_d9020c5d-6c98-4b91-9c7a-aa14b3726381" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_d9020c5d-6c98-4b91-9c7a-aa14b3726381_E_1_1">
+                      <gml:posList srsDimension="3">770450.850718259110000000 6279507.744640754500000000 60.953544913712634000 770445.937589421870000000 6279508.207411288300000000 60.953544913712619000 770445.982754523870000000 6279508.685656207600000000 61.066399298653415000 770450.895883360640000000 6279508.222885672900000000 61.066399298653437000 770450.850718259110000000 6279507.744640754500000000 60.953544913712634000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_c4d28a1c-3e27-46a0-be11-f53c68e4c6cf">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_e90d614d-f1fc-4401-a0cf-8b9258451700" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_e90d614d-f1fc-4401-a0cf-8b9258451700_E_1_1">
+                      <gml:posList srsDimension="3">770450.895883360640000000 6279508.222885672900000000 61.066399298653437000 770445.982754523870000000 6279508.685656207600000000 61.066399298653415000 770446.029012106360000000 6279509.175469199200000000 61.104315923403334000 770450.942140943140000000 6279508.712698665400000000 61.104315923403334000 770450.895883360640000000 6279508.222885672900000000 61.066399298653437000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_e6ff8ef8-8877-4ede-8bea-c58888b86a0d">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_bfe594fc-3985-4e46-b4d6-a76630a44a36" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_bfe594fc-3985-4e46-b4d6-a76630a44a36_E_1_1">
+                      <gml:posList srsDimension="3">770450.942140943140000000 6279508.712698665400000000 61.104315923403334000 770446.029012106360000000 6279509.175469199200000000 61.104315923403334000 770446.075269688390000000 6279509.665282192600000000 61.066399298653415000 770450.988398525400000000 6279509.202511658000000000 61.066399298653437000 770450.942140943140000000 6279508.712698665400000000 61.104315923403334000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_54535f79-d707-4fac-b1d8-e896ceca9f85">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_64f9504a-98ed-49fa-9a24-5d9fa21fa79e" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_64f9504a-98ed-49fa-9a24-5d9fa21fa79e_E_1_1">
+                      <gml:posList srsDimension="3">770450.988398525400000000 6279509.202511658000000000 61.066399298653437000 770446.075269688390000000 6279509.665282192600000000 61.066399298653415000 770446.120434790380000000 6279510.143527111000000000 60.953544913712619000 770451.033563627400000000 6279509.680756577300000000 60.953544913712634000 770450.988398525400000000 6279509.202511658000000000 61.066399298653437000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_8338e12b-e471-464e-9184-5fcde7674c5e">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_80936f46-cb54-47bd-acf5-ed032b5cad00" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_80936f46-cb54-47bd-acf5-ed032b5cad00_E_1_1">
+                      <gml:posList srsDimension="3">770451.033563627400000000 6279509.680756577300000000 60.953544913712634000 770446.120434790380000000 6279510.143527111000000000 60.953544913712619000 770446.163440732750000000 6279510.598909090300000000 60.768418087444083000 770451.076569569760000000 6279510.136138555600000000 60.768418087444090000 770451.033563627400000000 6279509.680756577300000000 60.953544913712634000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_9631fb75-b06d-4105-8c47-2ffb5417c9e4">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_26f1bf41-b104-4b39-a9b3-77267343aeaa" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_26f1bf41-b104-4b39-a9b3-77267343aeaa_E_1_1">
+                      <gml:posList srsDimension="3">770451.076569569760000000 6279510.136138555600000000 60.768418087444090000 770446.163440732750000000 6279510.598909090300000000 60.768418087444083000 770446.203271830450000000 6279511.020673224700000000 60.515391020559335000 770451.116400667470000000 6279510.557902690000000000 60.515391020559335000 770451.076569569760000000 6279510.136138555600000000 60.768418087444090000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_18901eb0-5719-4407-8fdb-3df96a1745c2">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_127b5107-d8a2-4655-9e12-a611beabb9fb" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_127b5107-d8a2-4655-9e12-a611beabb9fb_E_1_1">
+                      <gml:posList srsDimension="3">770451.116400667470000000 6279510.557902690000000000 60.515391020559335000 770446.203271830450000000 6279511.020673224700000000 60.515391020559335000 770446.238987379240000000 6279511.398858572400000000 60.200439535926179000 770451.152116216250000000 6279510.936088037700000000 60.200439535926179000 770451.116400667470000000 6279510.557902690000000000 60.515391020559335000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_56a64482-c262-40fa-8bf3-04b15d1ffeb4">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_6eb844f8-1e53-4375-bcee-ce1877ecced8" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_6eb844f8-1e53-4375-bcee-ce1877ecced8_E_1_1">
+                      <gml:posList srsDimension="3">770451.152116216250000000 6279510.936088037700000000 60.200439535926179000 770446.238987379240000000 6279511.398858572400000000 60.200439535926179000 770446.269743873270000000 6279511.724533407900000000 59.831001945608620000 770451.182872710750000000 6279511.261762873300000000 59.831001945608620000 770451.152116216250000000 6279510.936088037700000000 60.200439535926179000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_f7b6c29d-8ecb-4c67-b726-00e94a96fb84">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_56702119-7adb-4f59-8d57-d06b8c23f717" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_56702119-7adb-4f59-8d57-d06b8c23f717_E_1_1">
+                      <gml:posList srsDimension="3">770451.182872710750000000 6279511.261762873300000000 59.831001945608620000 770446.269743873270000000 6279511.724533407900000000 59.831001945608620000 770446.294814927040000000 6279511.990006160900000000 59.415803377821732000 770451.207943764050000000 6279511.527235626200000000 59.415803377821746000 770451.182872710750000000 6279511.261762873300000000 59.831001945608620000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_cd2c3933-73ab-47b3-b37e-5dacfa3b6c16">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f40e242f-d552-4b4f-be45-c6864815f4d9" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f40e242f-d552-4b4f-be45-c6864815f4d9_E_1_1">
+                      <gml:posList srsDimension="3">770451.207943764050000000 6279511.527235626200000000 59.415803377821746000 770446.294814927040000000 6279511.990006160900000000 59.415803377821732000 770446.313608428460000000 6279512.189007076400000000 58.964649712729326000 770451.226737265480000000 6279511.726236541800000000 58.964649712729326000 770451.207943764050000000 6279511.527235626200000000 59.415803377821746000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_fc95d554-5bc4-457d-a21b-bc0dd5945aff">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_3bd403a6-b631-4ccb-8cef-2f7e7ebe60af" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_3bd403a6-b631-4ccb-8cef-2f7e7ebe60af_E_1_1">
+                      <gml:posList srsDimension="3">770451.226737265480000000 6279511.726236541800000000 58.964649712729326000 770446.313608428460000000 6279512.189007076400000000 58.964649712729326000 770446.325680525740000000 6279512.316836283500000000 58.488195993769850000 770451.238809362990000000 6279511.854065747900000000 58.488195993769850000 770451.226737265480000000 6279511.726236541800000000 58.964649712729326000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_07b60d50-cef3-4510-a372-a2c7bc583423">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_ca0f8d69-ccc9-4364-bdbf-e88301f5c707" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_ca0f8d69-ccc9-4364-bdbf-e88301f5c707_E_1_1">
+                      <gml:posList srsDimension="3">770450.767881218810000000 6279506.867494641800000000 60.515391020559335000 770445.854752381800000000 6279507.330265176500000000 60.515391020559335000 770445.894583479500000000 6279507.752029309000000000 60.768418087444083000 770450.807712316510000000 6279507.289258775300000000 60.768418087444090000 770450.767881218810000000 6279506.867494641800000000 60.515391020559335000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_48dafcf2-5030-4cab-90c5-d4bc4fadbbf1">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_b3af55aa-0028-4600-97a0-86de22cc968b" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_b3af55aa-0028-4600-97a0-86de22cc968b_E_1_1">
+                      <gml:posList srsDimension="3">770450.807712316510000000 6279507.289258775300000000 60.768418087444090000 770445.894583479500000000 6279507.752029309000000000 60.768418087444083000 770445.937589421870000000 6279508.207411288300000000 60.953544913712619000 770450.850718259110000000 6279507.744640754500000000 60.953544913712634000 770450.807712316510000000 6279507.289258775300000000 60.768418087444090000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_1a262819-8f95-4648-a77f-d4744dc862f4">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_eb5db984-69fe-4e81-845f-fc69a5e6ca1c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_eb5db984-69fe-4e81-845f-fc69a5e6ca1c_E_1_1">
+                      <gml:posList srsDimension="3">770451.238809362990000000 6279511.854065747900000000 58.488195993769850000 770446.325680525740000000 6279512.316836283500000000 58.488195993769850000 770446.330746107970000000 6279512.370474797700000000 57.997694784015991000 770451.243874944980000000 6279511.907704263000000000 57.997694784016005000 770451.238809362990000000 6279511.854065747900000000 58.488195993769850000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_506d257a-0be5-4a66-85d1-4c4b27990cc6">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>36.95</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_4b9926ef-510d-40b5-9369-1090530a332f" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_4b9926ef-510d-40b5-9369-1090530a332f_E_1_2">
+                      <gml:posList srsDimension="3">770451.626515871380000000 6279508.648236988100000000 63.921208409613556000 770450.704579123300000000 6279498.860245511900000000 63.921208409613556000 770444.314419571310000000 6279499.462138447900000000 63.921208409613556000 770445.236356319160000000 6279509.250129923200000000 63.921208409613556000 770446.158293067010000000 6279519.038121398500000000 63.921208409613556000 770452.548452619000000000 6279518.436228464400000000 63.921208409613570000 770451.626515871380000000 6279508.648236988100000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                  <gml:interior>
+                    <gml:LinearRing gml:id="ID_4b9926ef-510d-40b5-9369-1090530a332f_I_2_2">
+                      <gml:posList srsDimension="3">770451.649553134570000000 6279517.711006602300000000 63.921208409613556000 770446.905966217160000000 6279518.157807880100000000 63.921208409613556000 770446.893709710570000000 6279518.027683354000000000 63.921208409613556000 770446.865262478590000000 6279518.030369891800000000 63.921208409613556000 770446.029012106360000000 6279509.175469202900000000 63.921208409613556000 770445.176664570810000000 6279500.150118627600000000 63.921208409613556000 770450.089679043970000000 6279499.686137118400000000 63.921208409613556000 770450.942140943840000000 6279508.712698671000000000 63.921208409613556000 770451.778276951980000000 6279517.566388379800000000 63.921208409613556000 770451.637186498850000000 6279517.579712859400000000 63.921208409613548000 770451.649553134570000000 6279517.711006602300000000 63.921208409613556000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:interior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:GroundSurface gml:id="ID_4479e087-b72f-489d-bd23-6dce38689399">
+          <gen:stringAttribute name="Type">
+            <gen:value>Ground</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>57.58</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_42f865d7-f6b7-45d3-8e14-d834462bf3b7" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_42f865d7-f6b7-45d3-8e14-d834462bf3b7_E_1_1">
+                      <gml:posList srsDimension="3">770450.089679043970000000 6279499.686137118400000000 51.280000000000001000 770445.176664570810000000 6279500.150118627600000000 51.280000000000001000 770445.727278104280000000 6279505.980463600700000000 51.280000000000001000 770450.640406941060000000 6279505.517693067900000000 51.280000000000001000 770450.089679043970000000 6279499.686137118400000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:GroundSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:GroundSurface gml:id="ID_13b78c2d-cd54-47e3-a04f-50549dffd94d">
+          <gen:stringAttribute name="Type">
+            <gen:value>Ground</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>57.58</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_c34019c0-c0f6-4426-8653-cae58f9445a1" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_c34019c0-c0f6-4426-8653-cae58f9445a1_E_1_1">
+                      <gml:posList srsDimension="3">770451.637186498850000000 6279517.579712859400000000 51.280000000000001000 770451.778276951750000000 6279517.566388379800000000 51.280000000000001000 770451.243874944750000000 6279511.907704263000000000 51.280000000000001000 770446.330746108200000000 6279512.370474797700000000 51.280000000000001000 770446.865262478820000000 6279518.030369890900000000 51.280000000000001000 770446.893709710330000000 6279518.027683355800000000 51.280000000000001000 770446.905966217160000000 6279518.157807880100000000 51.280000000000001000 770451.649553134570000000 6279517.711006602300000000 51.280000000000001000 770451.637186498850000000 6279517.579712859400000000 51.280000000000001000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:GroundSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:RoofSurface gml:id="ID_f024bdbb-a0a2-419a-b2df-b19422f69055">
+          <gen:stringAttribute name="Index">
+            <gen:value>IR_P:137169_C:1</gen:value>
+          </gen:stringAttribute>
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationRoof</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>5.83</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>0.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_74125c1c-0f51-4df5-93cc-10090b27ffc3" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_74125c1c-0f51-4df5-93cc-10090b27ffc3_E_1_1">
+                      <gml:posList srsDimension="3">770450.434423299970000000 6279515.321619780700000000 68.935208409613693000 770450.425053659830000000 6279515.553082533200000000 68.935208409613693000 770450.376701398750000000 6279515.779632426800000000 68.935208409613693000 770450.290757522920000000 6279515.994752034500000000 68.935208409613693000 770450.169694481420000000 6279516.192252756100000000 68.935208409613693000 770450.016995037440000000 6279516.366452857900000000 68.935208409613693000 770449.837052076120000000 6279516.512340918200000000 68.935208409613693000 770449.635042228270000000 6279516.625720002700000000 68.935208409613693000 770449.416776950010000000 6279516.703328401800000000 68.935208409613693000 770449.188535335940000000 6279516.742933464200000000 68.935208409613693000 770448.956883481700000000 6279516.743395824900000000 68.935208409613693000 770448.728485588920000000 6279516.704702179900000000 68.935208409613693000 770448.509912249870000000 6279516.627965678500000000 68.935208409613693000 770448.307451420930000000 6279516.515393886700000000 68.935208409613693000 770448.126927532490000000 6279516.370225291700000000 68.935208409613693000 770447.973533926530000000 6279516.196636129200000000 68.935208409613693000 770447.851683459240000000 6279515.999620244800000000 68.935208409613693000 770447.764881545910000000 6279515.784845426700000000 68.935208409613693000 770447.715625319860000000 6279515.558490350800000000 68.935208409613693000 770447.705331793050000000 6279515.327066846200000000 68.935208409613693000 770447.734297091610000000 6279515.097232542900000000 68.935208409613693000 770447.801687936530000000 6279514.875599355400000000 68.935208409613693000 770447.905565615740000000 6279514.668543268900000000 68.935208409613693000 770448.042941757480000000 6279514.482020908000000000 68.935208409613693000 770448.209864300680000000 6279514.321398183700000000 68.935208409613693000 770448.401531187820000000 6279514.191295915300000000 68.935208409613693000 770448.612428510560000000 6279514.095456913100000000 68.935208409613693000 770448.836489137730000000 6279514.036638286000000000 68.935208409613693000 770449.067267252600000000 6279514.016532141700000000 68.935208409613693000 770449.298123789490000000 6279514.035716898700000000 68.935208409613693000 770449.522417425640000000 6279514.093640641300000000 68.935208409613693000 770449.733695642090000000 6279514.188637014500000000 68.935208409613693000 770449.925880348310000000 6279514.317973141600000000 68.935208409613693000 770450.093442741080000000 6279514.477928259400000000 68.935208409613693000 770450.231562355070000000 6279514.663900752600000000 68.935208409613693000 770450.336265740450000000 6279514.870540526700000000 68.935208409613693000 770450.404540771620000000 6279515.091902934000000000 68.935208409613693000 770450.434423299970000000 6279515.321619780700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:RoofSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_d40a0fb1-d51d-4077-b7a5-52429c61aa1c">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>321.20</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_791c6ff7-8ea3-44ae-b9de-3f8707c729a7" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_791c6ff7-8ea3-44ae-b9de-3f8707c729a7_E_1_1">
+                      <gml:posList srsDimension="3">770448.307451420930000000 6279516.515393886700000000 67.714208409613590000 770448.126927532490000000 6279516.370225290800000000 67.714208409613590000 770448.126927532490000000 6279516.370225291700000000 68.935208409613693000 770448.307451420930000000 6279516.515393886700000000 68.935208409613693000 770448.307451420930000000 6279516.515393886700000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_fc8bba85-e382-40de-a48f-8222647af571">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>311.47</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_b2bd384b-e476-406c-8141-85227235edb9" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_b2bd384b-e476-406c-8141-85227235edb9_E_1_1">
+                      <gml:posList srsDimension="3">770448.126927532490000000 6279516.370225290800000000 67.714208409613590000 770447.973533926530000000 6279516.196636129200000000 67.714208409613590000 770447.973533926530000000 6279516.196636129200000000 68.935208409613693000 770448.126927532490000000 6279516.370225291700000000 68.935208409613693000 770448.126927532490000000 6279516.370225290800000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_759c68a1-9f67-40a6-91b1-2625ded2dbb4">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>301.74</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_fb80662a-4b80-4537-9cbc-ea6ae87a1211" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_fb80662a-4b80-4537-9cbc-ea6ae87a1211_E_1_1">
+                      <gml:posList srsDimension="3">770447.973533926530000000 6279516.196636129200000000 67.714208409613590000 770447.851683459240000000 6279515.999620244800000000 67.714208409613590000 770447.851683459240000000 6279515.999620244800000000 68.935208409613693000 770447.973533926530000000 6279516.196636129200000000 68.935208409613693000 770447.973533926530000000 6279516.196636129200000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_a96d07be-844f-4861-b2db-ca4d214c0e3c">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>292.01</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_fd66a2bd-6455-450c-aa18-fbbf631bfef2" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_fd66a2bd-6455-450c-aa18-fbbf631bfef2_E_1_1">
+                      <gml:posList srsDimension="3">770447.851683459240000000 6279515.999620244800000000 67.714208409613590000 770447.764881546140000000 6279515.784845425700000000 67.714208409613590000 770447.764881545910000000 6279515.784845426700000000 68.935208409613693000 770447.851683459240000000 6279515.999620244800000000 68.935208409613693000 770447.851683459240000000 6279515.999620244800000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_9c312e76-4005-492e-9bf0-cd6f81c7c7d4">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>282.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_22aff992-6ec6-4021-bb1f-2d746a6e2418" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_22aff992-6ec6-4021-bb1f-2d746a6e2418_E_1_1">
+                      <gml:posList srsDimension="3">770447.764881546140000000 6279515.784845425700000000 67.714208409613590000 770447.715625319860000000 6279515.558490350800000000 67.714208409613590000 770447.715625319860000000 6279515.558490350800000000 68.935208409613693000 770447.764881545910000000 6279515.784845426700000000 68.935208409613693000 770447.764881546140000000 6279515.784845425700000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_9a3f2ac6-36ae-4583-b188-5c88400eba12">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>272.55</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_c6d1cca5-ba7f-4162-83af-3b1e2f25e46b" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_c6d1cca5-ba7f-4162-83af-3b1e2f25e46b_E_1_1">
+                      <gml:posList srsDimension="3">770447.715625319860000000 6279515.558490350800000000 67.714208409613590000 770447.705331793050000000 6279515.327066846200000000 67.714208409613590000 770447.705331793050000000 6279515.327066846200000000 68.935208409613693000 770447.715625319860000000 6279515.558490350800000000 68.935208409613693000 770447.715625319860000000 6279515.558490350800000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_d17bc1a0-b346-4739-961e-d6b99783cec6">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>262.82</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_9dec0f3b-4b69-4fdc-862a-56d9986ca47c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_9dec0f3b-4b69-4fdc-862a-56d9986ca47c_E_1_1">
+                      <gml:posList srsDimension="3">770447.734297091610000000 6279515.097232542900000000 68.935208409613693000 770447.705331793050000000 6279515.327066846200000000 68.935208409613693000 770447.705331793050000000 6279515.327066846200000000 67.714208409613590000 770447.734297091610000000 6279515.097232543900000000 67.714208409613590000 770447.734297091610000000 6279515.097232542900000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_59451c36-2854-474c-89c4-a3484ce9b3a8">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>253.09</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_ffae505d-2a08-498a-a930-12c525bb58ae" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_ffae505d-2a08-498a-a930-12c525bb58ae_E_1_1">
+                      <gml:posList srsDimension="3">770447.801687936530000000 6279514.875599355400000000 68.935208409613693000 770447.734297091610000000 6279515.097232542900000000 68.935208409613693000 770447.734297091610000000 6279515.097232543900000000 67.714208409613590000 770447.801687936530000000 6279514.875599355400000000 67.714208409613590000 770447.801687936530000000 6279514.875599355400000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_1aa2aab3-4298-49b6-bb5d-d3113eb952d9">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>243.36</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_a8832aa7-e96c-4c71-acec-e1c0d8cf91f7" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_a8832aa7-e96c-4c71-acec-e1c0d8cf91f7_E_1_1">
+                      <gml:posList srsDimension="3">770447.905565615740000000 6279514.668543268900000000 68.935208409613693000 770447.801687936530000000 6279514.875599355400000000 68.935208409613693000 770447.801687936530000000 6279514.875599355400000000 67.714208409613590000 770447.905565615740000000 6279514.668543268900000000 67.714208409613590000 770447.905565615740000000 6279514.668543268900000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_721f2a6b-7dcc-4b24-96b7-6c699ddd689c">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>233.63</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_2002f580-5f86-42e7-8fa9-92585122437c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_2002f580-5f86-42e7-8fa9-92585122437c_E_1_1">
+                      <gml:posList srsDimension="3">770448.042941757480000000 6279514.482020908000000000 68.935208409613693000 770447.905565615740000000 6279514.668543268900000000 68.935208409613693000 770447.905565615740000000 6279514.668543268900000000 67.714208409613590000 770448.042941757480000000 6279514.482020908000000000 67.714208409613590000 770448.042941757480000000 6279514.482020908000000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_433ceb96-d468-473c-8aac-f62dfd25e511">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>223.90</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_70a4f1a4-106b-487c-8fdb-fd65a3d6bc0b" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_70a4f1a4-106b-487c-8fdb-fd65a3d6bc0b_E_1_1">
+                      <gml:posList srsDimension="3">770448.209864300680000000 6279514.321398183700000000 68.935208409613693000 770448.042941757480000000 6279514.482020908000000000 68.935208409613693000 770448.042941757480000000 6279514.482020908000000000 67.714208409613590000 770448.209864300680000000 6279514.321398182800000000 67.714208409613605000 770448.209864300680000000 6279514.321398183700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_0cae501a-c839-4278-95ec-431ba51dcd6e">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>214.17</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_27efa9c8-1623-45ca-8108-93cdb5099c37" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_27efa9c8-1623-45ca-8108-93cdb5099c37_E_1_1">
+                      <gml:posList srsDimension="3">770448.401531187820000000 6279514.191295915300000000 68.935208409613693000 770448.209864300680000000 6279514.321398183700000000 68.935208409613693000 770448.209864300680000000 6279514.321398182800000000 67.714208409613605000 770448.401531187820000000 6279514.191295915300000000 67.714208409613590000 770448.401531187820000000 6279514.191295915300000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_155bdb2f-a27d-40d7-9e32-d0527361d3af">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>204.44</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_6c69d22d-7d30-4aa1-9043-7589e96489e7" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_6c69d22d-7d30-4aa1-9043-7589e96489e7_E_1_1">
+                      <gml:posList srsDimension="3">770448.612428510560000000 6279514.095456913100000000 68.935208409613693000 770448.401531187820000000 6279514.191295915300000000 68.935208409613693000 770448.401531187820000000 6279514.191295915300000000 67.714208409613590000 770448.612428510560000000 6279514.095456913100000000 67.714208409613590000 770448.612428510560000000 6279514.095456913100000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_be0b3f10-9c4b-41d6-bc17-ae1e8ff3206f">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>194.71</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_9eea3b47-d64e-45c4-844a-9b24342e3a98" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_9eea3b47-d64e-45c4-844a-9b24342e3a98_E_1_1">
+                      <gml:posList srsDimension="3">770448.836489137730000000 6279514.036638286000000000 68.935208409613693000 770448.612428510560000000 6279514.095456913100000000 68.935208409613693000 770448.612428510560000000 6279514.095456913100000000 67.714208409613590000 770448.836489137730000000 6279514.036638286900000000 67.714208409613590000 770448.836489137730000000 6279514.036638286000000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_1413dc0f-8b82-463a-a842-380db628f21e">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>184.98</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_0c58133c-cf89-4d29-8e97-7b9259921224" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_0c58133c-cf89-4d29-8e97-7b9259921224_E_1_1">
+                      <gml:posList srsDimension="3">770449.067267252600000000 6279514.016532141700000000 68.935208409613693000 770448.836489137730000000 6279514.036638286000000000 68.935208409613693000 770448.836489137730000000 6279514.036638286900000000 67.714208409613590000 770449.067267252600000000 6279514.016532141700000000 67.714208409613576000 770449.067267252600000000 6279514.016532141700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_1ff4d532-34af-42c3-a6ab-efa65d184fd3">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>175.25</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_f88e1d7a-297b-47cd-81c7-ae726800698a" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_f88e1d7a-297b-47cd-81c7-ae726800698a_E_1_1">
+                      <gml:posList srsDimension="3">770449.298123789490000000 6279514.035716898700000000 68.935208409613693000 770449.067267252600000000 6279514.016532141700000000 68.935208409613693000 770449.067267252600000000 6279514.016532141700000000 67.714208409613576000 770449.298123789490000000 6279514.035716898700000000 67.714208409613590000 770449.298123789490000000 6279514.035716898700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_0130afe9-c25a-45cd-8074-4435d09e6f27">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>165.52</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_8fafa26e-0e51-44d0-a27d-c05489649002" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_8fafa26e-0e51-44d0-a27d-c05489649002_E_1_1">
+                      <gml:posList srsDimension="3">770449.522417425640000000 6279514.093640641300000000 68.935208409613693000 770449.298123789490000000 6279514.035716898700000000 68.935208409613693000 770449.298123789490000000 6279514.035716898700000000 67.714208409613590000 770449.522417425640000000 6279514.093640641300000000 67.714208409613590000 770449.522417425640000000 6279514.093640641300000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_fd690246-c96b-438a-b87b-feb44aec0ed4">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>155.79</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_28981e17-a6db-4035-a674-88203ccf68a5" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_28981e17-a6db-4035-a674-88203ccf68a5_E_1_1">
+                      <gml:posList srsDimension="3">770449.733695642090000000 6279514.188637014500000000 68.935208409613693000 770449.522417425640000000 6279514.093640641300000000 68.935208409613693000 770449.522417425640000000 6279514.093640641300000000 67.714208409613590000 770449.733695642090000000 6279514.188637015400000000 67.714208409613576000 770449.733695642090000000 6279514.188637014500000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_b1caac5c-8443-4fe3-a393-5e189fb26b06">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>146.06</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_63edfc2d-f0a3-421e-ab57-db0c48d62e43" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_63edfc2d-f0a3-421e-ab57-db0c48d62e43_E_1_1">
+                      <gml:posList srsDimension="3">770449.925880348310000000 6279514.317973141600000000 68.935208409613693000 770449.733695642090000000 6279514.188637014500000000 68.935208409613693000 770449.733695642090000000 6279514.188637015400000000 67.714208409613576000 770449.925880348310000000 6279514.317973141600000000 67.714208409613590000 770449.925880348310000000 6279514.317973141600000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_e5670b24-41c4-4fdd-a951-a0d6813aab65">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>136.33</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_38800f4e-de4d-4d85-915c-2bae6fc70211" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_38800f4e-de4d-4d85-915c-2bae6fc70211_E_1_1">
+                      <gml:posList srsDimension="3">770450.093442741080000000 6279514.477928259400000000 68.935208409613693000 770449.925880348310000000 6279514.317973141600000000 68.935208409613693000 770449.925880348310000000 6279514.317973141600000000 67.714208409613590000 770450.093442741080000000 6279514.477928259400000000 67.714208409613590000 770450.093442741080000000 6279514.477928259400000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_d763b6ce-1389-4a8b-b25a-bfbe5b72e7ca">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>126.60</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_d970d97f-8ec6-49aa-8651-309091f12826" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_d970d97f-8ec6-49aa-8651-309091f12826_E_1_1">
+                      <gml:posList srsDimension="3">770450.231562355070000000 6279514.663900752600000000 68.935208409613693000 770450.093442741080000000 6279514.477928259400000000 68.935208409613693000 770450.093442741080000000 6279514.477928259400000000 67.714208409613590000 770450.231562355070000000 6279514.663900752600000000 67.714208409613590000 770450.231562355070000000 6279514.663900752600000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_14d1d39d-e09f-4b28-b9c6-d44c7a5a9efd">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>116.87</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_11f74158-133b-4498-9449-788f48753573" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_11f74158-133b-4498-9449-788f48753573_E_1_1">
+                      <gml:posList srsDimension="3">770450.336265740450000000 6279514.870540526700000000 68.935208409613693000 770450.231562355070000000 6279514.663900752600000000 68.935208409613693000 770450.231562355070000000 6279514.663900752600000000 67.714208409613590000 770450.336265740450000000 6279514.870540526700000000 67.714208409613576000 770450.336265740450000000 6279514.870540526700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_426bf8e7-fdcf-4315-b9b7-ff2cfde0d9c9">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>107.14</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_5bef4396-8fe4-4944-8bd3-048dc16ea448" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_5bef4396-8fe4-4944-8bd3-048dc16ea448_E_1_1">
+                      <gml:posList srsDimension="3">770450.404540771620000000 6279515.091902934000000000 68.935208409613693000 770450.336265740450000000 6279514.870540526700000000 68.935208409613693000 770450.336265740450000000 6279514.870540526700000000 67.714208409613576000 770450.404540771620000000 6279515.091902934900000000 67.714208409613576000 770450.404540771620000000 6279515.091902934000000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_22398b7d-4e8c-49f7-92c4-392f96f3aaf5">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>97.41</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_570b63c3-ecad-4ce4-8e09-bc5400254723" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_570b63c3-ecad-4ce4-8e09-bc5400254723_E_1_1">
+                      <gml:posList srsDimension="3">770450.434423299970000000 6279515.321619780700000000 68.935208409613693000 770450.404540771620000000 6279515.091902934000000000 68.935208409613693000 770450.404540771620000000 6279515.091902934900000000 67.714208409613576000 770450.434423299970000000 6279515.321619781700000000 67.714208409613590000 770450.434423299970000000 6279515.321619780700000000 68.935208409613693000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_2f6eb112-2a9f-4385-928c-ac91845b52ef">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>87.68</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_da0af807-14a1-4993-971c-9d07217b82fe" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_da0af807-14a1-4993-971c-9d07217b82fe_E_1_1">
+                      <gml:posList srsDimension="3">770450.434423299970000000 6279515.321619781700000000 67.714208409613590000 770450.425053659830000000 6279515.553082533200000000 67.714208409613590000 770450.425053659830000000 6279515.553082533200000000 68.935208409613693000 770450.434423299970000000 6279515.321619780700000000 68.935208409613693000 770450.434423299970000000 6279515.321619781700000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_0e2fb78f-2b79-4dcb-8174-465c4fd5eed8">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>77.95</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_343e18ab-238c-4754-8b7f-8c3a61818eb6" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_343e18ab-238c-4754-8b7f-8c3a61818eb6_E_1_1">
+                      <gml:posList srsDimension="3">770450.425053659830000000 6279515.553082533200000000 67.714208409613590000 770450.376701398750000000 6279515.779632425900000000 67.714208409613590000 770450.376701398750000000 6279515.779632426800000000 68.935208409613693000 770450.425053659830000000 6279515.553082533200000000 68.935208409613693000 770450.425053659830000000 6279515.553082533200000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_00ceeb47-1c54-4be4-81af-104bb04fd4f5">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>68.22</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_97590c05-0039-4622-9acb-4a31b6e51e56" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_97590c05-0039-4622-9acb-4a31b6e51e56_E_1_1">
+                      <gml:posList srsDimension="3">770450.376701398750000000 6279515.779632425900000000 67.714208409613590000 770450.290757522920000000 6279515.994752033600000000 67.714208409613590000 770450.290757522920000000 6279515.994752034500000000 68.935208409613693000 770450.376701398750000000 6279515.779632426800000000 68.935208409613693000 770450.376701398750000000 6279515.779632425900000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_2d27b82d-d82f-4bf8-9212-364de1863a47">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>58.49</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_24a78683-3756-42ad-8b38-aaa31d191158" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_24a78683-3756-42ad-8b38-aaa31d191158_E_1_1">
+                      <gml:posList srsDimension="3">770450.290757522920000000 6279515.994752033600000000 67.714208409613590000 770450.169694481420000000 6279516.192252756100000000 67.714208409613590000 770450.169694481420000000 6279516.192252756100000000 68.935208409613693000 770450.290757522920000000 6279515.994752034500000000 68.935208409613693000 770450.290757522920000000 6279515.994752033600000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_fbe67b06-5c5b-49c8-b305-6e0c4c4aa4d2">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>48.76</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_5476f219-cc22-4e17-bfb5-70e5590ed5d8" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_5476f219-cc22-4e17-bfb5-70e5590ed5d8_E_1_1">
+                      <gml:posList srsDimension="3">770450.169694481420000000 6279516.192252756100000000 67.714208409613590000 770450.016995037440000000 6279516.366452857900000000 67.714208409613590000 770450.016995037440000000 6279516.366452857900000000 68.935208409613693000 770450.169694481420000000 6279516.192252756100000000 68.935208409613693000 770450.169694481420000000 6279516.192252756100000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_53f2102c-4a12-4710-8e09-366b66e1a83d">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>39.03</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_2df3a6e5-5d9f-4a7c-918c-8d2b23c39155" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_2df3a6e5-5d9f-4a7c-918c-8d2b23c39155_E_1_1">
+                      <gml:posList srsDimension="3">770450.016995037440000000 6279516.366452857900000000 67.714208409613590000 770449.837052076120000000 6279516.512340917300000000 67.714208409613605000 770449.837052076120000000 6279516.512340918200000000 68.935208409613693000 770450.016995037440000000 6279516.366452857900000000 68.935208409613693000 770450.016995037440000000 6279516.366452857900000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_6982363b-6550-444c-ae14-c37e8636020a">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>29.30</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_8d7b87ac-af55-46d2-abee-77663a72ef0b" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_8d7b87ac-af55-46d2-abee-77663a72ef0b_E_1_1">
+                      <gml:posList srsDimension="3">770449.837052076120000000 6279516.512340917300000000 67.714208409613605000 770449.635042228270000000 6279516.625720002700000000 67.714208409613590000 770449.635042228270000000 6279516.625720002700000000 68.935208409613693000 770449.837052076120000000 6279516.512340918200000000 68.935208409613693000 770449.837052076120000000 6279516.512340917300000000 67.714208409613605000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_02830115-d793-4dbf-9f89-8b062c7859c3">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>19.57</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_0e0e413c-e6be-45fa-8a18-4e5beb254196" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_0e0e413c-e6be-45fa-8a18-4e5beb254196_E_1_1">
+                      <gml:posList srsDimension="3">770449.635042228270000000 6279516.625720002700000000 67.714208409613590000 770449.416776950010000000 6279516.703328401800000000 67.714208409613576000 770449.416776950010000000 6279516.703328401800000000 68.935208409613693000 770449.635042228270000000 6279516.625720002700000000 68.935208409613693000 770449.635042228270000000 6279516.625720002700000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_767c8218-6532-4edd-9861-a19e0e5ebe0d">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>9.84</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_6fafed1e-4ece-4a8c-a6a1-3e79c3963e6c" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_6fafed1e-4ece-4a8c-a6a1-3e79c3963e6c_E_1_1">
+                      <gml:posList srsDimension="3">770449.416776950010000000 6279516.703328401800000000 67.714208409613576000 770449.188535335940000000 6279516.742933464200000000 67.714208409613590000 770449.188535335940000000 6279516.742933464200000000 68.935208409613693000 770449.416776950010000000 6279516.703328401800000000 68.935208409613693000 770449.416776950010000000 6279516.703328401800000000 67.714208409613576000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_20000c92-1206-4653-b069-7810bf3cc984">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>0.11</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_1e1c4be4-fdf4-453e-85c6-acec92d786bd" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_1e1c4be4-fdf4-453e-85c6-acec92d786bd_E_1_1">
+                      <gml:posList srsDimension="3">770449.188535335940000000 6279516.742933464200000000 67.714208409613590000 770448.956883481700000000 6279516.743395824900000000 67.714208409613590000 770448.956883481700000000 6279516.743395824900000000 68.935208409613693000 770449.188535335940000000 6279516.742933464200000000 68.935208409613693000 770449.188535335940000000 6279516.742933464200000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_2ed4005c-8cc0-41dc-9e5c-a0aabf9a6b48">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>350.38</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_61903974-0a5a-4a74-bad3-caa47be2e7fb" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_61903974-0a5a-4a74-bad3-caa47be2e7fb_E_1_1">
+                      <gml:posList srsDimension="3">770448.956883481700000000 6279516.743395824900000000 67.714208409613590000 770448.728485588920000000 6279516.704702178900000000 67.714208409613576000 770448.728485588920000000 6279516.704702179900000000 68.935208409613693000 770448.956883481700000000 6279516.743395824900000000 68.935208409613693000 770448.956883481700000000 6279516.743395824900000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_784fbd15-01fc-4ed4-a007-b4a684449178">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>340.65</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_cbc7429c-5984-4c7a-8a7c-6ef13f607018" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_cbc7429c-5984-4c7a-8a7c-6ef13f607018_E_1_1">
+                      <gml:posList srsDimension="3">770448.728485588920000000 6279516.704702178900000000 67.714208409613576000 770448.509912250100000000 6279516.627965678500000000 67.714208409613590000 770448.509912249870000000 6279516.627965678500000000 68.935208409613693000 770448.728485588920000000 6279516.704702179900000000 68.935208409613693000 770448.728485588920000000 6279516.704702178900000000 67.714208409613576000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:WallSurface gml:id="ID_33ce9d30-7f1a-4105-9885-f077da6082aa">
+          <gen:stringAttribute name="Type">
+            <gen:value>InstallationWall</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>0.28</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Azimuth">
+            <gen:value>330.93</gen:value>
+          </gen:doubleAttribute>
+          <gen:doubleAttribute name="Slope">
+            <gen:value>90.00</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_7fac24d7-c58d-48f3-82e9-47aec9dafda3" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_7fac24d7-c58d-48f3-82e9-47aec9dafda3_E_1_1">
+                      <gml:posList srsDimension="3">770448.509912250100000000 6279516.627965678500000000 67.714208409613590000 770448.307451420930000000 6279516.515393886700000000 67.714208409613590000 770448.307451420930000000 6279516.515393886700000000 68.935208409613693000 770448.509912249870000000 6279516.627965678500000000 68.935208409613693000 770448.509912250100000000 6279516.627965678500000000 67.714208409613590000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:WallSurface>
+      </bldg:boundedBy>
+      <bldg:boundedBy>
+        <bldg:OuterCeilingSurface gml:id="ID_58e5dac2-807e-4f85-8f0f-45a5a1afa54c">
+          <gen:stringAttribute name="Type">
+            <gen:value>OuterCeiling</gen:value>
+          </gen:stringAttribute>
+          <gen:doubleAttribute name="Area">
+            <gen:value>2.44</gen:value>
+          </gen:doubleAttribute>
+          <bldg:lod2MultiSurface>
+            <gml:MultiSurface>
+              <gml:surfaceMember>
+                <gml:Polygon gml:id="ID_eb376773-4784-403d-8616-9761d98e9539" srsDimension="3">
+                  <gml:exterior>
+                    <gml:LinearRing gml:id="ID_eb376773-4784-403d-8616-9761d98e9539_E_1_1">
+                      <gml:posList srsDimension="3">770450.732165670020000000 6279506.489309293200000000 60.200439535926179000 770445.819036833240000000 6279506.952079827900000000 60.200439535926172000 770445.854752381800000000 6279507.330265176500000000 60.515391020559335000 770450.767881218810000000 6279506.867494641800000000 60.515391020559335000 770450.732165670020000000 6279506.489309293200000000 60.200439535926179000</gml:posList>
+                    </gml:LinearRing>
+                  </gml:exterior>
+                </gml:Polygon>
+              </gml:surfaceMember>
+            </gml:MultiSurface>
+          </bldg:lod2MultiSurface>
+        </bldg:OuterCeilingSurface>
+      </bldg:boundedBy>
+    </bldg:Building>
+  </cityObjectMember>

@@ -3,6 +3,23 @@ export interface LatLon {
   lon: number;
 }
 
+/** Measured roof polygons: horizontal position in WGS84, altitude in metres IGN69. */
+export interface RoofSurface {
+  outer: Array<LatLon & { elevation: number }>;
+  holes: Array<Array<LatLon & { elevation: number }>>;
+}
+
+/** Complete measured boundary; includes the underside of arches and overhangs. */
+export interface MeasuredSurface extends RoofSurface {
+  kind: "roof" | "wall" | "ground" | "outerCeiling" | "outerFloor" | "closure";
+}
+
+export interface MeasuredSolid {
+  surfaces: MeasuredSurface[];
+  source: string;
+  year: number;
+}
+
 export interface OverpassResponse {
   elements: OverpassElement[];
   osm3s?: { timestamp_osm_base?: string };
@@ -15,6 +32,10 @@ export interface OverpassElement {
   tags?: Record<string, string>;
   geometry?: LatLon[];
   nodes?: number[];
+  roofSurfaces?: RoofSurface[];
+  groundElevation?: number;
+  roofSource?: string;
+  measuredSolid?: MeasuredSolid;
   members?: Array<{
     type: string;
     ref?: number;
@@ -61,6 +82,12 @@ export interface DataReport {
   elevationResolutionM: number | null;
   osmTimestamp?: string;
   seaCoverage: "available" | "unavailable";
+  /** Number of municipal buildings carrying measured roof surfaces. */
+  lod2BuildingCount?: number;
+  lod2RoofSurfaceCount?: number;
+  lod2Year?: number;
+  lod2SolidCount?: number;
+  municipalStructureCount?: number;
 }
 
 export interface MapDataResponse {

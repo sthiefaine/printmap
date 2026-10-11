@@ -6,6 +6,7 @@ import {
 } from "../src/store/use-scene-store";
 import { createDemoData, DEMO_BBOX } from "../src/lib/demo";
 import { getBboxDimensions } from "../src/lib/mesh/base-plate-mesh";
+import { validateImportedElements } from "../src/lib/data/validate-imported-elements";
 
 function project() {
   useSceneStore.getState().resetSettings();
@@ -87,6 +88,19 @@ test("imports reject geometry-breaking sizes, invalid bounds and corrupted relie
   }
 });
 
+test("malformed road filters are rejected before changing the current project", () => {
+  for (const roadTypeEnabled of [null, [], { residential: "yes" }]) {
+    const saved = project();
+    saved.settings.features.roads.roadTypeEnabled = roadTypeEnabled;
+    const current = useSceneStore.getState();
+    assert.throws(
+      () => useSceneStore.getState().loadProject(JSON.stringify(saved)),
+      /Options des voies du projet invalides/,
+    );
+    assert.equal(useSceneStore.getState(), current);
+  }
+});
+
 test("sizing selection preserves geographic aspect ratio and fits the requested length", () => {
   useSceneStore.getState().setTileSize(180, DEMO_BBOX);
   const mm = getBboxDimensions(DEMO_BBOX, useSceneStore.getState().scale);
@@ -100,5 +114,110 @@ test("sizing selection preserves geographic aspect ratio and fits the requested 
   assert.deepEqual(
     useSceneStore.getState().modelSettings,
     DEFAULT_MODEL_SETTINGS,
+  );
+});
+
+test("an old project with stale relief from another zone is rejected before changing current settings", () => {
+  const saved = project();
+  // Both individual bounds are valid. The geographic association is stale,
+  // as can happen when an older project retained its previous elevation cache.
+  saved.snapshot.bbox = DEMO_BBOX.map((coordinate) => coordinate + 0.01);
+  saved.settings.features.water.color = "#123abc";
+  const current = useSceneStore.getState().modelSettings;
+  assert.throws(
+    () => useSceneStore.getState().loadProject(JSON.stringify(saved)),
+    /Le relief du projet ne correspond pas à la zone enregistrée/,
+  );
+  assert.equal(useSceneStore.getState().modelSettings, current);
+  useSceneStore.getState().resetSettings();
+});
+
+test("malformed ordinary coordinates and tags reject an import atomically before meshing", () => {
+  const invalidElements = [
+    {
+      type: "way",
+      id: 1,
+      tags: { highway: "residential" },
+      geometry: [{ lat: "oops", lon: 3.87 }],
+    },
+    { type: "way", id: 1, geometry: [{ lat: 86, lon: 3.87 }] },
+    { type: "node", id: 1, lat: 43.61, lon: 181 },
+    { type: "node", id: 1, lat: 43.61 },
+    { type: "way", id: 1, tags: { highway: 42 } },
+    {
+      type: "relation",
+      id: 1,
+      members: [
+        { type: "way", role: "outer", geometry: [{ lat: 43.61, lon: "oops" }] },
+      ],
+    },
+    {
+      type: "relation",
+      id: 1,
+      members: [{ type: "way", role: "outer", geometry: "invalid" }],
+    },
+    null,
+  ];
+  for (const element of invalidElements) {
+    const saved = project();
+    saved.snapshot.osmData.elements = [element];
+    saved.settings.features.water.color = "#123abc";
+    saved.scale = 1234;
+    const current = useSceneStore.getState();
+    assert.throws(
+      () => useSceneStore.getState().loadProject(JSON.stringify(saved)),
+      /projet invalide/,
+    );
+    assert.equal(useSceneStore.getState(), current);
+  }
+  useSceneStore.getState().resetSettings();
+});
+
+test("normal Overpass elements and relation references without geometry remain importable", () => {
+  const saved = project();
+  saved.snapshot.osmData.elements = [
+    { type: "node", id: 1 },
+    {
+      type: "node",
+      id: 2,
+      lat: 43.61,
+      lon: 3.87,
+      tags: { name: "Reference node" },
+    },
+    { type: "way", id: 3, nodes: [1, 2], tags: { highway: "residential" } },
+    {
+      type: "relation",
+      id: 4,
+      members: [{ type: "way", ref: 3, role: "outer" }],
+      tags: { type: "multipolygon", leisure: "park" },
+    },
+  ];
+  const snapshot = useSceneStore.getState().loadProject(JSON.stringify(saved));
+  assert.deepEqual(
+    snapshot?.osmData?.elements,
+    saved.snapshot.osmData.elements,
+  );
+  useSceneStore.getState().resetSettings();
+});
+
+test("import coordinate budget includes ordinary ways and relation member geometry", () => {
+  const point = { lat: 43.61, lon: 3.87 };
+  assert.throws(
+    () =>
+      validateImportedElements([
+        { type: "way", id: 1, geometry: Array(600_000).fill(point) },
+        {
+          type: "relation",
+          id: 2,
+          members: [
+            {
+              type: "way",
+              role: "outer",
+              geometry: Array(400_001).fill(point),
+            },
+          ],
+        },
+      ]),
+    /trop de coordonnées géographiques/,
   );
 });

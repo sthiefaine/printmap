@@ -23,11 +23,13 @@ const name = args.includes("--name")
   : coast
     ? "palavas"
     : "montpellier";
-const placeName = args.includes("--name")
-  ? name
-  : coast
-    ? "Palavas-les-Flots"
-    : "Montpellier";
+const placeName = args.includes("--label")
+  ? option("--label")
+  : args.includes("--name")
+    ? name
+    : coast
+      ? "Palavas-les-Flots"
+      : "Montpellier";
 const bbox: BBox = args.includes("--bbox")
   ? (option("--bbox").split(",").map(Number) as BBox)
   : coast
@@ -58,10 +60,22 @@ else {
 }
 assert.ok(data.osmData.elements.length > 0, "real data is available");
 const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
+if (args.includes("--detail")) {
+  settings.features.roads.filter = "all";
+  settings.features.roads.footpathsEnabled = true;
+}
+// Keep the coloured model and monochrome engraving as separate real recipes.
+if (args.includes("--engrave")) {
+  settings.features.roads.heightMm = -0.2;
+  settings.features.parks.heightMm = -0.1;
+  settings.features.water.heightMm = -0.2;
+}
 settings.base.topographyEnabled = !coast;
 settings.base.grid = { cols: 2, rows: 2 };
 const geographic = getBboxDimensions(bbox, 1000);
-const scale = (Math.max(geographic.widthMm, geographic.heightMm) * 1000) / 200;
+const size = args.includes("--size") ? Number(option("--size")) : 200;
+assert.ok(Number.isFinite(size) && size >= 20 && size <= 1000);
+const scale = (Math.max(geographic.widthMm, geographic.heightMm) * 1000) / size;
 const start = performance.now();
 const model = await buildPrintModel(
   { ...data, bbox, scale, settings },
@@ -86,7 +100,22 @@ await writeFile(
   resolve(directory, `${name}.3mf`),
   Buffer.from(await create3MFBuffer(model, model.colors)),
 );
-useSceneStore.setState({ scale, tileSize: 200, modelSettings: settings });
+for (const tile of model.tiles) {
+  const stem = `${name}-tuile-${tile.row + 1}-${tile.col + 1}`;
+  await writeFile(
+    resolve(directory, `${stem}.stl`),
+    Buffer.from(createSTLBuffer(tile)),
+  );
+  await writeFile(
+    resolve(directory, `${stem}.3mf`),
+    Buffer.from(await create3MFBuffer(tile, model.colors, model)),
+  );
+}
+await writeFile(
+  resolve(directory, "SOURCES.txt"),
+  `${model.sources.join("\n")}\nCollecte : ${model.fetchedAt}\nTuiles : lignes du sud au nord, colonnes de l’ouest à l’est. Unités : millimètres.\n${model.warnings.join("\n")}\n`,
+);
+useSceneStore.setState({ scale, tileSize: size, modelSettings: settings });
 await writeFile(
   resolve(directory, `${name}.printmap.json`),
   useSceneStore.getState().saveProject({

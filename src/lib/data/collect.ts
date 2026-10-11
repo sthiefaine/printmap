@@ -7,6 +7,16 @@ import { fetchWaterPolygons } from "./ocean";
 import { parseElements } from "@/lib/osm/parse-elements";
 import { selectComplementaryWater } from "./water-coverage";
 import { parseLengthMeters } from "@/lib/osm/building-height";
+import {
+  enrichWithMunicipalRoofs,
+  fetchMontpellierRoofs,
+  MONTPELLIER_LOD2_SOURCE,
+} from "./montpellier-lod2";
+import {
+  enrichWithMunicipalStructures,
+  fetchMontpellierStructures,
+  MONTPELLIER_STRUCTURES_SOURCE,
+} from "./montpellier-structures";
 
 export async function collectMapData(
   bbox: BBox,
@@ -20,9 +30,18 @@ export async function collectMapData(
       : Promise.resolve({ features: [], warnings: [] }),
     relief ? fetchElevation(bbox, signal) : Promise.resolve(null),
     fetchWaterPolygons(bbox, signal),
+    fetchMontpellierRoofs(bbox, signal),
+    fetchMontpellierStructures(bbox, signal),
   ]);
   signal.throwIfAborted();
-  const [osmResult, ignResult, elevationResult, oceanResult] = results;
+  const [
+    osmResult,
+    ignResult,
+    elevationResult,
+    oceanResult,
+    municipalResult,
+    structuresResult,
+  ] = results;
   if (osmResult.status === "rejected") throw osmResult.reason;
   const osm = osmResult.value;
   const warnings: string[] = [],
@@ -41,6 +60,55 @@ export async function collectMapData(
     warnings.push(
       "Enrichissement IGN indisponible ; hauteurs OSM ou estimées.",
     );
+  if (municipalResult.status === "fulfilled") {
+    warnings.push(...municipalResult.value.warnings);
+    if (municipalResult.value.buildings.length) {
+      elements = enrichWithMunicipalRoofs(
+        elements,
+        municipalResult.value.buildings,
+      ).elements;
+      sources.push(
+        `${MONTPELLIER_LOD2_SOURCE} · ODbL · https://data.montpellier3m.fr/dataset/batiments-3d-de-la-ville-et-metropole-de-montpellier`,
+      );
+      warnings.push(
+        "Toitures municipales mesurées en 2020 : les constructions plus récentes présentes dans OSM sont conservées lorsqu’elles ne correspondent pas au modèle municipal.",
+      );
+    }
+  } else
+    warnings.push(
+      "Modèle municipal 3D indisponible ; utilisation des empreintes et toitures OSM.",
+    );
+  let municipalStructureCount = 0;
+  if (structuresResult.status === "fulfilled") {
+    warnings.push(...structuresResult.value.warnings);
+    if (structuresResult.value.elements.length) {
+      const enriched = enrichWithMunicipalStructures(
+        elements,
+        structuresResult.value.elements,
+      );
+      elements = enriched.elements;
+      municipalStructureCount = enriched.count;
+      sources.push(
+        `${MONTPELLIER_STRUCTURES_SOURCE} · https://data.montpellier3m.fr/dataset/ouvrages-dart-de-montpellier-mediterranee-metropole`,
+      );
+      if (
+        structuresResult.value.elements.some(
+          (e) => e.tags?.["printmap:structure_type"] === "aqueduct",
+        )
+      )
+        warnings.push(
+          "L’aqueduc est localisé par l’inventaire municipal ; cette source ne fournit pas la géométrie de ses voûtes et piles.",
+        );
+      if (
+        elements.some(
+          (element) => element.tags?.["printmap:bridge_deck_elevation"],
+        )
+      )
+        sources.push(
+          "IGN · BD TOPO (altitude de chaussée du Pont Vialleton, précision 1,5 m) · Licence Ouverte 2.0 · https://data.geopf.fr/annexes/ressources/documentation/DC_BDTOPO_3-5.pdf",
+        );
+    }
+  }
   const elevationGrid =
     elevationResult.status === "fulfilled" ? elevationResult.value : null;
   if (elevationGrid?.source) sources.push(elevationGrid.source);
@@ -81,6 +149,13 @@ export async function collectMapData(
       parseLengthMeters(building.tags.height) != null ||
       parseLengthMeters(building.tags["building:height"]) != null,
   ).length;
+  const roofBuildings = [
+    ...new Map(
+      buildings
+        .filter((building) => building.roofSurfaces?.length)
+        .map((building) => [building.sourceId, building]),
+    ).values(),
+  ];
   if (buildings.length > measuredBuildingCount)
     warnings.push(
       `${buildings.length - measuredBuildingCount} bâtiments sans hauteur mesurée : dimensions estimées à partir des étages ou du type de bâtiment.`,
@@ -117,6 +192,20 @@ export async function collectMapData(
       osmTimestamp: osm.osm3s?.timestamp_osm_base,
       seaCoverage:
         oceanResult.status === "fulfilled" ? "available" : "unavailable",
+      lod2BuildingCount: buildings.filter(
+        (building) => building.roofSurfaces?.length,
+      ).length,
+      lod2RoofSurfaceCount: roofBuildings.reduce(
+        (sum, building) => sum + (building.roofSurfaces?.length ?? 0),
+        0,
+      ),
+      lod2SolidCount: buildings.filter(
+        (building) => building.measuredSolid?.surfaces.length,
+      ).length,
+      municipalStructureCount,
+      ...(buildings.some((building) => building.roofSurfaces?.length)
+        ? { lod2Year: 2020 }
+        : {}),
     },
   };
 }

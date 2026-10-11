@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { assembleRings } from "../src/lib/osm/relation-polygons";
 import { parseElements } from "../src/lib/osm/parse-elements";
+import { createProjectionForBbox } from "../src/lib/projection";
+import { pointInPolygon } from "../src/lib/polygon/point-in-polygon";
 import {
   parseLengthMeters,
   getBuildingHeight,
@@ -10,6 +12,7 @@ import { validateBbox } from "../src/lib/data/bbox";
 import { validateElevationGrid } from "../src/lib/elevation/validate-grid";
 import { enrichWithIGN } from "../src/lib/data/ign-buildings";
 import { fetchOverpass } from "../src/lib/data/overpass";
+import { fetchElevation } from "../src/lib/data/elevation";
 import { selectComplementaryWater } from "../src/lib/data/water-coverage";
 import type { BBox, LatLon, OverpassElement } from "../src/types/osm";
 
@@ -124,6 +127,145 @@ test("roads respect measured widths and tunnel/bridge tags; extended green areas
   assert.equal(parsed.parks.length, 1);
 });
 
+const rectangle = (
+  south: number,
+  west: number,
+  north: number,
+  east: number,
+): LatLon[] => [
+  { lat: south, lon: west },
+  { lat: south, lon: east },
+  { lat: north, lon: east },
+  { lat: north, lon: west },
+  { lat: south, lon: west },
+];
+
+test("a detailed park retains its four lawns and the plaza's holes without colouring unclassified ground", () => {
+  const outer = rectangle(43.61, 3.88, 43.611, 3.8812);
+  const plazaHole = rectangle(43.61005, 3.88005, 43.61095, 3.88115);
+  const lawns: OverpassElement[] = [
+    rectangle(43.6101, 3.8801, 43.61035, 3.88045),
+    rectangle(43.6101, 3.88075, 43.61035, 3.8811),
+    rectangle(43.61065, 3.8801, 43.6109, 3.88045),
+    rectangle(43.61065, 3.88075, 43.6109, 3.8811),
+  ].map((geometry, i) => ({
+    type: "way",
+    id: 600 + i,
+    tags: { landuse: "grass" },
+    geometry,
+  }));
+  const envelope: OverpassElement = {
+    type: "relation",
+    id: 500,
+    tags: { leisure: "park", type: "multipolygon" },
+    members: [{ type: "way", ref: 501, role: "outer", geometry: outer }],
+  };
+  const duplicateOuter: OverpassElement = {
+    type: "way",
+    id: 501,
+    tags: { leisure: "park" },
+    geometry: outer,
+  };
+  const plaza: OverpassElement = {
+    type: "relation",
+    id: 700,
+    tags: {
+      highway: "pedestrian",
+      area: "yes",
+      surface: "asphalt",
+      type: "multipolygon",
+    },
+    members: [
+      { type: "way", role: "outer", geometry: outer },
+      { type: "way", role: "inner", geometry: plazaHole },
+    ],
+  };
+  const parsed = parseElements(
+    [plaza, envelope, duplicateOuter, ...lawns, lawns[0]],
+    bbox,
+    5000,
+  );
+  assert.equal(parsed.parks.length, 4);
+  assert.equal(parsed.parkOutlineIgnoredCount, 1);
+  assert.equal(parsed.parkOutlineFallbackCount, 0);
+  assert.equal(parsed.roadAreas.length, 1);
+  assert.equal(parsed.roadAreas[0].polygon.holes.length, 1);
+  const { project } = createProjectionForBbox(bbox);
+  const [cx, cy] = project(3.8806, 43.6105).map((value) => value * 0.2);
+  assert.ok(
+    !parsed.parks.some((polygon) => pointInPolygon(cx, cy, polygon.outer)),
+  );
+  assert.ok(pointInPolygon(cx, cy, parsed.roadAreas[0].polygon.holes[0]));
+  const [gx, gy] = project(3.8802, 43.6102).map((value) => value * 0.2);
+  assert.ok(
+    parsed.parks.some((polygon) => pointInPolygon(gx, gy, polygon.outer)),
+  );
+});
+
+test("an undetailed park keeps indicative colour; vegetation outside it or inside its hole does not qualify", () => {
+  const envelope: OverpassElement = {
+    type: "relation",
+    id: 800,
+    tags: { leisure: "park", type: "multipolygon" },
+    members: [
+      { type: "way", ref: 801, role: "outer", geometry: ring },
+      { type: "way", ref: 802, role: "inner", geometry: hole },
+    ],
+  };
+  const parsed = parseElements(
+    [
+      envelope,
+      envelope,
+      { type: "way", id: 801, tags: { leisure: "park" }, geometry: ring },
+      { type: "way", id: 802, tags: { landuse: "grass" }, geometry: hole },
+      {
+        type: "way",
+        id: 803,
+        tags: { landuse: "grass" },
+        geometry: ring.map((p) => ({ ...p, lon: p.lon + 0.001 })),
+      },
+    ],
+    bbox,
+    5000,
+  );
+  assert.equal(parsed.parks.length, 3);
+  assert.equal(parsed.parkOutlineIgnoredCount, 0);
+  assert.equal(parsed.parkOutlineFallbackCount, 1);
+  assert.equal(parsed.parks[0].holes.length, 1);
+});
+
+test("gardens and explicitly grassy parks keep their existing surfaces and vegetation multipolygons are deduplicated", () => {
+  const vegetation: OverpassElement = {
+    type: "relation",
+    id: 900,
+    tags: { landuse: "grass", type: "multipolygon" },
+    members: [
+      { type: "way", ref: 901, role: "outer", geometry: ring },
+      { type: "way", ref: 902, role: "inner", geometry: hole },
+    ],
+  };
+  const parsed = parseElements(
+    [
+      {
+        type: "way",
+        id: 903,
+        tags: { leisure: "park", landuse: "grass" },
+        geometry: ring,
+      },
+      { type: "way", id: 904, tags: { leisure: "garden" }, geometry: ring },
+      vegetation,
+      vegetation,
+      { type: "way", id: 901, tags: { landuse: "grass" }, geometry: ring },
+    ],
+    bbox,
+    5000,
+  );
+  assert.equal(parsed.parks.length, 3);
+  assert.equal(parsed.parks[2].holes.length, 1);
+  assert.equal(parsed.parkOutlineFallbackCount, 0);
+  assert.equal(parsed.parkOutlineIgnoredCount, 0);
+});
+
 test("height units are explicit and a wide footprint cannot fabricate tall buildings", () => {
   assert.equal(parseLengthMeters("30 ft"), 9.144);
   assert.equal(parseLengthMeters("12,5 m"), 12.5);
@@ -200,6 +342,47 @@ test("imported relief rejects missing elevations and normalises bounds from actu
   );
 });
 
+test("small-site terrain samples terraces densely within IGN's request and project limits", async (t) => {
+  const requests: { lat: number[]; lon: number[] }[] = [];
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: unknown, options: RequestInit) => {
+      const body = JSON.parse(options.body as string);
+      const lat = body.lat.split("|").map(Number),
+        lon = body.lon.split("|").map(Number);
+      requests.push({ lat, lon });
+      return new Response(
+        JSON.stringify({
+          elevations: lat.map((latitude: number) =>
+            latitude > 43.611 ? 51.25 : 45.5,
+          ),
+        }),
+      );
+    },
+  );
+  const small = await fetchElevation(
+    [43.6098, 3.8695, 43.6122, 3.873],
+    new AbortController().signal,
+  );
+  assert.equal(small.minElev, 45.5);
+  assert.equal(small.maxElev, 51.25);
+  assert.ok(small.resolutionM! <= 5);
+  assert.ok(small.rows > 40 && small.cols > 40);
+  assert.deepEqual(validateElevationGrid(small).points, small.points);
+  const medium = await fetchElevation(
+    [43.6096, 3.8665, 43.6137, 3.8754],
+    new AbortController().signal,
+  );
+  assert.ok(medium.resolutionM! < 12);
+  for (const request of requests)
+    assert.ok(
+      request.lat.length <= 5000 && request.lon.length === request.lat.length,
+    );
+  assert.ok(medium.rows <= 128 && medium.cols <= 128);
+  validateElevationGrid(medium);
+});
+
 test("IGN enriches matching OSM instead of duplicating buildings, preserving courtyards for added buildings", () => {
   const osm: OverpassElement = {
     type: "way",
@@ -236,6 +419,74 @@ test("IGN enriches matching OSM instead of duplicating buildings, preserving cou
   ).buildings[0];
   assert.ok(Math.abs(withRoof.wallHeight - 3.6) < 1e-8);
   assert.ok(Math.abs(withRoof.roofHeight - 0.6) < 1e-8);
+});
+
+test("IGN keeps a distinct annex inside an older OSM courtyard instead of matching their bounding boxes", () => {
+  const outer = rectangle(43.61, 3.88, 43.611, 3.881);
+  const courtyard = rectangle(43.6102, 3.8802, 43.6108, 3.8808);
+  const annex = rectangle(43.61035, 3.88035, 43.61065, 3.88065);
+  const existing: OverpassElement = {
+    type: "relation",
+    id: 110,
+    tags: { building: "yes", height: "12" },
+    members: [
+      { type: "way", role: "outer", geometry: outer },
+      { type: "way", role: "inner", geometry: courtyard },
+    ],
+  };
+  const ign = {
+    id: "batiment.annex",
+    properties: { cleabs: "NEW-COURTYARD", hauteur: 6 },
+    geometry: {
+      type: "Polygon" as const,
+      coordinates: [annex.map((p) => [p.lon, p.lat])],
+    },
+  };
+  const result = enrichWithIGN([existing], [ign, ign]);
+  const parsed = parseElements(result.elements, bbox, 5000);
+  assert.equal(result.added, 1);
+  assert.equal(result.enriched, 0);
+  assert.equal(parsed.buildings.length, 2);
+  assert.equal(parsed.buildings[0].polygon.holes.length, 1);
+  assert.equal(
+    parsed.buildings[1].heightSource,
+    "IGN · hauteur à la gouttière",
+  );
+  assert.ok(Math.abs(parsed.buildings[1].wallHeight - 1.2) < 1e-8);
+  assert.equal(existing.tags?.height, "12");
+});
+
+test("IGN still enriches an identical courtyard footprint whose centre is empty", () => {
+  const outer = rectangle(43.61, 3.88, 43.611, 3.881);
+  const courtyard = rectangle(43.6102, 3.8802, 43.6108, 3.8808);
+  const existing: OverpassElement = {
+    type: "relation",
+    id: 120,
+    tags: { building: "yes" },
+    members: [
+      { type: "way", role: "outer", geometry: outer },
+      { type: "way", role: "inner", geometry: courtyard },
+    ],
+  };
+  const ign = {
+    id: "batiment.courtyard",
+    properties: { hauteur: 12 },
+    geometry: {
+      type: "Polygon" as const,
+      coordinates: [outer, courtyard].map((ring) =>
+        ring.map((p) => [p.lon, p.lat]),
+      ),
+    },
+  };
+  const result = enrichWithIGN([existing], [ign]);
+  assert.equal(result.added, 0);
+  assert.equal(result.enriched, 1);
+  assert.equal(result.elements[0].tags?.height, "12");
+  assert.equal(
+    parseElements(result.elements, bbox, 5000).buildings[0].polygon.holes
+      .length,
+    1,
+  );
 });
 
 test("water tiles fill a selection inside an otherwise missing lake and never fill an OSM island", () => {

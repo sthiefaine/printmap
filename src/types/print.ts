@@ -43,6 +43,14 @@ export interface PrintModel extends PrintMesh {
     components: number;
     volumeMm3: number;
     estimatedHeights: number;
+    realRoofCount: number;
+    taggedRoofCount: number;
+    staircaseCount: number;
+    measuredStructureCount: number;
+    reconstructedBridgeCount: number;
+    basinRimCount: number;
+    reconstructedAqueductCount: number;
+    aqueductArchCount: number;
   };
   warnings: string[];
   sources: string[];

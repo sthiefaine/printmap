@@ -69,45 +69,35 @@ export const WATERWAY_WIDTHS: Record<string, number> = {
   ditch: 2,
 };
 
-export type RoofShape = "flat" | "gabled" | "hipped" | "pyramidal";
-
-export const DEFAULT_ROOF_SHAPES: Record<string, RoofShape> = {
-  house: "gabled",
-  residential: "gabled",
-  detached: "gabled",
-  semidetached_house: "gabled",
-  terrace: "gabled",
-  apartments: "hipped",
-  commercial: "hipped",
-  industrial: "gabled",
-  church: "gabled",
-  cathedral: "gabled",
-  retail: "hipped",
-  office: "hipped",
-  hospital: "hipped",
-  school: "hipped",
-  university: "hipped",
-  hotel: "hipped",
-  warehouse: "gabled",
-  garage: "flat",
-  garages: "flat",
-  shed: "gabled",
-  barn: "gabled",
-  farm: "gabled",
-  roof: "flat",
-  kiosk: "flat",
-  cabin: "gabled",
-  hut: "pyramidal",
-  civic: "hipped",
-  public: "hipped",
-  yes: "gabled",
-};
+export type RoofShape =
+  | "flat"
+  | "gabled"
+  | "hipped"
+  | "pyramidal"
+  | "skillion"
+  | "dome"
+  | "cone"
+  | "round"
+  | "onion"
+  | "mansard"
+  | "gambrel"
+  | "saltbox"
+  | "half-hipped";
 
 export const DEFAULT_ROOF_HEIGHT_RATIO: Record<RoofShape, number> = {
   flat: 0,
   gabled: 0.35,
   hipped: 0.3,
   pyramidal: 0.4,
+  skillion: 0.25,
+  dome: 0.35,
+  cone: 0.4,
+  round: 0.3,
+  onion: 0.5,
+  mansard: 0.35,
+  gambrel: 0.35,
+  saltbox: 0.35,
+  "half-hipped": 0.3,
 };
 
 export const DEFAULT_SCALE = 5000;

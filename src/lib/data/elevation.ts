@@ -13,16 +13,26 @@ function validElevations(value: unknown, count: number): value is number[] {
   );
 }
 
-function makeGrid(bbox: BBox, spacingM: number, maxResolution: number) {
+function makeGrid(
+  bbox: BBox,
+  spacingM: number,
+  maxResolution: number,
+  maxSamples = 4900,
+) {
   const { widthM, heightM } = bboxDimensions(bbox);
-  const rows = Math.max(
+  let rows = Math.max(
     5,
     Math.min(maxResolution, Math.ceil(heightM / spacingM) + 1),
   );
-  const cols = Math.max(
+  let cols = Math.max(
     5,
     Math.min(maxResolution, Math.ceil(widthM / spacingM) + 1),
   );
+  if (rows * cols > maxSamples) {
+    const ratio = Math.sqrt(maxSamples / (rows * cols));
+    rows = Math.max(5, Math.floor(rows * ratio));
+    cols = Math.max(5, Math.floor(cols * ratio));
+  }
   const lat: number[] = [],
     lon: number[] = [];
   for (let r = 0; r < rows; r++)
@@ -44,7 +54,12 @@ export async function fetchElevation(
   signal: AbortSignal,
 ): Promise<ElevationGrid> {
   if (isMetropolitanFrance(bbox)) {
-    const grid = makeGrid(bbox, 20, 65);
+    const dimensions = bboxDimensions(bbox);
+    // Sample small sites more densely so terraces and approaches survive.
+    // This remains a bare-earth height field, not a scan of stairs or arches.
+    // IGN accepts at most 5,000 coordinates in a request.
+    const smallSite = Math.max(dimensions.widthM, dimensions.heightM) <= 800;
+    const grid = makeGrid(bbox, smallSite ? 5 : 20, smallSite ? 128 : 65);
     try {
       const response = await fetchWithTimeout(
         "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json",

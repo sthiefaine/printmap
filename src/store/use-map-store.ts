@@ -9,6 +9,7 @@ import type {
 import type { PrintModel } from "@/types/print";
 import { generatePrintModel } from "@/lib/mesh/build-client";
 import { validateBbox } from "@/lib/data/bbox";
+import { validateElevationGrid } from "@/lib/elevation/validate-grid";
 import { createDemoData, DEMO_BBOX } from "@/lib/demo";
 import { useSceneStore, type ProjectSnapshot } from "./use-scene-store";
 import { useAppStore } from "./use-app-store";
@@ -47,6 +48,7 @@ interface MapState {
   setStatus: (status: GenerationStatus) => void;
   setError: (error: string | null) => void;
   generate: () => Promise<void>;
+  refreshRelief: () => Promise<void>;
   rebuild: () => Promise<void>;
   invalidateModel: () => void;
   cancel: () => void;
@@ -186,6 +188,109 @@ export const useMapStore = create<MapState>((set, get) => ({
       clearTimeout(timeout);
     }
   },
+  refreshRelief: async () => {
+    const { bbox, osmData } = get();
+    if (!bbox || !osmData) return;
+    stopOperation();
+    const id = operation;
+    const currentController = new AbortController();
+    controller = currentController;
+    const signal = currentController.signal;
+    const timeout = setTimeout(
+      () =>
+        currentController.abort(
+          new Error(
+            "Le relief a dépassé le délai. Réessayez ou réduisez la zone.",
+          ),
+        ),
+      180000,
+    );
+    // Set this synchronously before the settings effect can schedule a mesh
+    // without the newly requested terrain. The existing geography stays local.
+    set({
+      status: "fetching",
+      error: null,
+      progress: 8,
+      progressLabel: "Récupération du relief de la zone existante…",
+      model: null,
+      buildKey: null,
+    });
+    try {
+      const response = await fetch("/api/elevation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bbox }),
+        signal,
+      });
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Le relief de cette zone n’est pas disponible. Réessayez.",
+        );
+      if (id !== operation || signal.aborted) return;
+      const elevationGrid = validateElevationGrid(data.elevationGrid);
+      const bounds = [
+        elevationGrid.south,
+        elevationGrid.west,
+        elevationGrid.north,
+        elevationGrid.east,
+      ];
+      if (
+        bounds.some(
+          (coordinate, index) => Math.abs(coordinate - bbox[index]) > 1e-8,
+        )
+      )
+        throw new Error(
+          "Le relief reçu ne correspond pas à la zone sélectionnée.",
+        );
+      const report = get().report;
+      const source =
+        typeof elevationGrid.source === "string" ? elevationGrid.source : null;
+      const warnings = Array.isArray(elevationGrid.warnings)
+        ? elevationGrid.warnings.filter(
+            (warning) => typeof warning === "string",
+          )
+        : [];
+      set({
+        elevationGrid,
+        report: report
+          ? {
+              ...report,
+              sources: [
+                ...new Set([...report.sources, ...(source ? [source] : [])]),
+              ],
+              warnings: [
+                ...new Set([
+                  ...report.warnings.filter(
+                    (warning) => !/^Relief indisponible/.test(warning),
+                  ),
+                  ...warnings,
+                ]),
+              ],
+              elevationSource: source,
+              elevationResolutionM: elevationGrid.resolutionM ?? null,
+            }
+          : null,
+        progress: 28,
+      });
+      clearTimeout(timeout);
+      useAppStore.getState().setViewMode("preview");
+      await get().rebuild();
+    } catch (err) {
+      if (id !== operation) return;
+      set({
+        error:
+          err instanceof Error
+            ? err.message
+            : "Impossible de récupérer le relief.",
+        status: "error",
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
   rebuild: async () => {
     const { bbox, osmData, elevationGrid, report } = get();
     if (!bbox || !osmData) return;
@@ -231,6 +336,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   invalidateModel: () => {
     stopOperation();
     set({
+      buildKey: null,
       model: null,
       status: "processing",
       progress: 30,

@@ -111,9 +111,25 @@ export function ExportPanel() {
         Télécharger le STL<span aria-hidden="true">↓</span>
       </button>
       <p className="field-hint">
-        3MF : couleurs par surface. STL : une matière. Les exports sont en
-        millimètres, posés à plat sur le plateau.
+        3MF : couleurs par surface. STL : une matière. À 0 mm, routes et jardins
+        se distinguent par leur couleur ; pour les lire en STL, choisissez une
+        légère gravure. Les exports sont en millimètres, posés à plat sur le
+        plateau.
       </p>
+      {model &&
+      (model.stats.basinRimCount > 0 ||
+        model.stats.reconstructedAqueductCount > 0) ? (
+        <p className="field-hint">
+          {model.stats.basinRimCount > 0
+            ? `${model.stats.basinRimCount} bordure${model.stats.basinRimCount > 1 ? "s" : ""} de bassin reconstituée${model.stats.basinRimCount > 1 ? "s" : ""}. `
+            : ""}
+          {model.stats.reconstructedAqueductCount > 0
+            ? `${model.stats.reconstructedAqueductCount} aqueduc${model.stats.reconstructedAqueductCount > 1 ? "s" : ""} reconstitué${model.stats.reconstructedAqueductCount > 1 ? "s" : ""}, ${model.stats.aqueductArchCount} arches au profil documentaire approché. `
+            : ""}
+          Consultez les hypothèses dans le rapport. Les voûtes peuvent demander
+          des supports dans le slicer.
+        </p>
+      ) : null}
       {report && !isDemo ? (
         <p className="field-hint export-attribution">
           Données ©{" "}

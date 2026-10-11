@@ -2,7 +2,6 @@ import Module, {
   type CrossSection,
   type Manifold,
   type ManifoldToplevel,
-  type Vec3,
 } from "manifold-3d";
 import type {
   PrintInput,
@@ -17,6 +16,20 @@ import type { Point2D, Polygon2D } from "@/types/geometry";
 import type { ElevationGrid } from "@/types/osm";
 import { createProjectionForBbox } from "../projection";
 import { sampleElevation } from "../elevation/sample-grid";
+import { makeStairFlight, type StairFlight } from "./stair-solid";
+import { makeMeasuredSolid } from "./measured-solid";
+import { makeSurveyedArch } from "./bridge-solid";
+import { makeMeasuredBridgeApproach } from "./measured-bridge-approach";
+import { removeNumericalShells } from "./retain-shells";
+import { openEdgeContacts } from "./open-edge-contacts";
+import { makeBasinRim } from "./basin-rim";
+import { buildMeasuredStairReference } from "./measured-stair-reference";
+import { makeAqueduct } from "./aqueduct-solid";
+import { buildMeasuredTerraces } from "./measured-terraces";
+import { makeMappedRetainingWall } from "./mapped-retaining-wall";
+import { repairNumericalTriangles } from "./repair-numerical-triangles";
+import { contractShortEdges } from "./contract-short-edges";
+import { parseLengthMeters } from "../osm/building-height";
 import {
   parseElements,
   type BuildingData,
@@ -24,6 +37,9 @@ import {
 } from "../osm/parse-elements";
 import { simplifyPolyline } from "../polygon/simplify";
 import { pointInPolygon } from "../polygon/point-in-polygon";
+import { makeRoof, makeMeasuredRoof } from "./roof-solid";
+import { repairCoincident } from "./repair-coincident";
+import { repairCollinear } from "./repair-collinear";
 
 let runtime: Promise<ManifoldToplevel> | undefined;
 async function getRuntime(): Promise<ManifoldToplevel> {
@@ -105,6 +121,9 @@ interface Terrain {
   gridVertices: Point2D[];
   gridEdges: [Point2D, Point2D][];
   maxZ: number;
+  terraceCount?: number;
+  terraceWarnings?: string[];
+  terraceSources?: string[];
 }
 
 function validElevation(grid: ElevationGrid | null): grid is ElevationGrid {
@@ -225,7 +244,7 @@ function makeTerrain(
       b = edge[(j + 1) % edge.length];
     triangles.push(a, a + count, b, b, a + count, b + count);
   }
-  const solid = arena.keep(
+  let solid = arena.keep(
     new cad.Manifold(
       new cad.Mesh({
         numProp: 3,
@@ -236,7 +255,7 @@ function makeTerrain(
   );
   // Use the identical piecewise planar interpolation as the top mesh, rather than
   // bilinear interpolation which would place foundations above/below that mesh.
-  const surfaceAt = (x: number, y: number) => {
+  const originalSurfaceAt = (x: number, y: number) => {
     const cx = Math.max(
       0,
       Math.min(cols - 1, ((x + width / 2) / width) * (cols - 1)),
@@ -258,7 +277,131 @@ function makeTerrain(
       ? z00 + u * (z10 - z00) + v * (z01 - z00)
       : z11 + (1 - v) * (z10 - z11) + (1 - u) * (z01 - z11);
   };
-  return { solid, surfaceAt, gridVertices, gridEdges, maxZ };
+  const terraces = buildMeasuredTerraces(
+    input.osmData.elements,
+    grid,
+    (lon, lat) =>
+      project.project(lon, lat).map((value) => value * sf) as Point2D,
+    sf,
+  );
+  const terraceWarnings: string[] = [];
+  const terraceSources: string[] = [];
+  const selection = arena.keep(cad.CrossSection.square([width, depth], true));
+  const elevationZ = (elevation: number) =>
+    base + Math.max(0, elevation - grid.minElev) * sf * exaggeration;
+  for (const terrace of terraces) {
+    const toSection = (polygon: Polygon2D) =>
+      arena.keep(
+        new cad.CrossSection([polygon.outer, ...polygon.holes], "EvenOdd"),
+      );
+    let section = arena.keep(
+      cad.CrossSection.union(terrace.polygons.map(toSection)),
+    );
+    const exclusions = terrace.exclusions.length
+      ? arena.keep(cad.CrossSection.union(terrace.exclusions.map(toSection)))
+      : null;
+    if (exclusions) section = arena.keep(section.subtract(exclusions));
+    section = arena.keep(section.intersect(selection));
+    if (section.isEmpty()) continue;
+    const rings = section.toPolygons();
+    let patchMax = base;
+    for (const ring of rings)
+      for (let i = 0; i < ring.length; i++) {
+        const point = ring[i];
+        patchMax = Math.max(
+          patchMax,
+          elevationZ(terrace.elevationAt(...point)),
+        );
+        gridVertices.push(point);
+        gridEdges.push([point, ring[(i + 1) % ring.length]]);
+      }
+    maxZ = Math.max(maxZ, patchMax);
+    const cutter = arena.keep(section.extrude(maxZ + 1));
+    let insertSection = arena.keep(
+      arena.keep(section.offset(0.001, "Miter")).intersect(selection),
+    );
+    // Numerical overlap belongs outside the patch, never inside a measured
+    // building exclusion where it could create a film on a vertical facade.
+    if (exclusions)
+      insertSection = arena.keep(insertSection.subtract(exclusions));
+    const platform = arena.keep(
+      arena.keep(insertSection.extrude(1)).warp((vertex) => {
+        vertex[2] =
+          vertex[2] > 0.5
+            ? elevationZ(terrace.elevationAt(vertex[0], vertex[1]))
+            : 0;
+      }),
+    );
+    solid = arena.keep(arena.keep(solid.subtract(cutter)).add(platform));
+    terraceWarnings.push(
+      `${terrace.name} : terrasse reconstituée dans ses limites cartographiées, pente ${terrace.slopePercent.toFixed(2)} %, niveau estimé par ${terrace.sampleCount} points du terrain (écart aux points du terrain ${terrace.fitRmsM.toFixed(2)} m). Le relevé raster lissé aux murs de soutènement est remplacé localement ; les jardins inférieurs gardent leur relief.`,
+    );
+    terraceSources.push(`${terrace.source} · ${terrace.sourceUrl}`);
+  }
+  let surfaceAt = (x: number, y: number) => {
+    const terrace = terraces.find((item) => item.contains(x, y));
+    return terrace
+      ? elevationZ(terrace.elevationAt(x, y))
+      : originalSurfaceAt(x, y);
+  };
+  if (
+    grid.source?.includes("IGN") &&
+    grid.resolutionM &&
+    grid.resolutionM <= 15
+  ) {
+    for (const id of [1305300161, 1305300162]) {
+      const element = input.osmData.elements.find(
+        (item) =>
+          item.type === "way" &&
+          item.id === id &&
+          item.tags?.barrier === "retaining_wall",
+      );
+      if (!element?.geometry?.length) continue;
+      const maximum = parseLengthMeters(
+        element.tags?.["printmap:structure_max_height"],
+      );
+      const wall = makeMappedRetainingWall(cad, arena, {
+        polylineMm: element.geometry.map(
+          (point) =>
+            project
+              .project(point.lon, point.lat)
+              .map((value) => value * sf) as Point2D,
+        ),
+        clip: selection,
+        resolutionMm: grid.resolutionM * sf,
+        surfaceAt,
+        terrainMaxZ: maxZ,
+        foundationZ: Math.max(0.2, base - 0.3),
+        sourceMaxHeightMm: maximum == null ? undefined : maximum * sf,
+        sourceVerticalUncertaintyMm: 1.5 * sf,
+      });
+      if (!wall) continue;
+      solid = arena.keep(
+        arena.keep(solid.subtract(wall.cutter)).add(wall.solid),
+      );
+      surfaceAt = wall.surfaceAt;
+      gridVertices.push(...wall.topVertices);
+      gridEdges.push(...wall.topEdges);
+      maxZ = Math.max(maxZ, wall.maxZ);
+      terraceWarnings.push(
+        `Mur de soutènement way/${id} : rupture reconstituée sur le tracé OSM, dans une bande de ${(wall.widthMm / sf).toFixed(1)} m. Niveaux variables estimés depuis ${wall.sampleCount} points du terrain hors zone lissée ; hauteur ${(wall.minimumHeightMm / sf).toFixed(2)}–${(wall.maximumHeightMm / sf).toFixed(2)} m. ${maximum == null ? "Maximum non renseigné." : `Maximum d’inventaire ${maximum} m utilisé pour le contrôle de cohérence, avec marge de 1,5 m, et non comme hauteur uniforme.`}`,
+      );
+      terraceSources.push(
+        "© OpenStreetMap contributors · murs cartographiés · ODbL · https://www.openstreetmap.org/copyright",
+        "Montpellier Méditerranée Métropole · ouvrages d’art · ODbL · https://data.montpellier3m.fr/dataset/ouvrages-dart-de-montpellier-mediterranee-metropole",
+      );
+    }
+  }
+  return {
+    solid,
+    surfaceAt,
+    gridVertices,
+    gridEdges,
+    maxZ,
+    terraceCount: terraces.length,
+    terraceWarnings,
+    terraceSources,
+  };
 }
 
 /** The maximum of a linear terrain surface lies at an intersection vertex. */
@@ -334,10 +477,14 @@ function cleanRing(ring: Point2D[]): Point2D[] {
   return result;
 }
 
-function roadIncluded(road: RoadData, input: PrintInput): boolean {
+function roadIncluded(
+  road: Pick<RoadData, "isUnderground" | "roadType" | "roadClass">,
+  input: PrintInput,
+): boolean {
   const settings = input.settings.features.roads;
   if (road.isUnderground || settings.roadTypeEnabled[road.roadType] === false)
     return false;
+  if (road.roadType === "steps") return settings.filter !== "major";
   if (!settings.footpathsEnabled && road.roadClass === "pedestrian")
     return false;
   return (
@@ -407,20 +554,9 @@ function stabilizeSolid(
   cad: ManifoldToplevel,
   arena: Arena,
   solid: Manifold,
+  minimumTolerance = 0.001,
 ): Manifold {
   const mesh = solid.getMesh();
-  const count = mesh.vertProperties.length / mesh.numProp;
-  const parent = new Uint32Array(count);
-  for (let i = 0; i < count; i++) parent[i] = i;
-  const root = (i: number): number => {
-    while (parent[i] !== i) {
-      parent[i] = parent[parent[i]];
-      i = parent[i];
-    }
-    return i;
-  };
-  for (let i = 0; i < mesh.mergeFromVert.length; i++)
-    parent[root(mesh.mergeFromVert[i])] = root(mesh.mergeToVert[i]);
   let maxCoordinate = 1;
   for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp)
     for (let j = 0; j < 3; j++)
@@ -428,74 +564,22 @@ function stabilizeSolid(
         maxCoordinate,
         Math.abs(mesh.vertProperties[i + j]),
       );
-  const tolerance = Math.max(0.0001, maxCoordinate * 0.0000005);
-  // Kernel simplification preserves material boundaries. At an intersection,
-  // those boundaries can contain edges smaller than a Float32 ULP. Contract
-  // such edges ourselves, then require the repaired topology to pass Manifold.
-  for (let i = 0; i < mesh.triVerts.length; i += 3)
-    for (let edge = 0; edge < 3; edge++) {
-      const a = root(mesh.triVerts[i + edge]),
-        b = root(mesh.triVerts[i + ((edge + 1) % 3)]);
-      if (a === b) continue;
-      const p = mesh.vertProperties,
-        ai = a * mesh.numProp,
-        bi = b * mesh.numProp;
-      if (
-        Math.hypot(
-          p[ai] - p[bi],
-          p[ai + 1] - p[bi + 1],
-          p[ai + 2] - p[bi + 2],
-        ) < tolerance
-      )
-        parent[b] = a;
-    }
-  const remap = new Map<number, number>();
-  const positions: number[] = [],
-    indices: number[] = [],
-    runIndex: number[] = [],
-    runOriginalID: number[] = [];
-  for (let run = 0; run < mesh.runOriginalID.length; run++) {
-    const start = indices.length;
-    for (let i = mesh.runIndex[run]; i < mesh.runIndex[run + 1]; i += 3) {
-      const roots = [
-        root(mesh.triVerts[i]),
-        root(mesh.triVerts[i + 1]),
-        root(mesh.triVerts[i + 2]),
-      ];
-      if (new Set(roots).size < 3) continue;
-      for (const key of roots) {
-        let mapped = remap.get(key);
-        if (mapped === undefined) {
-          mapped = positions.length / 3;
-          remap.set(key, mapped);
-          positions.push(
-            mesh.vertProperties[key * mesh.numProp],
-            mesh.vertProperties[key * mesh.numProp + 1],
-            mesh.vertProperties[key * mesh.numProp + 2],
-          );
-        }
-        indices.push(mapped);
-      }
-    }
-    if (indices.length > start) {
-      runIndex.push(start);
-      runOriginalID.push(mesh.runOriginalID[run]);
-    }
-  }
-  runIndex.push(indices.length);
+  const tolerance = Math.max(minimumTolerance, maxCoordinate * 0.0000005);
+  // A short edge alone does not authorise changing a surface's topology.
+  // Contract only native edges with a valid link and unchanged neighbouring
+  // winding, while retaining separate shells and export contact clearances.
   const rounded = arena.keep(
+    new cad.Manifold(contractShortEdges(cad, mesh, tolerance)),
+  );
+  const simplified = arena.keep(rounded.simplify(tolerance));
+  return arena.keep(
     new cad.Manifold(
-      new cad.Mesh({
-        numProp: 3,
-        vertProperties: new Float32Array(positions),
-        triVerts: new Uint32Array(indices),
-        runIndex: new Uint32Array(runIndex),
-        runOriginalID: new Uint32Array(runOriginalID),
-        tolerance,
-      }),
+      repairNumericalTriangles(
+        cad,
+        repairCollinear(cad, repairCoincident(cad, simplified.getMesh())),
+      ),
     ),
   );
-  return arena.keep(rounded.simplify(tolerance));
 }
 
 /** Check the exported coordinates, since STL consumers weld equal positions. */
@@ -560,10 +644,11 @@ export function validatePrintMesh(mesh: PrintMesh): void {
     const nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
       nz = ux * vy - uy * vx;
-    if (nx * nx + ny * ny + nz * nz <= 1e-20)
+    if (nx * nx + ny * ny + nz * nz <= 1e-20) {
       throw new Error(
         "Le maillage contient une face collinéaire sans surface imprimable.",
       );
+    }
     volume +=
       (p[a * 3] * (p[b * 3 + 1] * p[c * 3 + 2] - p[b * 3 + 2] * p[c * 3 + 1]) -
         p[a * 3 + 1] * (p[b * 3] * p[c * 3 + 2] - p[b * 3 + 2] * p[c * 3]) +
@@ -619,8 +704,17 @@ export async function buildPrintModel(
       components: 0,
       volumeMm3: 0,
       estimatedHeights: 0,
+      realRoofCount: 0,
+      taggedRoofCount: 0,
+      staircaseCount: 0,
+      measuredStructureCount: 0,
+      reconstructedBridgeCount: 0,
+      basinRimCount: 0,
+      reconstructedAqueductCount: 0,
+      aqueductArchCount: 0,
     };
-    const warnings: string[] = [];
+    const warnings: string[] = [...(terrain.terraceWarnings ?? [])];
+    const derivedSources: string[] = [...(terrain.terraceSources ?? [])];
     if (settings.base.topographyEnabled && !validElevation(input.elevationGrid))
       warnings.push("Relief indisponible : la maquette utilise un socle plat.");
     const solids: Manifold[] = [];
@@ -720,7 +814,120 @@ export async function buildPrintModel(
       );
       solids.push(tag(arena.keep(prism.intersect(raisedTerrain)), layer));
     };
+    // Replace the terrain inside the footprint, rather than stacking a slab on it.
+    // At zero offset the geometry stays exactly at the DEM surface, while the
+    // face provenance retains the colour of roads, gardens and water in 3MF.
+    // Later surfaces replace earlier ones, so a road through a park stays road.
+    const laySurface = (
+      section: CrossSection,
+      requestedOffset: number,
+      layer: PrintLayer,
+    ): void => {
+      if (!Number.isFinite(requestedOffset)) return;
+      const offset = Math.max(
+        requestedOffset,
+        1 - settings.base.basePlateThicknessMm,
+      );
+      if (offset !== requestedOffset)
+        warnings.push(
+          "La gravure a été limitée pour conserver au moins 1 mm de socle.",
+        );
+      if (offset <= 0 && terrain.terraceCount) {
+        if (offset < 0) {
+          const loweredTerrain = arena.keep(
+            terrain.solid.warp((vertex) => {
+              if (vertex[2] > 0) vertex[2] += offset;
+            }),
+          );
+          // Engrave twenty microns inside the footprint: crossing the exact edge
+          // of a vertical terrace can leave a coincident sheet after export.
+          // Subtraction from the current base preserves every existing cavity.
+          const engravingSection = arena.keep(
+            arena
+              .keep(section.offset(-0.02, "Miter"))
+              .intersect(arena.keep(clip.offset(-0.002, "Miter"))),
+          );
+          if (engravingSection.isEmpty()) return;
+          const engravingPrism = arena.keep(
+            engravingSection.extrude(terrain.maxZ + 1),
+          );
+          const engravingCutter = arena.keep(
+            engravingPrism.subtract(loweredTerrain),
+          );
+          base = arena.keep(base.subtract(engravingCutter));
+        }
+        // Keep the colour partition five microns inside the mapped boundary
+        // after its overlap. A terrace can have a vertical break on that exact
+        // boundary; cutting through it would recreate a coplanar contact film.
+        // The palette boundary remains outside the engraved step, so their
+        // edges cannot create coincident films while the ground is recoloured.
+        const bounded = arena.keep(
+          arena.keep(section.offset(-0.01, "Miter")).intersect(clip),
+        );
+        if (bounded.isEmpty()) return;
+        const prism = arena.keep(bounded.extrude(terrain.maxZ + 1));
+        const [inside, outside] = base.split(prism);
+        arena.keep(inside);
+        arena.keep(outside);
+        // Partition the current ground itself, including terrace corrections
+        // and cavities. Reusing a separate DEM skin can create coincident films
+        // along vertical walls. A five-micron overlap keeps the same volume and
+        // elevation while making the colour boundary robust to Float32 export.
+        const overlappingSection = arena.keep(
+          arena.keep(bounded.offset(0.005, "Miter")).intersect(clip),
+        );
+        const overlappingPrism = arena.keep(
+          overlappingSection.extrude(terrain.maxZ + 1),
+        );
+        const overlappingInside = arena.keep(base.intersect(overlappingPrism));
+        base = arena.keep(outside.add(tag(overlappingInside, layer)));
+        return;
+      }
+      const shiftedTerrain = (shift: number) =>
+        arena.keep(
+          terrain.solid.warp((vertex) => {
+            if (vertex[2] > 0) vertex[2] += shift;
+          }),
+        );
+      const top = shiftedTerrain(offset);
+      const underneath = shiftedTerrain(Math.min(offset, 0) - 0.3);
+      // Leave a two-micron rim at the clipped outer wall. That wall is already
+      // closed by the terrain; replacing it coplanarly can create duplicate
+      // boundary sheets after Float32 rounding at grid/selection intersections.
+      const insetClip = arena.keep(clip.offset(-0.002, "Miter"));
+      const bounded = arena.keep(section.intersect(insetClip));
+      if (bounded.isEmpty()) return;
+      const prism = arena.keep(
+        bounded.extrude(terrain.maxZ + Math.max(0, offset) + 1),
+      );
+      // A micron of horizontal overlap avoids duplicate vertical walls where
+      // independently clipped DEM triangles round to different Float32 planes.
+      // The top remains at the exact terrain height; no vertical embossing.
+      const insertSection = arena.keep(
+        arena
+          .keep(bounded.offset(0.001, "Miter"))
+          .intersect(arena.keep(clip.offset(-0.001, "Miter"))),
+      );
+      const insertPrism = arena.keep(
+        insertSection.extrude(terrain.maxZ + Math.max(0, offset) + 1),
+      );
+      const cutter = arena.keep(prism.subtract(underneath));
+      const insertCutter = arena.keep(insertPrism.subtract(underneath));
+      const insert = tag(arena.keep(top.intersect(insertCutter)), layer);
+      base = arena.keep(base.subtract(cutter));
+      base = arena.keep(base.add(insert));
+    };
     const parsed = parseElements(input.osmData.elements, bbox, scale);
+    if (settings.features.parks.enabled) {
+      if (parsed.parkOutlineIgnoredCount)
+        warnings.push(
+          `${parsed.parkOutlineIgnoredCount} contour(s) de parc ne sont pas assimilés à une pelouse : seules les surfaces végétalisées cartographiées sont colorées. Le sol non renseigné conserve sa couleur neutre.`,
+        );
+      if (parsed.parkOutlineFallbackCount)
+        warnings.push(
+          `${parsed.parkOutlineFallbackCount} parc(s) sont colorés à titre indicatif faute de surfaces végétalisées cartographiées ; leur contour ne décrit pas précisément les pelouses.`,
+        );
+    }
     onProgress(12, "Préparation des empreintes et du relief");
     const sharedVertices = new Map<string, Set<number>>();
     for (let i = 0; i < parsed.buildings.length; i++)
@@ -777,6 +984,32 @@ export async function buildPrintModel(
           height: Math.max(totalHeight, minBuildingHeightMm),
         });
       }
+    const measuredGroundZ = (
+      building: BuildingData,
+      section: CrossSection,
+    ): number => {
+      const grid = input.elevationGrid;
+      // A closed survey ground face is the shell's datum, not the local walking
+      // surface. Moving a podium up to the highest DEM point lifts its stairs.
+      if (
+        (building.measuredSolid || building.roofSurfaces?.length) &&
+        building.groundElevation != null &&
+        settings.base.topographyEnabled &&
+        terrain.gridVertices.length &&
+        grid?.source?.includes("IGN")
+      )
+        return (
+          settings.base.basePlateThicknessMm +
+          (building.groundElevation - grid.minElev) *
+            sf *
+            settings.base.elevationExaggeration
+        );
+      return footprintSurfaceMaximum(
+        section,
+        terrain,
+        settings.base.basePlateThicknessMm,
+      );
+    };
     // Area boundaries from OSM often touch building corners exactly. A tiny
     // clearance prevents four exterior faces from meeting on the same edge.
     const buildingMasks = preparedBuildings.map(({ section }) => section);
@@ -794,6 +1027,11 @@ export async function buildPrintModel(
     };
 
     const waters: CrossSection[] = [];
+    const basinRims: {
+      polygon: Polygon2D;
+      tags: Record<string, string>;
+      sourceId: string;
+    }[] = [];
     if (settings.features.water.enabled) {
       for (const water of parsed.waterAreas) {
         if (water.isOcean && !settings.features.water.oceanEnabled) continue;
@@ -807,6 +1045,12 @@ export async function buildPrintModel(
         if (section) {
           waters.push(section);
           stats.waterCount++;
+          if (
+            water.tags.water === "basin" ||
+            water.tags.landuse === "basin" ||
+            water.tags.amenity === "fountain"
+          )
+            basinRims.push(water);
         } else stats.discardedFeatures++;
       }
       for (const water of parsed.waterways) {
@@ -839,7 +1083,8 @@ export async function buildPrintModel(
           const cutter = tag(arena.keep(prism.subtract(lowered)), "water");
           base = arena.keep(base.subtract(cutter));
         }
-      } else emboss(waterSection, settings.features.water.heightMm, "water");
+      } else
+        laySurface(waterSection, settings.features.water.heightMm, "water");
     }
     for (const layer of ["sand", "parks", "piers"] as const) {
       if (!settings.features[layer].enabled) continue;
@@ -875,16 +1120,99 @@ export async function buildPrintModel(
         }
       const raw = combine(sections);
       const section = raw ? regularizeArea(raw) : null;
-      if (section) emboss(section, settings.features[layer].heightMm, layer);
+      if (section) {
+        if (layer === "piers")
+          emboss(section, settings.features[layer].heightMm, layer);
+        else laySurface(section, settings.features[layer].heightMm, layer);
+      }
     }
     onProgress(28, "Construction des routes et des espaces naturels");
     let supportedStructures = 0;
+    const stairs: StairFlight[] = [];
     if (settings.features.roads.enabled) {
       const roads: CrossSection[] = [];
+      let groupedStairs = 0,
+        estimatedStairs = 0,
+        unavailableStairs = 0,
+        measuredLandings = 0;
+      for (const area of parsed.roadAreas) {
+        const section = roadIncluded(area, input)
+          ? footprint(area.polygon)
+          : null;
+        if (section) {
+          roads.push(section);
+          stats.roadCount++;
+        } else stats.discardedFeatures++;
+      }
       for (const road of parsed.roads) {
         if (!roadIncluded(road, input)) {
           stats.discardedFeatures++;
           continue;
+        }
+        if (road.roadType === "steps") {
+          const reference = buildMeasuredStairReference(
+            road,
+            preparedBuildings.map(({ building }) => building),
+            (lon, lat) =>
+              projection
+                .project(lon, lat)
+                .map((value) => value * sf) as Point2D,
+            (building, elevation) => {
+              const prepared = preparedBuildings.find(
+                (item) => item.building === building,
+              )!;
+              return (
+                measuredGroundZ(building, prepared.section) +
+                (elevation - building.groundElevation!) *
+                  sf *
+                  settings.features.buildings.buildingScale
+              );
+            },
+            { scaleFactor: sf, fallbackSurfaceAt: terrain.surfaceAt },
+          );
+          let stairClip = clip;
+          if (reference) {
+            // Only mapped exposed floors may replace the surveyed architecture.
+            // The uncovered approach remains connected to the bare-earth DEM.
+            const buildingMask = footprint(reference.buildingFootprint, 0);
+            const floors = combine(
+              reference.walkablePolygons
+                .map((poly) => footprint(poly, 0))
+                .filter((part): part is CrossSection => !!part),
+            );
+            if (buildingMask && floors)
+              stairClip = arena.keep(
+                arena.keep(clip.subtract(buildingMask)).add(floors),
+              );
+          }
+          const flight = makeStairFlight(cad, arena, road, {
+            scaleFactor: sf,
+            halfWidth: Math.max(
+              minFeatureMm / 2,
+              road.halfWidth * settings.features.roads.widthMultiplier,
+            ),
+            minTreadMm: minFeatureMm,
+            minRiserMm: 0.12,
+            foundationZ: Math.max(
+              0.2,
+              settings.base.basePlateThicknessMm - 0.3,
+            ),
+            terrainMaxZ: terrain.maxZ,
+            surfaceAt: reference?.surfaceAt ?? terrain.surfaceAt,
+            hasElevation: !!reference || terrain.gridVertices.length > 0,
+            clip: stairClip,
+          });
+          if (flight) {
+            stairs.push(flight);
+            stats.staircaseCount++;
+            stats.roadCount++;
+            if (reference) measuredLandings++;
+            if (flight.grouped) groupedStairs++;
+            if (flight.estimatedRise || flight.estimatedCount)
+              estimatedStairs++;
+            continue;
+          }
+          unavailableStairs++;
         }
         const section = corridor(
           road.polyline,
@@ -893,50 +1221,483 @@ export async function buildPrintModel(
         if (section) {
           roads.push(section);
           stats.roadCount++;
-          if (road.isBridge) supportedStructures++;
+          if (
+            road.isBridge &&
+            !parsed.bridges.some((bridge) =>
+              road.polyline.some((point) =>
+                pointInPolygon(...point, bridge.polygon.outer),
+              ),
+            )
+          )
+            supportedStructures++;
         } else stats.discardedFeatures++;
       }
       const roadSection = combine(roads);
       if (roadSection)
-        emboss(roadSection, settings.features.roads.heightMm, "roads");
+        laySurface(roadSection, settings.features.roads.heightMm, "roads");
+      if (measuredLandings)
+        warnings.push(
+          `${measuredLandings} escalier(s) sont raccordés aux surfaces de circulation mesurées du relevé 3D ; les paliers hors couverture gardent l’altitude du terrain.`,
+        );
+      if (groupedStairs)
+        warnings.push(
+          `${groupedStairs} escalier(s) regroupent plusieurs marches pour conserver une profondeur imprimable et une montée d’au moins 0,12 mm ; la hauteur totale est conservée.`,
+        );
+      if (estimatedStairs)
+        warnings.push(
+          `${estimatedStairs} escalier(s) utilisent un nombre de marches ou une montée estimés lorsque ces mesures ne sont pas renseignées.`,
+        );
+      if (unavailableStairs)
+        warnings.push(
+          `${unavailableStairs} escalier(s) restent des chemins au niveau du sol : les altitudes ou dimensions disponibles ne permettent pas de relier des marches imprimables au terrain.`,
+        );
+    }
+    if (settings.features.piers.enabled) {
+      let missingBridges = 0;
+      let aqueductFootprint: CrossSection | null = null;
+      // This documentary profile belongs only to the identified Arceaux canal.
+      // Unknown aqueducts retain their mapped outline and an explicit warning.
+      const arceaux = input.osmData.elements.find(
+        (element) =>
+          element.type === "way" &&
+          element.id === 380742761 &&
+          element.tags?.bridge === "aqueduct",
+      );
+      if (arceaux?.geometry?.length) {
+        const axis = arceaux.geometry.map(
+          (point) =>
+            projection
+              .project(point.lon, point.lat)
+              .map((value) => value * sf) as Point2D,
+        );
+        const length = axis
+          .slice(1)
+          .reduce(
+            (sum, point, index) =>
+              sum +
+              Math.hypot(point[0] - axis[index][0], point[1] - axis[index][1]),
+            0,
+          );
+        const terminalLength = Math.min(length, 51 * sf);
+        const grid = terrain.gridVertices.length ? input.elevationGrid : null;
+        const deckZ = grid
+          ? settings.base.basePlateThicknessMm +
+            (57.774 - grid.minElev) * sf * settings.base.elevationExaggeration
+          : settings.base.basePlateThicknessMm + 21.68 * sf;
+        const aqueduct = makeAqueduct(cad, arena, {
+          axisPolylineMm: axis,
+          sections: [
+            ...(length > terminalLength + 0.001
+              ? [
+                  {
+                    fromMm: 0,
+                    toMm: length - terminalLength,
+                    kind: "pitot-double" as const,
+                  },
+                ]
+              : []),
+            {
+              fromMm: length - terminalLength,
+              toMm: length,
+              kind: "giral-terminal",
+              spanCount: 3,
+            },
+          ],
+          clip,
+          surfaceAt: terrain.surfaceAt,
+          terrainMaxZ: terrain.maxZ,
+          foundationZ: Math.max(0.2, settings.base.basePlateThicknessMm - 0.3),
+          deckZMm: deckZ,
+          scaleFactor: sf,
+          minFeatureMm,
+        });
+        if (aqueduct) {
+          base = arena.keep(base.subtract(aqueduct.cutter));
+          const aboveDeck = arena.keep(
+            arena
+              .keep(
+                aqueduct.footprint.extrude(
+                  Math.max(1, terrain.maxZ - deckZ + 1),
+                ),
+              )
+              .translate([0, 0, deckZ]),
+          );
+          base = arena.keep(base.subtract(aboveDeck));
+          solids.push(tag(aqueduct.solid, "buildings"));
+          aqueductFootprint = aqueduct.footprint;
+          stats.reconstructedAqueductCount++;
+          stats.aqueductArchCount += aqueduct.spanCount;
+          warnings.push(
+            `Aqueduc des Arceaux : reconstitution documentaire approchée, ${aqueduct.largeSpanCount} grandes et ${aqueduct.smallSpanCount} petites ouvertures dans la sélection. Profil Pitot tiré du plan historique coté ; trois travées terminales Giral. Leur répartition sur 51 m est une hypothèse, les portées terminales et épaisseurs ne sont pas levées. ${grid ? "Cote du canal estimée depuis la terrasse voisine à 57,774 m IGN69, sans mesure du tablier." : "Hauteur moyenne historique 21,68 m utilisée sur le socle plat."}${aqueduct.modifiedForPrinting ? " Piles ou voûtes épaissies pour l’impression." : ""}${aqueduct.boundarySupportCount ? ` ${aqueduct.boundarySupportCount} appui(s) ajoutés au bord de coupe pour soutenir les voûtes.` : ""}`,
+          );
+          derivedSources.push(
+            "Montpellier Méditerranée Métropole · plan historique de l’aqueduc, EstL0112-03 · domaine public · https://memonum-mediatheques.montpellier3m.fr/ark:/12148/btv1b106601010",
+            "Ministère de la Culture · aqueduc Saint-Clément, PA00103609 · https://pop.culture.gouv.fr/notice/merimee/PA00103609",
+          );
+        }
+      }
+      for (const bridge of parsed.bridges) {
+        const section = footprint(bridge.polygon);
+        if (!section) {
+          stats.discardedFeatures++;
+          continue;
+        }
+        if (
+          aqueductFootprint &&
+          /aqueduc.*arceaux/i.test(bridge.tags.name ?? "") &&
+          !arena.keep(section.intersect(aqueductFootprint)).isEmpty()
+        )
+          continue;
+        const contains = (point: Point2D) =>
+          pointInPolygon(...point, bridge.polygon.outer) &&
+          !bridge.polygon.holes.some((ring) => pointInPolygon(...point, ring));
+        // The mapped carried road identifies the span axis; a principal axis of
+        // the outline could instead follow the underpass and rotate the vault.
+        const segments = parsed.roads
+          .filter((road) => road.isBridge)
+          .flatMap((road) =>
+            road.polyline.slice(1).map((end, i) => {
+              const start = road.polyline[i];
+              return {
+                center: [
+                  (start[0] + end[0]) / 2,
+                  (start[1] + end[1]) / 2,
+                ] as Point2D,
+                axis: [end[0] - start[0], end[1] - start[1]] as Point2D,
+              };
+            }),
+          )
+          .filter((segment) => contains(segment.center))
+          .sort((a, b) => Math.hypot(...b.axis) - Math.hypot(...a.axis));
+        const segment = segments[0];
+        const span = parseLengthMeters(bridge.tags["printmap:bridge_span"]);
+        const clearance = parseLengthMeters(
+          bridge.tags["printmap:bridge_clearance"],
+        );
+        const surveyedDeck = parseLengthMeters(
+          bridge.tags["printmap:bridge_deck_elevation"],
+        );
+        const profile = bridge.tags["printmap:bridge_profile"]?.toLowerCase();
+        const grid = terrain.gridVertices.length ? input.elevationGrid : null;
+        const deckZ =
+          surveyedDeck != null && grid
+            ? settings.base.basePlateThicknessMm +
+              (surveyedDeck - grid.minElev) *
+                sf *
+                settings.base.elevationExaggeration
+            : footprintSurfaceMaximum(
+                section,
+                terrain,
+                settings.base.basePlateThicknessMm,
+              );
+        const foundationZ = Math.max(
+          0.2,
+          settings.base.basePlateThicknessMm - 0.3,
+        );
+        const approach =
+          segment && span && grid && profile?.includes("anse de panier")
+            ? makeMeasuredBridgeApproach(cad, arena, {
+                footprint: section,
+                clip,
+                center: segment.center,
+                axis: segment.axis,
+                roads: parsed.roads,
+                spanMm: span * sf,
+                resolutionMm:
+                  (grid.resolutionM ??
+                    Math.max(width / grid.cols / sf, depth / grid.rows / sf)) *
+                  sf,
+                terrainMaxZ: terrain.maxZ,
+                foundationZ,
+                surfaceAt: terrain.surfaceAt,
+              })
+            : null;
+        // Printing thickness must never determine the altitude of a road.
+        // Sample the connected lower street outside the bridge's DEM shadow.
+        const groundZ = approach?.groundZ;
+        const crownThickness = Math.max(0.15, Math.min(0.4, minFeatureMm / 2));
+        const arch =
+          segment &&
+          span &&
+          clearance &&
+          grid &&
+          groundZ != null &&
+          profile?.includes("anse de panier")
+            ? makeSurveyedArch(cad, arena, {
+                footprint: section,
+                clip,
+                center: approach!.center,
+                axis: approach!.axis,
+                spanMm: span * sf,
+                clearanceMm: clearance * sf,
+                groundZ,
+                deckZ,
+                foundationZ,
+                minThicknessMm: crownThickness,
+                profile: "basket-handle",
+              })
+            : null;
+        if (arch) {
+          base = arena.keep(base.subtract(approach!.cutter));
+          base = arena.keep(base.subtract(arch.cutter));
+          let floor = approach!.floorSolid;
+          if (settings.features.roads.enabled) {
+            const lowerRoads = parsed.roads.filter(
+              (road) =>
+                approach!.sourceIds.includes(road.sourceId) &&
+                roadIncluded({ ...road, isUnderground: false }, input),
+            );
+            const roadSections = lowerRoads.flatMap((road) => {
+              const shape = corridor(
+                road.polyline,
+                road.halfWidth * settings.features.roads.widthMultiplier,
+              );
+              return shape ? [shape] : [];
+            });
+            const roadSection = combine(roadSections);
+            if (roadSection) {
+              const prism = arena.keep(roadSection.extrude(terrain.maxZ + 1));
+              const underneath = arena.keep(floor.translate([0, 0, -0.3]));
+              const skin = arena.keep(
+                arena.keep(floor.intersect(prism)).subtract(underneath),
+              );
+              floor = arena.keep(floor.subtract(skin));
+              base = arena.keep(base.add(tag(skin, "roads")));
+              const restored = lowerRoads.filter(
+                (road) => road.isUnderground,
+              ).length;
+              stats.roadCount += restored;
+              stats.discardedFeatures -= restored;
+            }
+          }
+          base = arena.keep(base.add(tag(floor, "basePlate")));
+          // The DEM can smooth over the bridge. Its material above the surveyed
+          // deck must be removed as well, otherwise it hides the reconstructed
+          // vault and changes the documented deck elevation and thickness.
+          const aboveDeck = arena.keep(
+            arena
+              .keep(section.extrude(Math.max(1, terrain.maxZ - deckZ + 1)))
+              .translate([0, 0, deckZ]),
+          );
+          base = arena.keep(base.subtract(aboveDeck));
+          let bridgeSolid = arch.solid;
+          if (settings.features.roads.enabled) {
+            const carriedRoads = parsed.roads.filter(
+              (road) => road.isBridge && roadIncluded(road, input),
+            );
+            const shapes = carriedRoads.flatMap((road) => {
+              const shape = corridor(
+                road.polyline,
+                road.halfWidth * settings.features.roads.widthMultiplier,
+              );
+              return shape ? [arena.keep(shape.intersect(section))] : [];
+            });
+            const roadSection = combine(shapes);
+            if (roadSection && !roadSection.isEmpty()) {
+              const skin = arena.keep(
+                arena
+                  .keep(
+                    arch.solid.intersect(
+                      arena.keep(roadSection.extrude(deckZ + 1)),
+                    ),
+                  )
+                  .trimByPlane([0, 0, 1], deckZ - 0.3),
+              );
+              bridgeSolid = arena.keep(bridgeSolid.subtract(skin));
+              solids.push(tag(skin, "roads"));
+            }
+          }
+          solids.push(tag(bridgeSolid, "buildings"));
+          stats.reconstructedBridgeCount++;
+          warnings.push(
+            `${bridge.tags.name ?? "Pont"} : voûte reconstituée à partir de la portée (${span} m) et du passage (${clearance} m) documentés. Courbure elliptique approchée ; couronne minimale ${crownThickness} mm. Sol du boulevard et raccords estimés depuis ${approach!.sampleCount} points du terrain hors pont, pente ${approach!.slopePercent.toFixed(2)} %, correction limitée au passage et à ses accès. ${surveyedDeck != null ? `Cote du tablier IGN ${surveyedDeck} m, incertitude ${bridge.tags["printmap:bridge_deck_uncertainty"] ?? "non renseignée"} m.` : "Cote du tablier estimée depuis le relief."}`,
+          );
+        } else {
+          laySurface(section, 0, "piers");
+          missingBridges++;
+        }
+      }
+      if (missingBridges)
+        warnings.push(
+          `${missingBridges} pont(s) ou aqueduc(s) sont représentés par leur emprise au sol : les données ne fournissent pas de voûtes reconstructibles. Le contour ne représente pas leur volume architectural.`,
+        );
     }
     if (settings.features.buildings.enabled) {
       let flattenedRoofs = 0;
+      let approximateRoofs = 0;
+      let unavailableMeasuredRoofs = 0;
+      let unavailableStructures = 0;
+      let repairedStructureSeams = 0;
+      let repairedBuildingContacts = 0;
+      let replacedSurveyedFoundations = 0;
       for (let i = 0; i < preparedBuildings.length; i++) {
         const { building, section, height } = preparedBuildings[i];
         const polygons = section.toPolygons();
-        const surfaceZ = footprintSurfaceMaximum(
-          section,
-          terrain,
-          settings.base.basePlateThicknessMm,
-        );
+        const surfaceZ = measuredGroundZ(building, section);
+        const startZ = Math.max(0.2, settings.base.basePlateThicknessMm - 0.3);
+        const hasMeasuredRoof =
+          settings.features.buildings.roofs && !!building.roofSurfaces?.length;
+        let sourceRepairs = 0;
+        let measuredSolid =
+          building.measuredSolid && building.groundElevation != null
+            ? makeMeasuredSolid(cad, arena, building.measuredSolid, {
+                groundElevation: building.groundElevation,
+                project: projection.project,
+                scaleFactor: sf,
+                buildingScale: settings.features.buildings.buildingScale,
+                surfaceZ,
+                foundationZ: startZ,
+                minimumHeight: minBuildingHeightMm,
+                clip,
+                onRepair: (count) => {
+                  sourceRepairs += count;
+                },
+              })
+            : null;
+        const isMeasuredStructure = !!measuredSolid;
+        measuredSolid ??=
+          hasMeasuredRoof && building.groundElevation != null
+            ? makeMeasuredRoof(
+                cad,
+                arena,
+                building.roofSurfaces!,
+                building.groundElevation,
+                projection.project,
+                sf,
+                settings.features.buildings.buildingScale,
+                surfaceZ,
+                startZ,
+                section,
+                minBuildingHeightMm,
+              )
+            : null;
+        if (measuredSolid) {
+          try {
+            const stabilized = stabilizeSolid(cad, arena, measuredSolid);
+            const pieces = stabilized
+              .decompose()
+              .map((piece) => arena.keep(piece));
+            const supported = pieces.filter(
+              (piece) => piece.volume() > 0.000001,
+            );
+            if (
+              !supported.length ||
+              supported.some(
+                (piece) => piece.boundingBox().min[2] > startZ + 0.0001,
+              )
+            )
+              measuredSolid = null;
+            else {
+              let printable = removeNumericalShells(
+                cad,
+                arena,
+                stabilized,
+                (piece) => Math.abs(piece.volume()) > 0.000001,
+              );
+              const localRepair = openEdgeContacts(cad, arena, printable);
+              if (localRepair.repairedCount) {
+                const closed = arena.keep(
+                  new cad.Manifold(
+                    repairNumericalTriangles(
+                      cad,
+                      repairCollinear(
+                        cad,
+                        repairCoincident(cad, localRepair.solid.getMesh()),
+                      ),
+                    ),
+                  ),
+                );
+                printable = removeNumericalShells(
+                  cad,
+                  arena,
+                  closed,
+                  (piece) => Math.abs(piece.volume()) > 0.000001,
+                );
+              }
+              validatePrintMesh(extractMesh(printable, new Map()));
+              measuredSolid = printable;
+              repairedBuildingContacts += localRepair.repairedCount;
+            }
+          } catch {
+            measuredSolid = null;
+          }
+        }
+        if (building.measuredSolid && (!measuredSolid || !isMeasuredStructure))
+          unavailableStructures++;
+        if (hasMeasuredRoof && !measuredSolid) unavailableMeasuredRoofs++;
         const explicitRoof = settings.features.buildings.roofs
-          ? building.tags["roof:shape"]
+          ? building.tags["roof:shape"]?.trim().toLowerCase()
           : undefined;
-        const canRoof =
-          !building.polygon.holes.length &&
-          building.classification.footprintClass !== "complex" &&
-          (explicitRoof === "gabled" ||
-            explicitRoof === "hipped" ||
-            explicitRoof === "pyramidal");
+        const canRoof = !!explicitRoof && building.roofShape !== "flat";
         const roofHeight = canRoof
           ? Math.min(
-              height * 0.6,
-              building.roofHeight > 0
-                ? building.roofHeight *
-                    settings.features.buildings.buildingScale
-                : height * 0.25,
+              height,
+              building.roofHeight * settings.features.buildings.buildingScale,
             )
           : 0;
         const wallTop = surfaceZ + height - roofHeight;
         // Full foundation through the underlying terrain supports every building.
-        const startZ = Math.max(0.2, settings.base.basePlateThicknessMm - 0.3);
-        let solid = arena.keep(
-          arena
-            .keep(section.extrude(wallTop - startZ))
-            .translate([0, 0, startZ]),
-        );
-        if (canRoof && roofHeight > 0.02) {
+        let solid =
+          measuredSolid ??
+          arena.keep(
+            arena
+              .keep(section.extrude(wallTop - startZ))
+              .translate([0, 0, startZ]),
+          );
+        if (measuredSolid) {
+          stats.realRoofCount++;
+          if (isMeasuredStructure) stats.measuredStructureCount++;
+          if (isMeasuredStructure) repairedStructureSeams += sourceRepairs;
+          if (isMeasuredStructure) {
+            // The surveyed support footprint owns its ground. Letting the DEM
+            // run through a podium fabricates thin terrain/wall contact films.
+            // Use only explicit ground faces, including their holes; neither a
+            // roof projection nor the underside of a vault defines an abutment.
+            const supports = building
+              .measuredSolid!.surfaces.filter(
+                (surface) => surface.kind === "ground",
+              )
+              .map((surface) =>
+                arena.keep(
+                  new cad.CrossSection(
+                    [
+                      surface.outer.map(
+                        (point) =>
+                          projection
+                            .project(point.lon, point.lat)
+                            .map((value) => value * sf) as Point2D,
+                      ),
+                      ...surface.holes.map((ring) =>
+                        ring.map(
+                          (point) =>
+                            projection
+                              .project(point.lon, point.lat)
+                              .map((value) => value * sf) as Point2D,
+                        ),
+                      ),
+                    ],
+                    "EvenOdd",
+                  ),
+                ),
+              )
+              .filter((shape) => !shape.isEmpty());
+            if (supports.length) {
+              const support = arena.keep(
+                arena
+                  .keep(cad.CrossSection.union(supports))
+                  .offset(0.005, "Miter"),
+              );
+              const bounded = arena.keep(support.intersect(clip));
+              const cutter = arena.keep(
+                arena
+                  .keep(bounded.extrude(terrain.maxZ + 1))
+                  .translate([0, 0, startZ + 0.01]),
+              );
+              base = arena.keep(base.subtract(cutter));
+              replacedSurveyedFoundations++;
+            }
+          }
+        } else if (canRoof && roofHeight > 0.02) {
           const roof = makeRoof(
             cad,
             arena,
@@ -944,7 +1705,7 @@ export async function buildPrintModel(
             polygons,
             wallTop,
             roofHeight,
-            explicitRoof!,
+            building.roofShape,
           );
           const prism = arena.keep(
             arena
@@ -952,8 +1713,95 @@ export async function buildPrintModel(
               .translate([0, 0, wallTop - 0.03]),
           );
           solid = arena.keep(solid.add(arena.keep(roof.intersect(prism))));
+          stats.taggedRoofCount++;
+          if (
+            building.polygon.holes.length ||
+            building.classification.footprintClass === "complex" ||
+            (!building.tags["roof:height"] &&
+              !building.tags["roof:levels"] &&
+              !building.tags["roof:angle"])
+          )
+            approximateRoofs++;
         } else if (explicitRoof && explicitRoof !== "flat") flattenedRoofs++;
-        solids.push(tag(solid, "buildings"));
+        if (
+          measuredSolid &&
+          !isMeasuredStructure &&
+          preparedBuildings.length > 1
+        ) {
+          // Survey roof envelopes can touch neighbouring buildings on a single
+          // vertical edge. Give them five microns of horizontal overlap, without
+          // changing roof altitudes, so the final union has a finite junction.
+          // Complete architectural shells keep their source floor masks and
+          // openings: stretching those would misalign the measured stair cuts.
+          const sourceEnvelope = solid;
+          const bounds = solid.boundingBox();
+          const cx = (bounds.min[0] + bounds.max[0]) / 2;
+          const cy = (bounds.min[1] + bounds.max[1]) / 2;
+          const sx = 1 + 0.01 / Math.max(0.1, bounds.max[0] - bounds.min[0]);
+          const sy = 1 + 0.01 / Math.max(0.1, bounds.max[1] - bounds.min[1]);
+          solid = arena.keep(
+            solid.warp((vertex) => {
+              vertex[0] = cx + (vertex[0] - cx) * sx;
+              vertex[1] = cy + (vertex[1] - cy) * sy;
+            }),
+          );
+          const boundary = arena.keep(clip.extrude(bounds.max[2] + 1));
+          solid = arena.keep(solid.intersect(boundary));
+          try {
+            validatePrintMesh(extractMesh(solid, new Map()));
+          } catch {
+            // Float32 clipping can close a micron-scale gap between separate
+            // roof wings. Keep the already validated survey in that case;
+            // the optional overlap must not damage its source topology.
+            solid = sourceEnvelope;
+          }
+        }
+        // A clipped survey may have several separate roof envelopes, each
+        // supported by the common socle. Submit those as independent operands:
+        // a compound native operand can otherwise retain a closed terrain seam
+        // as a detached roof at the selection boundary. Architectural shells
+        // and envelopes containing negative cavity boundaries stay together.
+        const roofParts =
+          measuredSolid && !isMeasuredStructure
+            ? solid.decompose().map((part) => arena.keep(part))
+            : [];
+        if (
+          roofParts.length > 1 &&
+          roofParts.every((part) => part.volume() > 0) &&
+          roofParts.some((part) => {
+            const bounds = part.boundingBox();
+            return [
+              bounds.min[0] + width / 2,
+              width / 2 - bounds.max[0],
+              bounds.min[1] + depth / 2,
+              depth / 2 - bounds.max[1],
+            ].some((distance) => Math.abs(distance) <= 0.0001);
+          })
+        ) {
+          // A boundary alone does not justify changing the native operands.
+          // Verify that their compound union really retains a detached roof
+          // above the socle, as on B144777's clipped low northern panel. Other
+          // wings, including B140305's narrow north gap, remain together.
+          const surveyUnion = base.add(solid);
+          let detachedRoof = false;
+          try {
+            const surveyedComponents = surveyUnion.decompose();
+            try {
+              detachedRoof = surveyedComponents.some(
+                (component) =>
+                  component.volume() > 0.000001 &&
+                  component.boundingBox().min[2] > startZ + 0.0001,
+              );
+            } finally {
+              for (const component of surveyedComponents) component.delete();
+            }
+          } finally {
+            surveyUnion.delete();
+          }
+          if (detachedRoof)
+            for (const part of roofParts) solids.push(tag(part, "buildings"));
+          else solids.push(tag(solid, "buildings"));
+        } else solids.push(tag(solid, "buildings"));
         stats.buildingCount++;
         if (
           building.heightSource === "Estimation" ||
@@ -970,9 +1818,33 @@ export async function buildPrintModel(
             "Construction des bâtiments et des cours",
           );
       }
+      if (unavailableStructures)
+        warnings.push(
+          `${unavailableStructures} coque(s) 3D mesurée(s) n’ont pas pu être fermées ; leurs ouvertures et dessous ne sont pas garantis dans l’enveloppe de repli.`,
+        );
+      if (repairedStructureSeams)
+        warnings.push(
+          `${repairedStructureSeams} joint(s) ouverts du relevé 3D ont été fermés dans un plan déjà couvert par une face de la source ; les traversées architecturales sont conservées.`,
+        );
+      if (repairedBuildingContacts)
+        warnings.push(
+          `${repairedBuildingContacts} contact(s) de précision dans les relevés de bâtiments ont été ouverts localement sur 0,005 mm pour conserver leurs toitures détaillées.`,
+        );
+      if (replacedSurveyedFoundations)
+        warnings.push(
+          `${replacedSurveyedFoundations} appui(s) de coques mesurées remplacent le terrain sous leurs seules faces de fondation, avec raccord de précision de 0,005 mm. Les trous et passages architecturaux sont conservés.`,
+        );
       if (flattenedRoofs)
         warnings.push(
-          `${flattenedRoofs} toiture(s) complexe(s) représentée(s) à plat pour conserver un solide fiable.`,
+          `${flattenedRoofs} forme(s) de toiture non prise(s) en charge représentée(s) à plat.`,
+        );
+      if (approximateRoofs)
+        warnings.push(
+          `${approximateRoofs} toiture(s) suivent une forme renseignée avec des dimensions ou une implantation des pentes approximatives.`,
+        );
+      if (unavailableMeasuredRoofs)
+        warnings.push(
+          `${unavailableMeasuredRoofs} toiture(s) mesurée(s) incomplète(s) ou invalide(s) utilisent la représentation de repli renseignée dans les données.`,
         );
     }
     if (settings.base.frame.enabled) {
@@ -1006,11 +1878,77 @@ export async function buildPrintModel(
       const ring = arena.keep(outer.subtract(inner));
       emboss(ring, settings.base.frame.heightMm, "frame");
     }
+    for (const basin of basinRims) {
+      const outer = cleanRing(basin.polygon.outer);
+      if (outer.length < 3) continue;
+      // Keep the uncut water outline: a selection edge is not a basin wall.
+      const section = arena.keep(
+        new cad.CrossSection(
+          [
+            outer,
+            ...basin.polygon.holes
+              .map(cleanRing)
+              .filter((ring) => ring.length >= 3),
+          ],
+          "EvenOdd",
+        ),
+      );
+      const documentedHeight =
+        basin.tags.barrier === "wall"
+          ? parseLengthMeters(basin.tags.height)
+          : null;
+      const documentedWidth = parseLengthMeters(basin.tags["wall:width"]);
+      const rim = makeBasinRim(cad, arena, {
+        footprint: section,
+        clip,
+        terrainSolid: terrain.solid,
+        terrainMaxZ: terrain.maxZ,
+        foundationZ: Math.max(0.2, settings.base.basePlateThicknessMm - 0.3),
+        widthMm: (documentedWidth ?? 0) * sf,
+        heightMm: (documentedHeight ?? 0) * sf,
+        minWidthMm: Math.max(0.4, minFeatureMm / 2),
+        minHeightMm: 0.12,
+      });
+      if (rim) {
+        solids.push(tag(rim.solid, "buildings"));
+        stats.basinRimCount++;
+        warnings.push(
+          `Bassin ${basin.sourceId} : bordure sur le contour cartographié, largeur ${rim.widthMm.toFixed(2)} mm et hauteur ${rim.heightMm.toFixed(2)} mm dans la maquette. ${documentedHeight != null ? `Hauteur du mur renseignée ${documentedHeight} m ; ` : "Hauteur non renseignée ; "}${documentedWidth == null ? "largeur estimée ; " : ""}${rim.adjustedDimensions ? "dimensions adaptées pour l’impression." : "dimensions renseignées."}`,
+        );
+      }
+    }
     onProgress(72, "Fusion du socle et des détails en un seul solide");
-    const union = arena.keep(cad.Manifold.union([base, ...solids]));
+    let union = arena.keep(cad.Manifold.union([base, ...solids]));
+    // Carve source ramp faces after adding the surveyed shells, so the source
+    // ramps cannot cover the printable treads built on the same landings.
+    if (stairs.length) {
+      // Apply the replacement footprints together. Repeated alternating cuts
+      // and unions build a deep native operation history on dense city meshes.
+      const stairCutters = arena.keep(
+        cad.Manifold.union(stairs.map((flight) => flight.cutter)),
+      );
+      union = arena.keep(union.subtract(stairCutters));
+      union = arena.keep(
+        cad.Manifold.union([
+          union,
+          ...stairs.map((flight) => tag(flight.solid, "roads")),
+        ]),
+      );
+    }
+    // Remove numerical sheets before Float32 contraction can give their
+    // coincident opposite faces a spurious volume. Their effective thickness
+    // is below one coordinate step of the Float32 export, not printable matter.
+    const coordinateStep = Math.max(
+      0.00001,
+      Math.max(width, depth, terrain.maxZ) * 0.00000012,
+    );
+    const hasMaterial = (component: Manifold) =>
+      Math.abs(component.volume()) >
+      Math.max(0.000001, component.surfaceArea() * coordinateStep);
+    const cleanUnion = removeNumericalShells(cad, arena, union, hasMaterial);
     // The renderer/STL stores Float32 coordinates. Remove intersections smaller
     // than a micron before conversion so they cannot collapse into zero-area faces.
-    const merged = stabilizeSolid(cad, arena, union);
+    const merged = stabilizeSolid(cad, arena, cleanUnion);
     if (merged.status() !== "NoError" || merged.isEmpty())
       throw new Error(
         "Le moteur n’a pas pu produire un solide fermé. Réduisez la zone ou choisissez un profil plus épuré.",
@@ -1019,21 +1957,104 @@ export async function buildPrintModel(
     for (const component of components) arena.keep(component);
     // Coplanar boolean intersections can leave topological zero-volume shells.
     // They carry no printable material and must not become detached mesh faces.
-    const printable = components.filter(
-      (component) => component.volume() > 0.000001,
-    );
-    stats.components = printable.length;
-    if (printable.length !== 1)
+    // Internal voids have negative oriented boundary shells. They are not
+    // detached pieces and must remain in the original solid and export.
+    const underResolution = (component: Manifold): boolean => {
+      const volume = component.volume();
+      if (volume <= 0 || volume >= minFeatureMm ** 3) return false;
+      const bounds = component.boundingBox();
+      return (
+        bounds.min[2] > 0.001 &&
+        Math.min(
+          bounds.max[0] - bounds.min[0],
+          bounds.max[1] - bounds.min[1],
+          bounds.max[2] - bounds.min[2],
+        ) < minFeatureMm
+      );
+    };
+    const retained = (component: Manifold) =>
+      hasMaterial(component) && !underResolution(component);
+    const omittedFragments = components.filter(
+      (component) => hasMaterial(component) && underResolution(component),
+    ).length;
+    if (omittedFragments) {
+      stats.discardedFeatures += omittedFragments;
+      warnings.push(
+        `${omittedFragments} fragment(s) détaché(s) sous la résolution d’impression (${minFeatureMm} mm) ont été écartés. Les cavités des monuments sont conservées.`,
+      );
+    }
+    stats.components = components.filter(
+      (component) => retained(component) && component.volume() > 0,
+    ).length;
+    if (stats.components !== 1)
       throw new Error(
         "Le modèle contient des détails détachés du socle. Réduisez la zone ou désactivez les détails concernés.",
       );
-    const result = printable[0];
+    let result = removeNumericalShells(cad, arena, merged, retained);
+    const repairVolume = result.volume();
+    let removedVolume = 0;
+    let contactRepairs = 0;
+    let mesh: PrintMesh | undefined;
+    let failure: unknown;
+    for (let pass = 0; pass < 3; pass++) {
+      const beforeVolume = result.volume();
+      const contactRepair = openEdgeContacts(cad, arena, result);
+      contactRepairs += contactRepair.repairedCount;
+      // Check the actual Float32 export after each local cut. Its new vertices
+      // can expose another contact, as on the clipped Comedie roof. Keep the
+      // same clearance and total material budget; never simplify these cuts.
+      const recleaned = arena.keep(
+        new cad.Manifold(
+          repairNumericalTriangles(
+            cad,
+            repairCollinear(
+              cad,
+              repairCoincident(cad, contactRepair.solid.getMesh()),
+            ),
+          ),
+        ),
+      );
+      if (recleaned.status() !== "NoError")
+        throw new Error("La fermeture numérique du modèle a échoué.");
+      result = removeNumericalShells(cad, arena, recleaned, retained);
+      removedVolume += Math.max(0, beforeVolume - result.volume());
+      if (
+        removedVolume >
+        repairVolume * 0.0001 +
+          3 * Math.max(0.000001, repairVolume * 0.00000001)
+      )
+        throw new Error(
+          "La réparation du modèle dépasse la précision autorisée.",
+        );
+      const repairedPieces = result.decompose();
+      stats.components = repairedPieces.filter(
+        (piece) => piece.volume() > 0.000001,
+      ).length;
+      for (const piece of repairedPieces) piece.delete();
+      if (stats.components !== 1)
+        throw new Error(
+          "La réparation locale a laissé des détails détachés du socle.",
+        );
+      const candidate = extractMesh(result, materialIds);
+      try {
+        validatePrintMesh(candidate);
+        mesh = candidate;
+        break;
+      } catch (error) {
+        failure = error;
+      }
+      if (pass > 0 && !contactRepair.repairedCount) break;
+    }
+    if (!mesh) throw failure;
+    if (contactRepairs)
+      warnings.push(
+        `${contactRepairs} contact(s) de précision ont été ouverts localement sur 0,005 mm, en trois passages au maximum et avec un retrait cumulé limité à 0,01 % du volume du modèle. Les cavités sont conservées.`,
+      );
     stats.volumeMm3 = result.volume();
     const bounds = result.boundingBox();
-    const mesh = extractMesh(result, materialIds);
-    validatePrintMesh(mesh);
     stats.triangleCount = mesh.indices.length / 3;
     const tiles: PrintTile[] = [];
+    let tileContactRepairs = 0;
     const { cols, rows } = settings.base.grid;
     const widthMm = bounds.max[0] - bounds.min[0],
       depthMm = bounds.max[1] - bounds.min[1];
@@ -1053,18 +2074,68 @@ export async function buildPrintModel(
               .translate([minX, minY, 0]),
           );
           const cut = arena.keep(result.intersect(cube));
-          const cleaned = stabilizeSolid(cad, arena, cut);
-          const tile = arena.keep(
-            cleaned.translate([
-              -minX - tileWidth / 2,
-              -minY - tileDepth / 2,
-              0,
-            ]),
-          );
-          if (tile.status() !== "NoError" || tile.isEmpty())
-            throw new Error("Échec de la fermeture d’une tuile.");
-          const tileMesh = extractMesh(tile, materialIds);
-          validatePrintMesh(tileMesh);
+          // Prefer the tighter cut tolerance to conserve the repaired parent.
+          // Complex surveyed intersections can need its one-micron tolerance;
+          // either result must pass the same strict exported-mesh validation.
+          const finishCut = (tolerance: number): PrintMesh => {
+            // Translation changes Float32 rounding. Stabilize the coordinates
+            // that will actually be exported, including tiny cut intersections.
+            const localCut = arena.keep(
+              cut.translate([-minX - tileWidth / 2, -minY - tileDepth / 2, 0]),
+            );
+            let tile = stabilizeSolid(cad, arena, localCut, tolerance);
+            if (tile.status() !== "NoError" || tile.isEmpty())
+              throw new Error("Échec de la fermeture d’une tuile.");
+            const repairVolume = tile.volume();
+            let removedVolume = 0;
+            let repairedContacts = 0;
+            let failure: unknown;
+            // A local cut can expose another contact when its new vertices are
+            // rounded to Float32. Keep the same five-micron clearance and total
+            // removal budget across at most three strictly checked passes.
+            for (let pass = 0; pass < 3; pass++) {
+              const beforeVolume = tile.volume();
+              const repair = openEdgeContacts(cad, arena, tile);
+              repairedContacts += repair.repairedCount;
+              const closed = arena.keep(
+                new cad.Manifold(
+                  repairNumericalTriangles(
+                    cad,
+                    repairCollinear(
+                      cad,
+                      repairCoincident(cad, repair.solid.getMesh()),
+                    ),
+                  ),
+                ),
+              );
+              tile = removeNumericalShells(cad, arena, closed, retained);
+              removedVolume += Math.max(0, beforeVolume - tile.volume());
+              if (
+                removedVolume >
+                repairVolume * 0.0001 +
+                  3 * Math.max(0.000001, repairVolume * 0.00000001)
+              )
+                throw new Error(
+                  "La réparation d’une tuile dépasse la précision autorisée.",
+                );
+              const output = extractMesh(tile, materialIds);
+              try {
+                validatePrintMesh(output);
+                tileContactRepairs += repairedContacts;
+                return output;
+              } catch (error) {
+                failure = error;
+              }
+              if (pass > 0 && !repair.repairedCount) break;
+            }
+            throw failure;
+          };
+          let tileMesh: PrintMesh;
+          try {
+            tileMesh = finishCut(0.0001);
+          } catch {
+            tileMesh = finishCut(0.001);
+          }
           tiles.push({
             ...tileMesh,
             col,
@@ -1074,6 +2145,10 @@ export async function buildPrintModel(
           });
         }
     }
+    if (tileContactRepairs)
+      warnings.push(
+        `${tileContactRepairs} contact(s) de précision ont été ouverts localement dans les tuiles sur 0,005 mm, en trois passages au maximum et avec un retrait cumulé limité à 0,01 % du volume de chaque tuile. Les cavités sont conservées.`,
+      );
     if (stats.estimatedHeights)
       warnings.push(
         `${stats.estimatedHeights} bâtiment(s) utilisent une hauteur estimée faute de mesure disponible.`,
@@ -1093,7 +2168,7 @@ export async function buildPrintModel(
       dimensions: { widthMm, depthMm, heightMm: bounds.max[2] },
       stats,
       warnings,
-      sources: buildSources(input),
+      sources: [...new Set([...buildSources(input), ...derivedSources])],
       fetchedAt: input.report?.fetchedAt ?? new Date().toISOString(),
       osmTimestamp:
         input.report?.osmTimestamp ?? input.osmData.osm3s?.timestamp_osm_base,
@@ -1115,6 +2190,16 @@ export async function buildPrintModel(
 
 function buildSources(input: PrintInput): string[] {
   const sources = [...(input.report?.sources ?? ["OpenStreetMap · Overpass"])];
+  for (const element of input.osmData.elements) {
+    if (element.roofSource && element.roofSurfaces?.length)
+      sources.push(element.roofSource);
+    if (element.measuredSolid?.source)
+      sources.push(element.measuredSolid.source);
+    if (element.tags?.["printmap:structure_source"])
+      sources.push(element.tags["printmap:structure_source"]);
+    if (element.tags?.["printmap:bridge_deck_source"])
+      sources.push(element.tags["printmap:bridge_deck_source"]);
+  }
   if (sources.some((source) => /OpenStreetMap|OpenMapTiles/.test(source)))
     sources.push(
       "© OpenStreetMap contributors — ODbL · https://www.openstreetmap.org/copyright",
@@ -1127,56 +2212,17 @@ function buildSources(input: PrintInput): string[] {
     sources.push(
       "IGN — Licence Ouverte Etalab 2.0 · https://geoservices.ign.fr/conditions-utilisation",
     );
+  if (sources.some((source) => /Montpellier.*CityGML/.test(source)))
+    sources.push(
+      "Montpellier Méditerranée Métropole — bâtiments 3D 2020 · ODbL · https://data.montpellier3m.fr/dataset/batiments-3d-de-la-ville-et-metropole-de-montpellier",
+    );
+  if (sources.some((source) => /Montpellier.*ouvrages/.test(source)))
+    sources.push(
+      "Montpellier Méditerranée Métropole — ouvrages d’art · ODbL · https://data.montpellier3m.fr/dataset/ouvrages-dart-de-montpellier-mediterranee-metropole",
+    );
   if (sources.some((source) => /Open-Meteo|Copernicus/.test(source)))
     sources.push(
       "Copernicus DEM GLO-90 via Open-Meteo · https://open-meteo.com/en/docs/elevation-api · https://doi.org/10.5270/ESA-c5d3d65",
     );
   return [...new Set(sources)];
-}
-
-function makeRoof(
-  cad: ManifoldToplevel,
-  arena: Arena,
-  building: BuildingData,
-  polygons: Point2D[][],
-  baseZ: number,
-  height: number,
-  shape: string,
-): Manifold {
-  const axis = building.classification.dominantAxis;
-  const perp: Point2D = [-axis[1], axis[0]];
-  let minA = Infinity,
-    maxA = -Infinity,
-    minB = Infinity,
-    maxB = -Infinity;
-  const points: Vec3[] = [];
-  for (const ring of polygons)
-    for (const [x, y] of ring) {
-      // The lower ring overlaps the walls, while the upper eaves retain their
-      // actual height; the roof slope is not altered by the welding overlap.
-      points.push([x, y, baseZ], [x, y, baseZ - 0.02]);
-      const a = x * axis[0] + y * axis[1],
-        b = x * perp[0] + y * perp[1];
-      minA = Math.min(minA, a);
-      maxA = Math.max(maxA, a);
-      minB = Math.min(minB, b);
-      maxB = Math.max(maxB, b);
-    }
-  const centerA = (minA + maxA) / 2,
-    centerB = (minB + maxB) / 2;
-  const halfLong = (maxA - minA) / 2,
-    halfShort = (maxB - minB) / 2;
-  const ridge =
-    shape === "pyramidal"
-      ? 0
-      : shape === "hipped"
-        ? Math.max(0, halfLong - halfShort)
-        : halfLong;
-  for (const a of ridge ? [centerA - ridge, centerA + ridge] : [centerA])
-    points.push([
-      a * axis[0] + centerB * perp[0],
-      a * axis[1] + centerB * perp[1],
-      baseZ + height,
-    ]);
-  return arena.keep(cad.Manifold.hull(points));
 }

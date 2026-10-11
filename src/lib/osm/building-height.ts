@@ -4,6 +4,7 @@ import {
 } from "../constants";
 import type { RoofShape } from "../constants";
 import type { FootprintClassification } from "../polygon/footprint-classify";
+import { orientedFootprintBounds } from "../polygon/footprint-classify";
 import type { Point2D } from "@/types/geometry";
 
 /** OSM lengths are metres by default; support decimal commas and feet explicitly. */
@@ -47,7 +48,13 @@ export function getBuildingHeight(
   // 2. Level-based height
   if (tags["building:levels"]) {
     const levels = parseFloat(tags["building:levels"]);
-    if (!isNaN(levels) && levels > 0) return levels * 3;
+    const roofLevels = parseFloat(tags["roof:levels"]);
+    if (Number.isFinite(levels) && levels > 0)
+      return (
+        (levels +
+          (Number.isFinite(roofLevels) && roofLevels > 0 ? roofLevels : 0)) *
+        3
+      );
   }
 
   // Unknown height stays a conservative, clearly labelled estimate. A wide
@@ -86,75 +93,119 @@ const ROOF_SHAPE_MAP: Record<string, RoofShape> = {
   gabled: "gabled",
   hipped: "hipped",
   pyramidal: "pyramidal",
-  dome: "pyramidal",
-  onion: "pyramidal",
-  round: "pyramidal",
-  "half-hipped": "hipped",
-  gambrel: "gabled",
-  saltbox: "gabled",
-  mansard: "hipped",
+  skillion: "skillion",
+  dome: "dome",
+  cone: "cone",
+  onion: "onion",
+  round: "round",
+  "half-hipped": "half-hipped",
+  gambrel: "gambrel",
+  saltbox: "saltbox",
+  mansard: "mansard",
+  pitched: "gabled",
 };
-
-function applyClassificationOverride(
-  requested: RoofShape,
-  classification: FootprintClassification,
-): RoofShape {
-  const { footprintClass, convexity } = classification;
-
-  if (footprintClass === "complex") {
-    // Only force flat for truly irregular buildings (very low convexity)
-    // Buildings with moderate convexity (L-shapes, T-shapes) can still
-    // have hipped roofs — this matches OSM Buildings behavior
-    if (convexity < 0.55) return "flat";
-    // Moderately complex → hipped is safest (works on most shapes)
-    if (requested === "gabled") return "hipped";
-    if (requested === "pyramidal") return "hipped";
-    return requested;
-  }
-
-  if (footprintClass === "convex-simple") {
-    // Gabled works poorly on non-rectangular shapes → use hipped
-    if (requested === "gabled") return "hipped";
-    return requested;
-  }
-
-  // Rectangular: all roof shapes work fine
-  return requested;
-}
 
 export function getRoofShape(
   tags: Record<string, string>,
-  hasHoles: boolean,
-  classification: FootprintClassification,
+  _hasHoles: boolean,
+  _classification: FootprintClassification,
 ): RoofShape {
-  if (hasHoles) return "flat";
+  void _hasHoles;
+  void _classification;
+  // Footprint complexity is not evidence of a different roof shape. The solid
+  // generator clips the roof envelope to the complete footprint, including holes.
+  return ROOF_SHAPE_MAP[tags["roof:shape"]?.trim().toLowerCase()] ?? "flat";
+}
 
-  let requested: RoofShape;
-  const osmShape = tags["roof:shape"];
-  if (osmShape) {
-    requested = ROOF_SHAPE_MAP[osmShape] ?? "flat";
-  } else {
-    requested = "flat";
-  }
+const COMPASS_BEARINGS: Record<string, number> = {
+  N: 0,
+  NNE: 22.5,
+  NE: 45,
+  ENE: 67.5,
+  E: 90,
+  ESE: 112.5,
+  SE: 135,
+  SSE: 157.5,
+  S: 180,
+  SSW: 202.5,
+  SW: 225,
+  WSW: 247.5,
+  W: 270,
+  WNW: 292.5,
+  NW: 315,
+  NNW: 337.5,
+};
 
-  return applyClassificationOverride(requested, classification);
+/** Bearing denotes runoff, clockwise from north, rather than the ridge direction. */
+export function roofDirection(tags: Record<string, string>): Point2D | null {
+  const value = tags["roof:direction"]?.trim().toUpperCase();
+  if (!value) return null;
+  const bearing =
+    COMPASS_BEARINGS[value] ??
+    (/^[+-]?\d+(?:[.,]\d+)?(?:°)?$/.test(value)
+      ? Number(value.replace(",", ".").replace("°", ""))
+      : NaN);
+  if (!Number.isFinite(bearing)) return null;
+  const radians = (bearing * Math.PI) / 180;
+  return [Math.sin(radians), Math.cos(radians)];
+}
+
+export function roofRidgeAxis(
+  tags: Record<string, string>,
+  classification: FootprintClassification,
+): Point2D {
+  const downhill = roofDirection(tags);
+  if (downhill) return [-downhill[1], downhill[0]];
+  const axis = classification.dominantAxis;
+  return tags["roof:orientation"]?.trim().toLowerCase() === "across"
+    ? [-axis[1], axis[0]]
+    : axis;
+}
+
+export interface RoofFootprint {
+  points: Point2D[];
+  classification: FootprintClassification;
+  scaleFactor: number;
 }
 
 export function getRoofHeight(
   tags: Record<string, string>,
   totalHeight: number,
   roofShape: RoofShape,
+  footprint?: RoofFootprint,
 ): number {
   if (roofShape === "flat") return 0;
 
   if (tags["roof:height"]) {
+    if (/^0(?:[.,]0+)?(?:\s*m)?$/.test(tags["roof:height"].trim())) return 0;
     const h = parseLengthMeters(tags["roof:height"]);
-    if (h != null) return Math.min(h, totalHeight * 0.6);
+    if (h != null) return Math.min(h, totalHeight);
   }
 
   if (tags["roof:levels"]) {
-    const levels = parseInt(tags["roof:levels"], 10);
-    if (!isNaN(levels)) return Math.min(levels * 1.5, totalHeight * 0.6);
+    const levels = Number(tags["roof:levels"].replace(",", "."));
+    if (Number.isFinite(levels) && levels > 0)
+      return Math.min(levels * 3, totalHeight);
+  }
+
+  if (
+    footprint &&
+    ["gabled", "hipped", "pyramidal", "skillion", "half-hipped"].includes(
+      roofShape,
+    )
+  ) {
+    const angle = Number(tags["roof:angle"]?.replace(",", "."));
+    if (Number.isFinite(angle) && angle > 0 && angle < 85) {
+      const bounds = orientedFootprintBounds(
+        footprint.points,
+        roofRidgeAxis(tags, footprint.classification),
+      );
+      const run =
+        (bounds.maxAcross - bounds.minAcross) /
+        footprint.scaleFactor /
+        (roofShape === "skillion" ? 1 : 2);
+      return Math.min(run * Math.tan((angle * Math.PI) / 180), totalHeight);
+    }
   }
 
   return totalHeight * DEFAULT_ROOF_HEIGHT_RATIO[roofShape];

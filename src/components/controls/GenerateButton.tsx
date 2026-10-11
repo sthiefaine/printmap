@@ -1,5 +1,6 @@
 "use client";
 import { useMapStore } from "@/store/use-map-store";
+import { useSceneStore } from "@/store/use-scene-store";
 export function GenerateButton() {
   const bbox = useMapStore((s) => s.bbox);
   const status = useMapStore((s) => s.status);
@@ -7,12 +8,19 @@ export function GenerateButton() {
   const hasData = useMapStore((s) => !!s.osmData);
   const generate = useMapStore((s) => s.generate);
   const rebuild = useMapStore((s) => s.rebuild);
+  const refreshRelief = useMapStore((s) => s.refreshRelief);
+  const hasRelief = useMapStore((s) => !!s.elevationGrid);
+  const reliefEnabled = useSceneStore(
+    (s) => s.modelSettings.base.topographyEnabled,
+  );
   const busy = status === "fetching" || status === "processing";
   const resume = hasData && status !== "done";
   const label = busy
     ? "Préparation en cours…"
     : resume
-      ? "Construire avec les données reçues"
+      ? reliefEnabled && !hasRelief
+        ? "Récupérer le relief et construire"
+        : "Construire avec les données reçues"
       : status === "done"
         ? isDemo
           ? "Collecter les données réelles"
@@ -22,7 +30,13 @@ export function GenerateButton() {
     <button
       className="button button-primary button-full"
       disabled={!bbox || busy}
-      onClick={() => void (resume ? rebuild() : generate())}
+      onClick={() =>
+        void (resume
+          ? reliefEnabled && !hasRelief
+            ? refreshRelief()
+            : rebuild()
+          : generate())
+      }
     >
       <span aria-hidden="true">↗</span>
       {label}

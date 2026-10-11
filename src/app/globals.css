@@ -308,6 +308,7 @@ input[type="checkbox"] {
 }
 .quick-zones {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   margin: 9px 0 15px;
 }
@@ -321,6 +322,11 @@ input[type="checkbox"] {
 }
 .quick-zones button:hover {
   border-color: #96aa8d;
+}
+.selection-context {
+  padding: 9px 11px;
+  border-left: 2px solid #a5b691;
+  background: #f0f3e9;
 }
 .selection-actions {
   display: flex;
@@ -804,10 +810,42 @@ input[type="checkbox"] {
   border-radius: 7px !important;
   box-shadow: 0 2px 12px #23321c17 !important;
 }
-.map-notice {
+.map-tools {
   position: absolute;
   left: 24px;
   top: 22px;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  max-width: calc(100% - 48px);
+}
+.map-basemap-switch {
+  display: flex;
+  background: #fffefaed;
+  border: 1px solid #d8decfcc;
+  border-radius: 7px;
+  padding: 3px;
+  box-shadow: 0 5px 20px #23321c0c;
+}
+.map-basemap-switch button {
+  border: 0;
+  background: transparent;
+  color: #64735d;
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.map-basemap-switch button[aria-pressed="true"] {
+  background: #e8eedf;
+  color: #334d27;
+  font-weight: 650;
+}
+.map-basemap-switch button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.map-notice {
   padding: 11px 15px;
   background: #fffefaed;
   border: 1px solid #d8decfcc;
@@ -815,7 +853,12 @@ input[type="checkbox"] {
   box-shadow: 0 5px 20px #23321c0c;
   font-size: 11px;
   color: #6c7c62;
-  max-width: calc(100% - 48px);
+  max-width: 380px;
+}
+.map-reference {
+  margin: 7px 0 0;
+  line-height: 1.5;
+  color: #526a47;
 }
 .map-loading {
   height: 100%;
@@ -1180,13 +1223,15 @@ input[type="checkbox"] {
     padding: 0 18px;
     font-size: 9px;
   }
-  .map-notice,
+  .map-tools,
   .camera-tools {
     left: 17px;
     top: 17px;
   }
-  .map-notice {
+  .map-tools {
     max-width: calc(100% - 34px);
+  }
+  .map-notice {
     font-size: 10px;
   }
   .quality-report {
@@ -1217,4 +1262,113 @@ input[type="checkbox"] {
 .export-attribution a {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Compact model report leaves the object visible at every viewport size. */
+.quality-report {
+  left: auto;
+  right: 24px;
+  bottom: 21px;
+  width: 300px;
+  max-width: calc(100% - 48px);
+}
+.quality-report > summary {
+  padding: 10px 12px;
+  gap: 9px;
+}
+.quality-report summary > div {
+  min-width: 0;
+}
+.quality-report summary strong {
+  font-size: 10px;
+}
+.quality-report summary div > span {
+  font-size: 9px;
+}
+.quality-report summary > span:last-child {
+  font-size: 9px;
+  white-space: nowrap;
+}
+.quality-content {
+  max-height: 36vh;
+}
+.scene-hint {
+  bottom: 17px;
+  left: 24px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 9px;
+  background: #26372b6b;
+  border-radius: 4px;
+}
+.mobile-hint {
+  display: none;
+}
+.scale-precision {
+  margin: -7px 0 15px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #78876e;
+}
+.surface-level-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.surface-level-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 10px;
+  color: #607357;
+  border: 1px solid #e2e7d8;
+  background: #f7f9f1;
+  border-radius: 5px;
+}
+.surface-level-button[aria-pressed="true"] {
+  border-color: #c9d7ba;
+  background: #edf3e5;
+  color: #49673b;
+}
+@media (max-width: 1050px) {
+  .quality-report {
+    bottom: 50px;
+  }
+}
+@media (max-width: 760px) {
+  .quality-report {
+    bottom: 46px;
+    right: 17px;
+    left: auto;
+    width: 236px;
+    max-width: calc(100% - 34px);
+  }
+  .quality-report summary > span:last-child {
+    display: none;
+  }
+  .quality-check {
+    width: 21px;
+    height: 21px;
+  }
+  .quality-content {
+    max-height: 28vh;
+  }
+  .scene-hint {
+    left: 17px;
+    bottom: 14px;
+    font-size: 8px;
+  }
+  .desktop-hint {
+    display: none;
+  }
+  .mobile-hint {
+    display: inline;
+  }
+}
+
+.selection-actions {
+  flex-wrap: wrap;
 }

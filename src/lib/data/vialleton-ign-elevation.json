@@ -1,0 +1,44 @@
+{
+  "source": "https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=BDTOPO_V3:construction_lineaire&RESOURCEID=construction_lineaire.588486&SRSNAME=urn:ogc:def:crs:OGC:1.3:CRS84&OUTPUTFORMAT=application/json",
+  "license": "Licence Ouverte 2.0, IGN BD TOPO",
+  "feature": {
+    "type": "Feature",
+    "id": "construction_lineaire.588486",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [3.87238915, 43.61113582, 51.3],
+        [3.87223697, 43.61114514, 51],
+        [3.87212316, 43.61115325, 51.4]
+      ]
+    },
+    "geometry_name": "geometrie",
+    "properties": {
+      "cleabs": "CONSLINE0000000044468440",
+      "nature": "Pont",
+      "nature_detaillee": null,
+      "toponyme": null,
+      "statut_du_toponyme": null,
+      "importance": "5",
+      "etat_de_l_objet": "En service",
+      "date_creation": "2006-12-12T10:20:44.306Z",
+      "date_modification": "2017-02-09T10:18:02.614Z",
+      "date_d_apparition": null,
+      "date_de_confirmation": null,
+      "sources": null,
+      "identifiants_sources": null,
+      "methode_d_acquisition_planimetrique": "BDTopo",
+      "precision_planimetrique": 2.5,
+      "methode_d_acquisition_altimetrique": "BDTopo",
+      "precision_altimetrique": 1.5
+    }
+  },
+  "osmWayId": 436682851,
+  "municipalId": "PTM-MC4-01B-6905",
+  "municipalFeatureId": 407,
+  "observedAt": "2026-10-11",
+  "verticalDatum": "IGN69",
+  "documentation": "https://data.geopf.fr/annexes/ressources/documentation/DC_BDTOPO_3-5.pdf",
+  "licenseURL": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/",
+  "adjacentArcGroundElevation2020": 51.28
+}

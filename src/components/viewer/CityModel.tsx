@@ -43,7 +43,7 @@ export function CityModel() {
             (layer) =>
               new THREE.MeshStandardMaterial({
                 color: model.colors[layer],
-                roughness: layer === "water" ? 0.45 : 0.83,
+                roughness: layer === "water" ? 0.58 : 0.92,
                 metalness: 0,
                 flatShading: true,
               }),
@@ -58,5 +58,7 @@ export function CityModel() {
     },
     [geometry, materials],
   );
-  return geometry ? <mesh geometry={geometry} material={materials} /> : null;
+  return geometry ? (
+    <mesh geometry={geometry} material={materials} castShadow receiveShadow />
+  ) : null;
 }

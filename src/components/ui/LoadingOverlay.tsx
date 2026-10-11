@@ -1,5 +1,6 @@
 "use client";
 import { useMapStore } from "@/store/use-map-store";
+import { useSceneStore } from "@/store/use-scene-store";
 export function LoadingOverlay() {
   const status = useMapStore((s) => s.status);
   const error = useMapStore((s) => s.error);
@@ -9,6 +10,11 @@ export function LoadingOverlay() {
   const generate = useMapStore((s) => s.generate);
   const rebuild = useMapStore((s) => s.rebuild);
   const hasData = useMapStore((s) => !!s.osmData);
+  const hasRelief = useMapStore((s) => !!s.elevationGrid);
+  const refreshRelief = useMapStore((s) => s.refreshRelief);
+  const reliefEnabled = useSceneStore(
+    (s) => s.modelSettings.base.topographyEnabled,
+  );
   if (status !== "fetching" && status !== "processing" && status !== "error")
     return null;
   return (
@@ -24,7 +30,13 @@ export function LoadingOverlay() {
           <div className="job-actions">
             <button
               className="button button-primary"
-              onClick={() => void (hasData ? rebuild() : generate())}
+              onClick={() =>
+                void (hasData
+                  ? reliefEnabled && !hasRelief
+                    ? refreshRelief()
+                    : rebuild()
+                  : generate())
+              }
             >
               Réessayer
             </button>

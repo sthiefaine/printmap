@@ -1,0 +1,69 @@
+{
+  "source": "OpenStreetMap way8656870, enriched with IGN height",
+  "element": {
+    "type": "way",
+    "id": 8656870,
+    "bounds": {
+      "minlat": 43.6110531,
+      "minlon": 3.8723725,
+      "maxlat": 43.6112143,
+      "maxlon": 3.8724497
+    },
+    "nodes": [
+      61752418,
+      61752419,
+      6840237311,
+      61752420,
+      61752421,
+      2702355539,
+      61752418
+    ],
+    "geometry": [
+      {
+        "lat": 43.6112143,
+        "lon": 3.8723945
+      },
+      {
+        "lat": 43.6112102,
+        "lon": 3.8724497
+      },
+      {
+        "lat": 43.6111316,
+        "lon": 3.8724387
+      },
+      {
+        "lat": 43.6110531,
+        "lon": 3.8724277
+      },
+      {
+        "lat": 43.6110572,
+        "lon": 3.8723725
+      },
+      {
+        "lat": 43.6111369,
+        "lon": 3.872383
+      },
+      {
+        "lat": 43.6112143,
+        "lon": 3.8723945
+      }
+    ],
+    "tags": {
+      "addr:street": "Rue Foch",
+      "alt_name": "Arc de Triomphe",
+      "building": "yes",
+      "building:part": "no",
+      "height": "17.6",
+      "heritage": "2",
+      "historic": "city_gate",
+      "layer": "1",
+      "name": "Porte du Peyrou - Arc de Triomphe",
+      "ref:mhs": "PA00103609",
+      "wheelchair": "no",
+      "wikidata": "Q832351",
+      "wikipedia": "fr:Arc de triomphe (Montpellier)",
+      "printmap:eave_height": "17.6",
+      "printmap:height_source": "IGN \u00b7 hauteur \u00e0 la goutti\u00e8re"
+    }
+  }
+}

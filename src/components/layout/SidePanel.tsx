@@ -16,8 +16,13 @@ import { GenerateButton } from "@/components/controls/GenerateButton";
 import { SliderInput } from "@/components/controls/SliderInput";
 import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
 import { bboxDimensions } from "@/lib/data/bbox";
+import type { BBox } from "@/types/osm";
 
-function quickZone(type: "city" | "coast" | "nearby") {
+const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
+
+function quickZone(
+  type: "city" | "coast" | "peyrou" | "nearby" | "architecture",
+) {
   const store = useMapStore.getState();
   if (type === "city") {
     store.setSelectedCity({
@@ -33,19 +38,39 @@ function quickZone(type: "city" | "coast" | "nearby") {
       lng: 3.9315,
     });
     store.setBbox([43.5205, 3.9205, 43.5365, 3.9425]);
+  } else if (type === "peyrou") {
+    store.setSelectedCity({
+      name: "Peyrou · Arc et aqueduc",
+      lat: 43.6115,
+      lng: 3.8711,
+    });
+    useSceneStore.getState().updateBaseSettings({ topographyEnabled: true });
+    useSceneStore.getState().updateFeatureSettings("roads", {
+      filter: "all",
+      footpathsEnabled: true,
+    });
+    store.setBbox(PEYROU_BBOX);
   } else {
     const city = store.selectedCity || {
       name: "Montpellier",
       lat: 43.6119,
       lng: 3.8767,
     };
-    const deltaLat = 500 / 111195,
-      deltaLng = deltaLat / Math.cos((city.lat * Math.PI) / 180);
+    const center =
+      type === "architecture" && store.bbox
+        ? {
+            lat: (store.bbox[0] + store.bbox[2]) / 2,
+            lng: (store.bbox[1] + store.bbox[3]) / 2,
+          }
+        : city;
+    const halfSideM = type === "architecture" ? 150 : 500;
+    const deltaLat = halfSideM / 111195,
+      deltaLng = deltaLat / Math.cos((center.lat * Math.PI) / 180);
     store.setBbox([
-      city.lat - deltaLat,
-      city.lng - deltaLng,
-      city.lat + deltaLat,
-      city.lng + deltaLng,
+      center.lat - deltaLat,
+      center.lng - deltaLng,
+      center.lat + deltaLat,
+      center.lng + deltaLng,
     ]);
   }
   useAppStore.getState().setViewMode("map");
@@ -65,6 +90,9 @@ export function SidePanel() {
   const updatePrint = useSceneStore((s) => s.updatePrintSettings);
   const [tab, setTab] = useState<"layers" | "base">("layers");
   const dimensions = bbox ? getBboxDimensions(bbox, scale) : null;
+  const isPeyrouSelection =
+    selectedCity?.name === "Peyrou · Arc et aqueduc" &&
+    bbox?.every((coordinate, index) => coordinate === PEYROU_BBOX[index]);
   return (
     <aside className="side-panel" aria-label="Réglages du modèle">
       <section className="workflow-section">
@@ -79,6 +107,9 @@ export function SidePanel() {
         <div className="quick-zones">
           <button onClick={() => quickZone("city")}>Montpellier</button>
           <button onClick={() => quickZone("coast")}>Palavas · littoral</button>
+          <button onClick={() => quickZone("peyrou")}>
+            Peyrou · Arc et aqueduc
+          </button>
         </div>
         <div className="selection-actions">
           <SelectionTools />
@@ -87,6 +118,12 @@ export function SidePanel() {
             onClick={() => quickZone("nearby")}
           >
             Zone de 1 km²
+          </button>
+          <button
+            className="button button-quiet"
+            onClick={() => quickZone("architecture")}
+          >
+            Quartier de 300 m
           </button>
         </div>
         {bbox ? (
@@ -113,6 +150,15 @@ export function SidePanel() {
             km².
           </p>
         )}
+        {isPeyrouSelection ? (
+          <p className="field-hint selection-context">
+            Arc de triomphe, pont Vialleton, château d’eau et départ de
+            l’aqueduc. Relief et allées activés pour cette sélection. L’Arc et le
+            château d’eau utilisent le relevé 3D municipal ; les voûtes de
+            l’aqueduc sont reconstituées d’après un plan historique, avec des
+            dimensions et un placement approchés indiqués dans le rapport.
+          </p>
+        ) : null}
         <GenerateButton />
         <button
           className="demo-link"
@@ -162,6 +208,17 @@ export function SidePanel() {
               : "Proportions géographiques conservées"}
           </span>
         </div>
+        {dimensions ? (
+          <p className="scale-precision">
+            1 m réel ={" "}
+            {(1000 / scale).toLocaleString("fr-FR", {
+              maximumFractionDigits: 2,
+              minimumFractionDigits: 2,
+            })}{" "}
+            mm imprimé. Pour mieux voir l’architecture, choisissez une zone plus
+            petite ou une pièce plus grande.
+          </p>
+        ) : null}
         <div className="profiles" aria-label="Niveau de détail">
           {(Object.keys(PRINT_PROFILES) as PrintProfile[]).map((id) => (
             <button

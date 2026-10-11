@@ -1,4 +1,9 @@
-import type { OverpassElement, BBox } from "@/types/osm";
+import type {
+  OverpassElement,
+  BBox,
+  RoofSurface,
+  MeasuredSolid,
+} from "@/types/osm";
 import type { Point2D, Polygon2D } from "@/types/geometry";
 import type { RoofShape } from "../constants";
 import { ROAD_WIDTHS, WATERWAY_WIDTHS } from "../constants";
@@ -28,6 +33,10 @@ export interface BuildingData {
   heightSource?: string;
   sourceId?: string;
   minHeight?: number;
+  roofSurfaces?: RoofSurface[];
+  groundElevation?: number;
+  roofSource?: string;
+  measuredSolid?: MeasuredSolid;
 }
 
 export type RoadClass = "major" | "minor" | "pedestrian" | "railway";
@@ -49,7 +58,7 @@ const ROAD_CLASS_MAP: Record<string, RoadClass> = {
   footway: "pedestrian",
   path: "pedestrian",
   cycleway: "pedestrian",
-  pedestrian: "pedestrian",
+  pedestrian: "minor",
   track: "pedestrian",
   steps: "pedestrian",
   living_street: "minor",
@@ -60,6 +69,8 @@ export interface RoadData {
   halfWidth: number;
   roadClass: RoadClass;
   roadType: string;
+  tags: Record<string, string>;
+  sourceId: string;
   isUnderground: boolean;
   isBridge?: boolean;
 }
@@ -69,9 +80,18 @@ export interface WaterwayData {
   halfWidth: number;
 }
 
+export interface RoadAreaData {
+  polygon: Polygon2D;
+  roadClass: RoadClass;
+  roadType: string;
+  isUnderground: boolean;
+}
+
 export interface WaterPolygonData {
   polygon: Polygon2D;
   isOcean: boolean;
+  tags: Record<string, string>;
+  sourceId: string;
 }
 
 export interface PierLineData {
@@ -79,15 +99,27 @@ export interface PierLineData {
   halfWidth: number;
 }
 
+export interface BridgeData {
+  polygon: Polygon2D;
+  tags: Record<string, string>;
+  sourceId: string;
+}
+
 export interface ParsedOSMData {
   buildings: BuildingData[];
   roads: RoadData[];
+  roadAreas: RoadAreaData[];
   waterAreas: WaterPolygonData[];
   waterways: WaterwayData[];
   parks: Polygon2D[];
+  /** Park envelopes without mapped vegetation, retained as indicative colour. */
+  parkOutlineFallbackCount: number;
+  /** Park envelopes omitted in favour of their explicitly mapped vegetation. */
+  parkOutlineIgnoredCount: number;
   sandAreas: Polygon2D[];
   piers: Polygon2D[];
   pierLines: PierLineData[];
+  bridges: BridgeData[];
 }
 
 function projectAndScale(
@@ -138,7 +170,11 @@ function processWayBuilding(
   const footprintAreaM2 = computeFootprintAreaM2(outer, sf);
   const totalHeightM = getBuildingHeight(tags, footprintAreaM2);
   const roofShape = getRoofShape(tags, hasHoles, classification);
-  const roofHeightM = getRoofHeight(tags, totalHeightM, roofShape);
+  const roofHeightM = getRoofHeight(tags, totalHeightM, roofShape, {
+    points: outer,
+    classification,
+    scaleFactor: sf,
+  });
 
   return {
     polygon: { outer, holes },
@@ -151,6 +187,10 @@ function processWayBuilding(
     classification,
     minHeight: Math.max(0, parseLengthMeters(tags["min_height"]) ?? 0) * sf,
     sourceId: tags["printmap:source_id"] ?? `${el.type}/${el.id}`,
+    roofSurfaces: el.roofSurfaces,
+    groundElevation: el.groundElevation,
+    roofSource: el.roofSource,
+    measuredSolid: el.measuredSolid,
     heightSource:
       tags["printmap:height_source"] ??
       (parseLengthMeters(tags.height) != null ||
@@ -211,17 +251,178 @@ function isParkTag(tags?: Record<string, string>): boolean {
   );
 }
 
+/** A park describes a place's use; these tags describe its actual ground cover. */
+function isVegetationTag(tags?: Record<string, string>): boolean {
+  return (
+    !!tags &&
+    ([
+      "grass",
+      "meadow",
+      "forest",
+      "farmland",
+      "orchard",
+      "vineyard",
+      "village_green",
+    ].includes(tags.landuse) ||
+      ["wood", "grassland", "scrub", "heath", "wetland"].includes(
+        tags.natural,
+      ) ||
+      tags.surface === "grass")
+  );
+}
+
+type ParkArea = {
+  polygon: Polygon2D;
+  vegetation: boolean;
+  outline: boolean;
+};
+
+function polygonBounds(polygon: Polygon2D): [number, number, number, number] {
+  const box: [number, number, number, number] = [
+    Infinity,
+    Infinity,
+    -Infinity,
+    -Infinity,
+  ];
+  for (const [x, y] of polygon.outer) {
+    box[0] = Math.min(box[0], x);
+    box[1] = Math.min(box[1], y);
+    box[2] = Math.max(box[2], x);
+    box[3] = Math.max(box[3], y);
+  }
+  return box;
+}
+
+function pointOnRing(point: Point2D, ring: Point2D[]): boolean {
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[j],
+      b = ring[i];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (
+      Math.abs(
+        (b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0]),
+      ) <=
+        1e-7 * Math.max(1, length) &&
+      point[0] >= Math.min(a[0], b[0]) - 1e-7 &&
+      point[0] <= Math.max(a[0], b[0]) + 1e-7 &&
+      point[1] >= Math.min(a[1], b[1]) - 1e-7 &&
+      point[1] <= Math.max(a[1], b[1]) + 1e-7
+    )
+      return true;
+  }
+  return false;
+}
+
+function containsVegetation(park: Polygon2D, vegetation: Polygon2D): boolean {
+  const contains = (point: Point2D) =>
+    (pointInPolygon(point[0], point[1], park.outer) ||
+      pointOnRing(point, park.outer)) &&
+    !park.holes.some(
+      (hole) =>
+        pointInPolygon(point[0], point[1], hole) && !pointOnRing(point, hole),
+    );
+  if (!vegetation.outer.every(contains)) return false;
+  // Midpoints catch a mapped patch spanning a concave recess or a park exclusion.
+  for (
+    let i = 0, j = vegetation.outer.length - 1;
+    i < vegetation.outer.length;
+    j = i++
+  ) {
+    const a = vegetation.outer[j],
+      b = vegetation.outer[i];
+    if (!contains([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2])) return false;
+    const cross = (u: Point2D, v: Point2D, p: Point2D) =>
+      (v[0] - u[0]) * (p[1] - u[1]) - (v[1] - u[1]) * (p[0] - u[0]);
+    for (const ring of [park.outer, ...park.holes])
+      for (let k = 0, l = ring.length - 1; k < ring.length; l = k++) {
+        const c = ring[l],
+          d = ring[k];
+        // Reject crossings even when a narrow recess misses the midpoint.
+        if (
+          cross(a, b, c) * cross(a, b, d) < -1e-18 &&
+          cross(c, d, a) * cross(c, d, b) < -1e-18
+        )
+          return false;
+      }
+  }
+  // A patch enclosing a park hole is not contained unless its own hole excludes it.
+  return !park.holes.some((hole) =>
+    hole.some(
+      ([x, y]) =>
+        pointInPolygon(x, y, vegetation.outer) &&
+        !vegetation.holes.some(
+          (inner) => pointInPolygon(x, y, inner) || pointOnRing([x, y], inner),
+        ),
+    ),
+  );
+}
+
+function retainParkSurfaces(
+  areas: ParkArea[],
+  result: ParsedOSMData,
+  sf: number,
+): void {
+  const cellSize = Math.max(0.1, 100 * sf);
+  const vegetationCells = new Map<
+    string,
+    Array<{ polygon: Polygon2D; box: [number, number, number, number] }>
+  >();
+  for (const area of areas) {
+    if (!area.vegetation) continue;
+    const [x, y] = area.polygon.outer[0];
+    const key = `${Math.floor(x / cellSize)}/${Math.floor(y / cellSize)}`;
+    const bucket = vegetationCells.get(key) ?? [];
+    bucket.push({ polygon: area.polygon, box: polygonBounds(area.polygon) });
+    vegetationCells.set(key, bucket);
+  }
+  for (const area of areas) {
+    if (!area.outline) {
+      result.parks.push(area.polygon);
+      continue;
+    }
+    const box = polygonBounds(area.polygon);
+    const west = Math.floor(box[0] / cellSize),
+      east = Math.floor(box[2] / cellSize);
+    const south = Math.floor(box[1] / cellSize),
+      north = Math.floor(box[3] / cellSize);
+    const candidates = function* () {
+      // Very large imported polygons must not enumerate an unbounded grid.
+      if ((east - west + 1) * (north - south + 1) > vegetationCells.size) {
+        for (const bucket of vegetationCells.values()) yield* bucket;
+      } else {
+        for (let x = west; x <= east; x++)
+          for (let y = south; y <= north; y++)
+            yield* vegetationCells.get(`${x}/${y}`) ?? [];
+      }
+    };
+    let hasVegetation = false;
+    for (const candidate of candidates()) {
+      if (
+        candidate.box[0] < box[0] - 1e-7 ||
+        candidate.box[1] < box[1] - 1e-7 ||
+        candidate.box[2] > box[2] + 1e-7 ||
+        candidate.box[3] > box[3] + 1e-7
+      )
+        continue;
+      if (containsVegetation(area.polygon, candidate.polygon)) {
+        hasVegetation = true;
+        break;
+      }
+    }
+    if (hasVegetation) result.parkOutlineIgnoredCount++;
+    else {
+      result.parkOutlineFallbackCount++;
+      result.parks.push(area.polygon);
+    }
+  }
+}
+
 function isSandTag(tags?: Record<string, string>): boolean {
   return tags?.natural === "beach" || tags?.natural === "sand" || false;
 }
 
 function isPierTag(tags?: Record<string, string>): boolean {
-  return (
-    tags?.man_made === "pier" ||
-    tags?.man_made === "dock" ||
-    tags?.man_made === "bridge" ||
-    false
-  );
+  return tags?.man_made === "pier" || tags?.man_made === "dock" || false;
 }
 
 function processPolygonWay(
@@ -255,10 +456,13 @@ function processRelationPolygons(
 
 function featureCategory(tags?: Record<string, string>): string | null {
   if (tags?.building || tags?.["building:part"]) return "building";
+  if (tags?.["area:highway"] || (tags?.highway && tags.area === "yes"))
+    return "roadArea";
   if (isWaterTag(tags)) return "water";
   if (isParkTag(tags)) return "park";
   if (isSandTag(tags)) return "sand";
   if (isPierTag(tags)) return "pier";
+  if (tags?.man_made === "bridge") return "bridge";
   return null;
 }
 
@@ -326,13 +530,18 @@ export function parseElements(
   const result: ParsedOSMData = {
     buildings: [],
     roads: [],
+    roadAreas: [],
     waterAreas: [],
     waterways: [],
     parks: [],
+    parkOutlineFallbackCount: 0,
+    parkOutlineIgnoredCount: 0,
     sandAreas: [],
     piers: [],
     pierLines: [],
+    bridges: [],
   };
+  const parkAreas: ParkArea[] = [];
 
   const unique = [
     ...new Map(elements.map((el) => [`${el.type}/${el.id}`, el])).values(),
@@ -347,10 +556,19 @@ export function parseElements(
     const category = featureCategory(el.tags);
     if (!category) continue;
     for (const member of el.members ?? []) {
+      const memberTags =
+        member.ref == null ? undefined : ways.get(member.ref)?.tags;
+      // A functional park does not supersede a separately tagged grass patch.
+      // Other green multipolygons still supersede their duplicate member ways.
+      const explicitParkCover =
+        el.tags?.leisure === "park" &&
+        !isVegetationTag(el.tags) &&
+        isVegetationTag(memberTags);
       if (
         member.type === "way" &&
         member.ref != null &&
-        featureCategory(ways.get(member.ref)?.tags) === category
+        featureCategory(memberTags) === category &&
+        !explicitParkCover
       )
         memberFeatures.add(`way/${member.ref}`);
     }
@@ -370,6 +588,26 @@ export function parseElements(
           polygon.holes,
         );
         if (building) result.buildings.push(building);
+      }
+    }
+
+    // Real mapped plazas and broad pedestrian surfaces use their area, not a
+    // guessed corridor around the perimeter. Preserve multipolygon holes.
+    const areaRoadType =
+      el.tags?.["area:highway"] ??
+      (el.tags?.area === "yes" ? el.tags.highway : undefined);
+    if (
+      areaRoadType &&
+      !["construction", "proposed", "platform"].includes(areaRoadType)
+    ) {
+      for (const polygon of processRelationPolygons(el, project, sf, ways)) {
+        result.roadAreas.push({
+          polygon,
+          roadClass: ROAD_CLASS_MAP[areaRoadType] ?? "pedestrian",
+          roadType: areaRoadType,
+          isUnderground:
+            el.tags?.tunnel === "yes" || Number(el.tags?.layer ?? 0) < 0,
+        });
       }
     }
 
@@ -399,6 +637,8 @@ export function parseElements(
           halfWidth: (widthMeters * sf) / 2,
           roadClass,
           roadType,
+          tags: el.tags!,
+          sourceId: `${el.type}/${el.id}`,
           isUnderground,
           isBridge: !!el.tags?.bridge && el.tags.bridge !== "no",
         });
@@ -417,6 +657,8 @@ export function parseElements(
           halfWidth: (3 * sf) / 2,
           roadClass: "railway",
           roadType: "railway",
+          tags: el.tags,
+          sourceId: `${el.type}/${el.id}`,
           isUnderground,
           isBridge: !!el.tags?.bridge && el.tags.bridge !== "no",
         });
@@ -427,13 +669,23 @@ export function parseElements(
     if (el.type === "way" && isWaterTag(el.tags)) {
       const poly = processPolygonWay(el, project, sf);
       if (poly)
-        result.waterAreas.push({ polygon: poly, isOcean: isOcean(el.tags) });
+        result.waterAreas.push({
+          polygon: poly,
+          isOcean: isOcean(el.tags),
+          tags: el.tags!,
+          sourceId: `way/${el.id}`,
+        });
     }
 
     if (el.type === "relation" && isWaterTag(el.tags)) {
       const polys = processRelationPolygons(el, project, sf, ways);
       result.waterAreas.push(
-        ...polys.map((poly) => ({ polygon: poly, isOcean: isOcean(el.tags) })),
+        ...polys.map((poly) => ({
+          polygon: poly,
+          isOcean: isOcean(el.tags),
+          tags: el.tags!,
+          sourceId: `relation/${el.id}`,
+        })),
       );
     }
 
@@ -456,15 +708,15 @@ export function parseElements(
       }
     }
 
-    // ── Parks ──
-    if (el.type === "way" && isParkTag(el.tags)) {
-      const poly = processPolygonWay(el, project, sf);
-      if (poly) result.parks.push(poly);
-    }
-
-    if (el.type === "relation" && isParkTag(el.tags)) {
-      const polys = processRelationPolygons(el, project, sf, ways);
-      result.parks.push(...polys);
+    // Detailed vegetation takes precedence over a functional park envelope.
+    if (isParkTag(el.tags)) {
+      const vegetation = isVegetationTag(el.tags);
+      for (const polygon of processRelationPolygons(el, project, sf, ways))
+        parkAreas.push({
+          polygon,
+          vegetation,
+          outline: el.tags?.leisure === "park" && !vegetation,
+        });
     }
 
     // ── Sand / Beach ──
@@ -476,6 +728,18 @@ export function parseElements(
     if (el.type === "relation" && isSandTag(el.tags)) {
       const polys = processRelationPolygons(el, project, sf, ways);
       result.sandAreas.push(...polys);
+    }
+
+    // Bridge footprints are actual mapped outlines. Municipal location buffers
+    // are metadata and intentionally never receive man_made=bridge.
+    if (el.tags?.man_made === "bridge") {
+      for (const polygon of processRelationPolygons(el, project, sf, ways)) {
+        result.bridges.push({
+          polygon,
+          tags: el.tags,
+          sourceId: `${el.type}/${el.id}`,
+        });
+      }
     }
 
     // ── Piers / Docks ──
@@ -497,5 +761,6 @@ export function parseElements(
   }
 
   result.buildings = removeCoveredBuildingOutlines(result.buildings);
+  retainParkSurfaces(parkAreas, result, sf);
   return result;
 }

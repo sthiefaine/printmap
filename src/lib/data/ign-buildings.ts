@@ -1,7 +1,7 @@
-import type { BBox, LatLon, OverpassElement } from "@/types/osm";
+import earcut from "earcut";
+import type { BBox, OverpassElement } from "@/types/osm";
 import {
   elementPolygons,
-  geographicPointInRing,
   type GeographicPolygon,
 } from "@/lib/osm/relation-polygons";
 import { fetchWithTimeout } from "./request";
@@ -106,10 +106,51 @@ function featurePolygons(feature: IGNFeature): GeographicPolygon[] {
 }
 
 interface Footprint {
-  polygon: GeographicPolygon;
   bounds: BBox;
-  center: LatLon;
+  triangles: Point[][];
+  area: number;
   element: OverpassElement;
+}
+
+type Point = [number, number];
+
+function side(a: Point, b: Point, p: Point) {
+  return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+}
+
+function polygonArea(points: Point[]) {
+  let area = 0;
+  for (let i = 1; i + 1 < points.length; i++)
+    area += side(points[0], points[i], points[i + 1]);
+  return Math.abs(area) / 2;
+}
+
+/** Clip a triangle against another triangle; both coordinates share one origin. */
+function triangleIntersectionArea(a: Point[], b: Point[]) {
+  let clipped = a;
+  const orientation = side(b[0], b[1], b[2]) >= 0 ? 1 : -1;
+  for (let i = 0; i < 3 && clipped.length; i++) {
+    const start = b[i],
+      end = b[(i + 1) % 3];
+    const next: Point[] = [];
+    let previous = clipped.at(-1)!;
+    let previousSide = side(start, end, previous) * orientation;
+    for (const current of clipped) {
+      const currentSide = side(start, end, current) * orientation;
+      if (currentSide >= 0 !== previousSide >= 0) {
+        const fraction = previousSide / (previousSide - currentSide);
+        next.push([
+          previous[0] + (current[0] - previous[0]) * fraction,
+          previous[1] + (current[1] - previous[1]) * fraction,
+        ]);
+      }
+      if (currentSide >= 0) next.push(current);
+      previous = current;
+      previousSide = currentSide;
+    }
+    clipped = next;
+  }
+  return polygonArea(clipped);
 }
 
 function footprint(
@@ -124,13 +165,31 @@ function footprint(
     Math.max(...lat),
     Math.max(...lon),
   ];
+  const points: Point[] = [],
+    holes: number[] = [];
+  for (const [index, ring] of [polygon.outer, ...polygon.holes].entries()) {
+    if (index) holes.push(points.length);
+    // Local coordinates avoid cancellation at small footprints; intersection ratios
+    // are invariant under the common longitude/latitude scale within this selection.
+    points.push(
+      ...ring.map((p): Point => [p.lon - bounds[1], p.lat - bounds[0]]),
+    );
+  }
+  const indices = earcut(points.flat(), holes);
+  const triangles: Point[][] = [];
+  for (let i = 0; i < indices.length; i += 3)
+    triangles.push([
+      points[indices[i]],
+      points[indices[i + 1]],
+      points[indices[i + 2]],
+    ]);
   return {
-    polygon,
     bounds,
-    center: {
-      lat: (bounds[0] + bounds[2]) / 2,
-      lon: (bounds[1] + bounds[3]) / 2,
-    },
+    triangles,
+    area: triangles.reduce(
+      (total, triangle) => total + polygonArea(triangle),
+      0,
+    ),
     element,
   };
 }
@@ -148,12 +207,20 @@ function overlap(a: Footprint, b: Footprint) {
   const areaA = (a.bounds[2] - a.bounds[0]) * (a.bounds[3] - a.bounds[1]);
   const areaB = (b.bounds[2] - b.bounds[0]) * (b.bounds[3] - b.bounds[1]);
   if (intersection < Math.min(areaA, areaB) * 0.45) return 0;
-  if (
-    !geographicPointInRing(a.center, b.polygon.outer) &&
-    !geographicPointInRing(b.center, a.polygon.outer)
-  )
-    return 0;
-  return intersection / Math.max(areaA, areaB);
+  if (!a.area || !b.area) return 0;
+  const offsetX = b.bounds[1] - a.bounds[1],
+    offsetY = b.bounds[0] - a.bounds[0];
+  const bTriangles = b.triangles.map((triangle) =>
+    triangle.map(([x, y]): Point => [x + offsetX, y + offsetY]),
+  );
+  let actualIntersection = 0;
+  for (const triangleA of a.triangles)
+    for (const triangleB of bTriangles)
+      actualIntersection += triangleIntersectionArea(triangleA, triangleB);
+  // A courtyard is empty space, even when both bounding-box centres lie inside it.
+  // A slight survey offset or an adjacent shared boundary must not suppress a building.
+  if (actualIntersection < Math.min(a.area, b.area) * 0.45) return 0;
+  return Math.min(1, actualIntersection / Math.max(a.area, b.area));
 }
 
 function bucketKeys(bounds: BBox) {

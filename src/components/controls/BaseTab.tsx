@@ -9,6 +9,9 @@ export function BaseTab() {
   const update = useSceneStore((s) => s.updateBaseSettings);
   const elevationGrid = useMapStore((s) => s.elevationGrid);
   const hasData = useMapStore((s) => !!s.osmData);
+  const refreshRelief = useMapStore((s) => s.refreshRelief);
+  const status = useMapStore((s) => s.status);
+  const busy = status === "fetching" || status === "processing";
   return (
     <div className="settings-stack">
       <SliderInput
@@ -30,7 +33,11 @@ export function BaseTab() {
       </div>
       <ToggleSwitch
         checked={settings.topographyEnabled}
-        onChange={(topographyEnabled) => update({ topographyEnabled })}
+        onChange={(topographyEnabled) => {
+          update({ topographyEnabled });
+          if (topographyEnabled && hasData && !elevationGrid)
+            void refreshRelief();
+        }}
         label="Relief du terrain"
       />
       {settings.topographyEnabled ? (
@@ -47,10 +54,20 @@ export function BaseTab() {
             unit="×"
           />
           {hasData && !elevationGrid ? (
-            <p className="field-hint warning">
-              Relief absent des données actuelles. Relancez la collecte pour le
-              récupérer.
-            </p>
+            <div className="settings-stack">
+              <p className="field-hint warning">
+                Le relief manque dans ces données. Récupérez-le pour retrouver
+                les terrasses et variations du terrain en conservant les
+                bâtiments et votre zone.
+              </p>
+              <button
+                className="button button-secondary button-full"
+                disabled={busy}
+                onClick={() => void refreshRelief()}
+              >
+                Récupérer le relief
+              </button>
+            </div>
           ) : null}
         </>
       ) : null}

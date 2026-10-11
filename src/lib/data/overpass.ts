@@ -8,6 +8,7 @@ export function buildOverpassQuery(bbox: BBox) {
       wr["building"]["building"!="no"](${bb});
       wr["building:part"]["building:part"!="no"](${bb});
       way["highway"]["area"!="yes"](${bb});
+      wr["highway"]["area"="yes"](${bb});
       wr["area:highway"](${bb});
       way["railway"~"^(rail|light_rail|tram|narrow_gauge|preserved)$"](${bb});
       wr["leisure"~"^(park|garden|golf_course|pitch|recreation_ground|nature_reserve)$"](${bb});
@@ -17,7 +18,10 @@ export function buildOverpassQuery(bbox: BBox) {
       wr["water"]["water"!="sea"](${bb});
       wr["leisure"="swimming_pool"](${bb});
       way["natural"="coastline"](${bb});
-      wr["man_made"~"^(pier|dock|bridge)$"](${bb});
+      wr["man_made"~"^(pier|dock|bridge|aqueduct|embankment)$"](${bb});
+      wr["historic"~"^(city_gate|monument|aqueduct|ruins|castle|fort)$"](${bb});
+      way["barrier"~"^(wall|retaining_wall|city_wall)$"](${bb});
+      wr["bridge"]["bridge"!="no"](${bb});
     ); out body geom;`;
 }
 

@@ -63,6 +63,24 @@ function normalize(v: Point2D): Point2D {
   return [v[0] / len, v[1] / len];
 }
 
+/** Bounds in an explicit roof axis; a minimum rectangle alone loses tagged bearings. */
+export function orientedFootprintBounds(points: Point2D[], axis: Point2D) {
+  const perpendicular: Point2D = [-axis[1], axis[0]];
+  let minAlong = Infinity,
+    maxAlong = -Infinity,
+    minAcross = Infinity,
+    maxAcross = -Infinity;
+  for (const [x, y] of points) {
+    const along = x * axis[0] + y * axis[1];
+    const across = x * perpendicular[0] + y * perpendicular[1];
+    minAlong = Math.min(minAlong, along);
+    maxAlong = Math.max(maxAlong, along);
+    minAcross = Math.min(minAcross, across);
+    maxAcross = Math.max(maxAcross, across);
+  }
+  return { minAlong, maxAlong, minAcross, maxAcross };
+}
+
 function computeMinAreaOBB(points: Point2D[]): {
   axis: Point2D;
   halfLong: number;

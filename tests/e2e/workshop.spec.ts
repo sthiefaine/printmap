@@ -1,7 +1,20 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import JSZip from "jszip";
-import { createDemoData } from "../../src/lib/demo";
+import { createDemoData, DEMO_BBOX } from "../../src/lib/demo";
+import { getBboxDimensions } from "../../src/lib/mesh/base-plate-mesh";
+import { parseCityGMLBuilding } from "../../src/lib/data/citygml-parser";
+import {
+  enrichWithMunicipalRoofs,
+  MONTPELLIER_LOD2_SOURCE,
+} from "../../src/lib/data/montpellier-lod2";
+import { assertClosedSolid } from "../helpers/solid";
+import type {
+  BBox,
+  MapDataResponse,
+  OverpassElement,
+} from "../../src/types/osm";
+import type { PrintMesh } from "../../src/types/print";
 
 async function demo(page: Page) {
   await page
@@ -37,6 +50,81 @@ function stlBounds(bytes: Buffer) {
         max[axis] = Math.max(max[axis], value);
       }
   return { min, max, size: max.map((value, i) => value - min[i]) };
+}
+
+async function horizontalSurfaceHeights(bytes: Buffer, layer: string) {
+  const zip = await JSZip.loadAsync(bytes);
+  const xml = await zip.file("3D/3dmodel.model")!.async("string");
+  const materials = [...xml.matchAll(/<base name="([^"]+)"/g)].map(
+    (match) => match[1],
+  );
+  const material = materials.indexOf(layer);
+  expect(material).toBeGreaterThanOrEqual(0);
+  const vertices = [...xml.matchAll(/<vertex[^>]+z="([^"]+)"/g)].map((match) =>
+    Number(match[1]),
+  );
+  const heights: number[] = [];
+  for (const match of xml.matchAll(/<triangle\s+([^>]+)\/>/g)) {
+    const attributes = Object.fromEntries(
+      [...match[1].matchAll(/(\w+)="([^"]+)"/g)].map((attribute) => [
+        attribute[1],
+        attribute[2],
+      ]),
+    );
+    if (Number(attributes.p1) !== material) continue;
+    const z = [attributes.v1, attributes.v2, attributes.v3].map(
+      (index) => vertices[Number(index)],
+    );
+    if (Math.max(...z) - Math.min(...z) < 1e-5) heights.push(z[0]);
+  }
+  expect(heights.length).toBeGreaterThan(0);
+  return heights;
+}
+
+function meshFrom3MF(xml: string): PrintMesh {
+  const attributes = (text: string) =>
+    Object.fromEntries(
+      [...text.matchAll(/(\w+)="([^"]+)"/g)].map((attribute) => [
+        attribute[1],
+        Number(attribute[2]),
+      ]),
+    );
+  const vertices = [...xml.matchAll(/<vertex\s+([^>]+)\/>/g)].flatMap(
+    (match) => {
+      const vertex = attributes(match[1]);
+      return [vertex.x, vertex.y, vertex.z];
+    },
+  );
+  const triangles = [...xml.matchAll(/<triangle\s+([^>]+)\/>/g)].map((match) =>
+    attributes(match[1]),
+  );
+  return {
+    positions: new Float32Array(vertices),
+    indices: new Uint32Array(
+      triangles.flatMap((triangle) => [triangle.v1, triangle.v2, triangle.v3]),
+    ),
+    faceLayers: new Uint8Array(triangles.map((triangle) => triangle.p1)),
+  };
+}
+
+function enclosedDemoData(bbox: BBox) {
+  const data = createDemoData();
+  const [south, west, north, east] = bbox;
+  // Resize the synthetic fixture so all its geometry belongs to the requested
+  // area, while retaining its known roads, buildings and natural surfaces.
+  for (const element of data.osmData.elements)
+    for (const point of element.geometry || []) {
+      point.lat =
+        south +
+        ((point.lat - DEMO_BBOX[0]) / (DEMO_BBOX[2] - DEMO_BBOX[0])) *
+          (north - south);
+      point.lon =
+        west +
+        ((point.lon - DEMO_BBOX[1]) / (DEMO_BBOX[3] - DEMO_BBOX[1])) *
+          (east - west);
+    }
+  data.elevationGrid = { ...data.elevationGrid, south, west, north, east };
+  return data;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -107,13 +195,11 @@ test("saved project restores the zone and raw data without network collection", 
   await expect(
     page.getByRole("button", { name: "Télécharger le STL", exact: true }),
   ).toBeDisabled();
-  await page
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: saved.name,
-      mimeType: "application/json",
-      buffer: saved.bytes,
-    });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: saved.name,
+    mimeType: "application/json",
+    buffer: saved.bytes,
+  });
   await expect(
     page.getByText("Projet restauré, données disponibles hors ligne.", {
       exact: true,
@@ -206,4 +292,504 @@ test("small screens expose settings and return to the model", async ({
     () => document.documentElement.scrollWidth > window.innerWidth,
   );
   expect(overflow).toBe(false);
+});
+
+test("a 300 m district exports surfaces at ground level and keeps engraving reversible", async ({
+  page,
+}) => {
+  let collectedBbox: BBox | undefined;
+  await page.route("**/api/map-data", async (route) => {
+    const { bbox } = route.request().postDataJSON() as { bbox: BBox };
+    collectedBbox = bbox;
+    const data = enclosedDemoData(bbox);
+    await route.fulfill({ json: { ...data, elevationGrid: null } });
+  });
+  await page.getByRole("button", { name: "Montpellier", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Quartier de 300 m", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+
+  const flat = await download(page, "Télécharger le 3MF");
+  for (const layer of ["roads", "parks", "water", "sand"])
+    for (const height of await horizontalSurfaceHeights(flat.bytes, layer))
+      expect(height).toBeCloseTo(3, 4);
+
+  const roads = page
+    .locator("details.feature-card")
+    .filter({ has: page.getByText("Routes et chemins", { exact: true }) });
+  await roads.getByText("Routes et chemins", { exact: true }).click();
+  const offset = roads.getByRole("slider", { name: "Décalage vertical" });
+  await offset.press("Home");
+  for (let i = 0; i < 8; i++) await offset.press("ArrowRight");
+  await expect(offset).toHaveValue("-0.4");
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const engraved = await download(page, "Télécharger le 3MF");
+  for (const height of await horizontalSurfaceHeights(engraved.bytes, "roads"))
+    expect(height).toBeCloseTo(2.6, 4);
+
+  await roads.getByRole("button", { name: /^Au niveau du terrain/ }).click();
+  await expect(offset).toHaveValue("0");
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const restored = await download(page, "Télécharger le 3MF");
+  for (const height of await horizontalSurfaceHeights(restored.bytes, "roads"))
+    expect(height).toBeCloseTo(3, 4);
+  const bounds = stlBounds((await download(page, "Télécharger le STL")).bytes);
+  expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(200, 2);
+  const saved = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(saved.snapshot.bbox).toEqual(collectedBbox);
+  const district = getBboxDimensions(saved.snapshot.bbox, 1000);
+  expect(Math.max(district.widthMm, district.heightMm)).toBeCloseTo(300, 1);
+  for (const layer of ["roads", "parks", "water", "sand"])
+    expect(saved.settings.features[layer].heightMm).toBe(0);
+});
+
+test("Peyrou preset collects relief and all park access routes, then saves its exact site", async ({
+  page,
+}) => {
+  let request: { bbox: BBox; relief: boolean } | undefined;
+  let collections = 0;
+  await page.route("**/api/map-data", async (route) => {
+    collections++;
+    request = route.request().postDataJSON() as typeof request;
+    await route.fulfill({ json: enclosedDemoData(request!.bbox) });
+  });
+  await page
+    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
+    .click();
+  await expect(
+    page.getByText(/Relief et allées activés pour cette sélection/),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  expect(request?.relief).toBe(true);
+  expect(request?.bbox).toEqual([43.6099, 3.8677, 43.6131, 3.8745]);
+
+  const saved = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(saved.snapshot.bbox).toEqual(request?.bbox);
+  expect(saved.settings.base.topographyEnabled).toBe(true);
+  expect(saved.settings.features.roads.filter).toBe("all");
+  expect(saved.settings.features.roads.footpathsEnabled).toBe(true);
+  expect(saved.snapshot.elevationGrid.south).toBe(request?.bbox[0]);
+  expect(saved.snapshot.elevationGrid.east).toBe(request?.bbox[3]);
+  const bounds = stlBounds((await download(page, "Télécharger le STL")).bytes);
+  expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(200, 2);
+  expect(bounds.size[2]).toBeGreaterThan(
+    saved.settings.base.basePlateThicknessMm,
+  );
+
+  // Turning fine paths off remains an explicit reversible choice; one action
+  // restores the complete access network without another collection request.
+  const roads = page
+    .locator("details.feature-card")
+    .filter({ has: page.getByText("Routes et chemins", { exact: true }) });
+  await roads.getByText("Routes et chemins", { exact: true }).click();
+  await roads
+    .getByRole("combobox", { name: "Réseau visible" })
+    .selectOption("minor");
+  const allPaths = roads.getByRole("button", {
+    name: "Afficher allées et escaliers",
+  });
+  await expect(allPaths).toHaveAttribute("aria-pressed", "false");
+  await allPaths.click();
+  await expect(allPaths).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    roads.getByRole("combobox", { name: "Réseau visible" }),
+  ).toHaveValue("all");
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const restored = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(restored.settings.features.roads.footpathsEnabled).toBe(true);
+  expect(restored.snapshot.bbox).toEqual(request?.bbox);
+  expect(collections).toBe(1);
+});
+
+test("terrain can be recovered after a flat collection without replacing the stairs or source date", async ({
+  page,
+}) => {
+  const fetchedAt = "2020-07-01T10:00:00Z";
+  const osmTimestamp = "2020-06-30T23:00:00Z";
+  let collectionCalls = 0;
+  let elevationCalls = 0;
+  let collectedBbox: BBox | undefined;
+  let collectedElements: OverpassElement[] = [];
+  await page.route("**/api/map-data", async (route) => {
+    collectionCalls++;
+    const { bbox, relief } = route.request().postDataJSON() as {
+      bbox: BBox;
+      relief: boolean;
+    };
+    expect(relief).toBe(false);
+    collectedBbox = bbox;
+    const [south, west, north, east] = bbox;
+    collectedElements = [
+      {
+        type: "way",
+        id: 910001,
+        tags: { highway: "steps", step_count: "12", width: "6", incline: "up" },
+        geometry: [
+          { lat: south + (north - south) * 0.35, lon: (west + east) / 2 },
+          { lat: south + (north - south) * 0.45, lon: (west + east) / 2 },
+        ],
+      },
+    ];
+    const response: MapDataResponse = {
+      osmData: {
+        elements: collectedElements,
+        osm3s: { timestamp_osm_base: osmTimestamp },
+      },
+      elevationGrid: null,
+      report: {
+        sources: ["Escalier synthétique de test"],
+        warnings: [],
+        fetchedAt,
+        osmTimestamp,
+        areaKm2: 0.09,
+        elementCount: 1,
+        buildingCount: 0,
+        measuredBuildingCount: 0,
+        ignBuildingCount: 0,
+        elevationSource: null,
+        elevationResolutionM: null,
+        seaCoverage: "unavailable",
+      },
+    };
+    await route.fulfill({ json: response });
+  });
+  await page.route("**/api/elevation", async (route) => {
+    elevationCalls++;
+    const { bbox } = route.request().postDataJSON() as { bbox: BBox };
+    expect(bbox).toEqual(collectedBbox);
+    const [south, west, north, east] = bbox;
+    // Two plateaux separated by a four metre terrace; the stairway crosses
+    // the incline, so its rebuilt flights must connect to the actual terrain.
+    const rows = 33,
+      cols = 2;
+    const points = Array.from({ length: rows * cols }, (_, index) => {
+      const y = Math.floor(index / cols) / (rows - 1);
+      return 40 + 4 * Math.max(0, Math.min(1, (y - 0.35) / 0.1));
+    });
+    await route.fulfill({
+      json: {
+        elevationGrid: {
+          south,
+          west,
+          north,
+          east,
+          rows,
+          cols,
+          points,
+          minElev: 40,
+          maxElev: 44,
+          source: "Terrasse synthétique de test",
+          resolutionM: 9.375,
+        },
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Montpellier", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Quartier de 300 m", exact: true })
+    .click();
+  await page.getByRole("tab", { name: "Socle et relief", exact: true }).click();
+  const reliefToggle = page.getByRole("checkbox", {
+    name: "Relief du terrain",
+    exact: true,
+  });
+  await reliefToggle.uncheck();
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  const flat = stlBounds((await download(page, "Télécharger le STL")).bytes);
+  expect(flat.size[2]).toBeCloseTo(3, 4);
+
+  await reliefToggle.check();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  expect(elevationCalls).toBe(1);
+  expect(collectionCalls).toBe(1);
+  const terrain = stlBounds((await download(page, "Télécharger le STL")).bytes);
+  expect(terrain.min[2]).toBe(0);
+  expect(terrain.size[2]).toBeGreaterThan(5);
+  expect(Math.max(...terrain.size.slice(0, 2))).toBeCloseTo(200, 2);
+  await page.getByText("Rapport du modèle", { exact: true }).click();
+  await expect(
+    page
+      .locator("p")
+      .filter({ has: page.getByText("Escaliers", { exact: true }) }),
+  ).toContainText("1 volée reconstruite");
+  const zip = await JSZip.loadAsync(
+    (await download(page, "Télécharger le 3MF")).bytes,
+  );
+  const xml = await zip.file("3D/3dmodel.model")!.async("string");
+  assertClosedSolid(meshFrom3MF(xml));
+  expect(xml).toContain("Terrasse synthétique de test");
+  const saved = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(saved.snapshot.bbox).toEqual(collectedBbox);
+  expect(saved.snapshot.osmData.elements).toEqual(collectedElements);
+  expect(saved.snapshot.osmData.osm3s.timestamp_osm_base).toBe(osmTimestamp);
+  expect(saved.snapshot.report.fetchedAt).toBe(fetchedAt);
+  expect(saved.snapshot.report.osmTimestamp).toBe(osmTimestamp);
+  expect(saved.snapshot.report.elevationSource).toBe(
+    "Terrasse synthétique de test",
+  );
+  expect(
+    saved.snapshot.elevationGrid.maxElev - saved.snapshot.elevationGrid.minElev,
+  ).toBe(4);
+  expect(saved.settings.base.topographyEnabled).toBe(true);
+});
+
+test("aerial reference switching preserves the selected site and rectangle drawing on both backgrounds", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("https://tiles.openfreemap.org/styles/liberty", (route) =>
+    route.fulfill({
+      json: {
+        version: 8,
+        sources: {},
+        layers: [
+          {
+            id: "test-background",
+            type: "background",
+            paint: { "background-color": "#dce3d3" },
+          },
+        ],
+      },
+    }),
+  );
+  let aerialTiles = 0;
+  const aerialTile = await readFile(
+    new URL("../fixtures/aerial-reference-tile.png", import.meta.url),
+  );
+  await page.route("https://data.geopf.fr/wmts?**", (route) => {
+    aerialTiles++;
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get("LAYER")).toBe("ORTHOIMAGERY.ORTHOPHOTOS");
+    expect(url.searchParams.get("TILEMATRIXSET")).toBe("PM_0_19");
+    // An isolated image fixture keeps the test independent from IGN availability.
+    return route.fulfill({
+      contentType: "image/png",
+      body: aerialTile,
+    });
+  });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
+    .click();
+  const backgrounds = page.getByRole("group", {
+    name: "Fond de carte",
+    exact: true,
+  });
+  await backgrounds
+    .getByRole("button", { name: "Photo aérienne (France)", exact: true })
+    .click();
+  await expect(
+    backgrounds.getByRole("button", {
+      name: "Photo aérienne (France)",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/Référence visuelle IGN/)).toBeVisible();
+  await expect.poll(() => aerialTiles).toBeGreaterThan(0);
+  await expect(
+    page.getByText("Dessinez un rectangle : cliquez sur deux coins opposés.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const original = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(original.snapshot.bbox).toEqual([43.6099, 3.8677, 43.6131, 3.8745]);
+  expect(original.snapshot.osmData).toBeNull();
+
+  const drawRectangle = async (horizontalOffset = 0) => {
+    const bounds = await page.locator(".map-canvas canvas").boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.mouse.click(
+      bounds!.x + bounds!.width * (0.35 + horizontalOffset),
+      bounds!.y + bounds!.height * 0.45,
+    );
+    await page.mouse.move(
+      bounds!.x + bounds!.width * (0.6 + horizontalOffset),
+      bounds!.y + bounds!.height * 0.7,
+      { steps: 4 },
+    );
+    await page.mouse.click(
+      bounds!.x + bounds!.width * (0.6 + horizontalOffset),
+      bounds!.y + bounds!.height * 0.7,
+    );
+    return JSON.parse((await download(page, "Enregistrer")).bytes.toString());
+  };
+  const aerialSelection = await drawRectangle();
+  expect(aerialSelection.snapshot.bbox).not.toEqual(original.snapshot.bbox);
+  expect(aerialSelection.snapshot.bbox[2]).toBeGreaterThan(
+    aerialSelection.snapshot.bbox[0],
+  );
+  expect(aerialSelection.snapshot.bbox[3]).toBeGreaterThan(
+    aerialSelection.snapshot.bbox[1],
+  );
+  await backgrounds.getByRole("button", { name: "Carte", exact: true }).click();
+  await expect(
+    page.getByText("Dessinez un rectangle : cliquez sur deux coins opposés.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const kept = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(kept.snapshot.bbox).toEqual(aerialSelection.snapshot.bbox);
+  const cartographicSelection = await drawRectangle(-0.05);
+  expect(cartographicSelection.snapshot.bbox).not.toEqual(
+    aerialSelection.snapshot.bbox,
+  );
+  expect(cartographicSelection.snapshot.bbox[2]).toBeGreaterThan(
+    cartographicSelection.snapshot.bbox[0],
+  );
+  expect(cartographicSelection.snapshot.bbox[3]).toBeGreaterThan(
+    cartographicSelection.snapshot.bbox[1],
+  );
+  expect(cartographicSelection.snapshot.osmData).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test("the real municipal Peyrou gate reaches the preview and closed 3MF export as a complete measured volume", async ({
+  page,
+}) => {
+  const building = parseCityGMLBuilding(
+    await readFile(
+      new URL("../fixtures/montpellier-lod2-arc-b137169.xml", import.meta.url),
+      "utf8",
+    ),
+  );
+  expect(building).not.toBeNull();
+  expect(building!.measuredSolid!.surfaces).toHaveLength(90);
+  // The existing OSM envelope must be replaced: extruding it as well as the
+  // real surveyed gate would fill its opening again.
+  const osmGate: OverpassElement = {
+    type: "way",
+    id: 8656870,
+    tags: {
+      building: "yes",
+      height: "0",
+      historic: "city_gate",
+      name: "Porte du Peyrou - Arc de Triomphe",
+    },
+    geometry: [
+      { lat: 43.6112143, lon: 3.8723945 },
+      { lat: 43.6112102, lon: 3.8724497 },
+      { lat: 43.6111316, lon: 3.8724387 },
+      { lat: 43.6110531, lon: 3.8724277 },
+      { lat: 43.6110572, lon: 3.8723725 },
+      { lat: 43.6111369, lon: 3.872383 },
+      { lat: 43.6112143, lon: 3.8723945 },
+    ],
+  };
+  const enriched = enrichWithMunicipalRoofs([osmGate], [building!]);
+  expect(enriched.replaced).toBe(1);
+  expect(enriched.elements).toHaveLength(1);
+  await page.route("**/api/map-data", async (route) => {
+    const { bbox, relief } = route.request().postDataJSON() as {
+      bbox: BBox;
+      relief: boolean;
+    };
+    expect(relief).toBe(true);
+    const [south, west, north, east] = bbox;
+    const altitude = building!.groundElevation;
+    const response: MapDataResponse = {
+      osmData: { elements: enriched.elements },
+      elevationGrid: {
+        south,
+        west,
+        north,
+        east,
+        rows: 2,
+        cols: 2,
+        points: Array(4).fill(altitude),
+        minElev: altitude,
+        maxElev: altitude,
+        source: "Plan de référence constant du test",
+      },
+      report: {
+        sources: [
+          "OpenStreetMap · Overpass",
+          `${MONTPELLIER_LOD2_SOURCE} · ODbL · https://data.montpellier3m.fr/dataset/batiments-3d-de-la-ville-et-metropole-de-montpellier`,
+        ],
+        warnings: [],
+        fetchedAt: "2026-10-11T12:00:00Z",
+        areaKm2: 0.195,
+        elementCount: 1,
+        buildingCount: 1,
+        measuredBuildingCount: 1,
+        ignBuildingCount: 0,
+        elevationSource: "Plan de référence constant du test",
+        elevationResolutionM: null,
+        seaCoverage: "unavailable",
+        lod2BuildingCount: 1,
+        lod2RoofSurfaceCount: building!.roofSurfaces.length,
+        lod2SolidCount: 1,
+        lod2Year: 2020,
+      },
+    };
+    await route.fulfill({ json: response });
+  });
+  await page
+    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  await page.getByText("Rapport du modèle", { exact: true }).click();
+  await expect(
+    page.locator("p").filter({
+      has: page.getByText("Volumes 3D complets mesurés", { exact: true }),
+    }),
+  ).toContainText("1 géométrie complète");
+  const exported = await JSZip.loadAsync(
+    (await download(page, "Télécharger le 3MF")).bytes,
+  );
+  const xml = await exported.file("3D/3dmodel.model")!.async("string");
+  expect(xml).toContain('unit="millimeter"');
+  expect(xml).toMatch(/<metadata name="Copyright">[^<]*Montpellier/);
+  expect(xml).toContain("CityGML");
+  expect(xml).toContain("2020");
+  assertClosedSolid(meshFrom3MF(xml));
+  const saved = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(saved.snapshot.osmData.elements).toHaveLength(1);
+  expect(
+    saved.snapshot.osmData.elements[0].measuredSolid.surfaces,
+  ).toHaveLength(90);
+  expect(saved.snapshot.report.lod2SolidCount).toBe(1);
 });

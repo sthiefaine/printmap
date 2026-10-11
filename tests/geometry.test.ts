@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import {
   buildPrintModel,
   validatePrintMesh,
@@ -168,6 +169,297 @@ test("roof shapes use explicit data and remain closed", async () => {
   close(assertClosedSolid(implicit) - assertClosedSolid(baseline), 16000);
   close(assertClosedSolid(explicit) - assertClosedSolid(baseline), 1600 * 8.5);
   close(explicit.dimensions.heightMm, 13);
+});
+
+test("tagged roof families retain slopes and curves as closed printable solids", async () => {
+  const baseline = await buildPrintModel(input());
+  const flatVolume = assertClosedSolid(baseline) + 16000;
+  for (const shape of [
+    " GABLED ",
+    "pitched",
+    "skillion",
+    "hipped",
+    "pyramidal",
+    "mansard",
+    "half-hipped",
+    "gambrel",
+    "saltbox",
+    "round",
+    "dome",
+    "cone",
+    "onion",
+  ]) {
+    const model = await buildPrintModel(
+      input([
+        building(square, {
+          "roof:shape": shape,
+          "roof:height": "3",
+          "roof:direction": "N",
+        }),
+      ]),
+    );
+    close(model.dimensions.heightMm, 13);
+    assert.ok(
+      assertClosedSolid(model) < flatVolume - 100,
+      `${shape} must retain its roof relief`,
+    );
+    assert.ok(
+      !model.warnings.some((warning) =>
+        warning.includes("représentée(s) à plat"),
+      ),
+      shape,
+    );
+  }
+});
+
+test("roof bearings describe runoff and across orientation rotates the ridge", async () => {
+  const topAt = (
+    model: Awaited<ReturnType<typeof buildPrintModel>>,
+    x: number,
+    y: number,
+  ) => {
+    let top = -Infinity;
+    for (let i = 0; i < model.positions.length; i += 3)
+      if (
+        Math.abs(model.positions[i] - x) < 0.01 &&
+        Math.abs(model.positions[i + 1] - y) < 0.01
+      )
+        top = Math.max(top, model.positions[i + 2]);
+    return top;
+  };
+  const north = await buildPrintModel(
+    input([
+      building(square, {
+        "roof:shape": "skillion",
+        "roof:height": "3",
+        "roof:direction": "N",
+      }),
+    ]),
+  );
+  close(topAt(north, 20, -20), 13);
+  close(topAt(north, 20, 20), 10);
+  const south = await buildPrintModel(
+    input([
+      building(square, {
+        "roof:shape": "skillion",
+        "roof:height": "3",
+        "roof:direction": "180",
+      }),
+    ]),
+  );
+  close(topAt(south, 20, -20), 10);
+  close(topAt(south, 20, 20), 13);
+  const rectangle: Point2D[] = [
+    [-30, -10],
+    [30, -10],
+    [30, 10],
+    [-30, 10],
+  ];
+  const across = await buildPrintModel(
+    input([
+      building(rectangle, {
+        "roof:shape": "gabled",
+        "roof:height": "3",
+        "roof:orientation": "across",
+      }),
+    ]),
+  );
+  close(topAt(across, 0, 10), 13);
+  close(topAt(across, 30, 10), 10);
+  const east = await buildPrintModel(
+    input([
+      building(rectangle, {
+        "roof:shape": "gabled",
+        "roof:height": "3",
+        "roof:direction": "E",
+      }),
+    ]),
+  );
+  close(topAt(east, 0, 10), 13);
+  for (const model of [north, south, across, east]) assertClosedSolid(model);
+});
+
+test("a tagged roof angle controls pitch instead of the fallback ratio", async () => {
+  const model = await buildPrintModel(
+    input([
+      building(square, {
+        height: "50",
+        "roof:shape": "gabled",
+        "roof:angle": "30",
+        "roof:direction": "N",
+      }),
+    ]),
+  );
+  close(model.dimensions.heightMm, 53);
+  const roofEave = 53 - 20 * Math.tan(Math.PI / 6);
+  const eaveVertices: number[] = [];
+  for (let i = 0; i < model.positions.length; i += 3)
+    if (
+      Math.abs(Math.abs(model.positions[i + 1]) - 20) < 0.01 &&
+      model.positions[i + 2] > 4
+    )
+      eaveVertices.push(model.positions[i + 2]);
+  assert.ok(eaveVertices.some((z) => Math.abs(z - roofEave) < 0.01));
+  assertClosedSolid(model);
+});
+
+test("tagged roofs on courtyards and concave footprints retain their exact holes", async () => {
+  const courtyard: OverpassElement = {
+    type: "relation",
+    id: 99,
+    tags: {
+      type: "multipolygon",
+      building: "yes",
+      height: "10",
+      "roof:shape": "hipped",
+      "roof:height": "3",
+    },
+    members: [
+      { type: "way", role: "outer", geometry: geometry(square) },
+      {
+        type: "way",
+        role: "inner",
+        geometry: geometry([
+          [-5, -5],
+          [5, -5],
+          [5, 5],
+          [-5, 5],
+        ]),
+      },
+    ],
+  };
+  const model = await buildPrintModel(input([courtyard]));
+  assertClosedSolid(model);
+  assert.ok(model.dimensions.heightMm > 12);
+  for (let i = 0; i < model.positions.length; i += 3)
+    if (
+      Math.abs(model.positions[i]) < 4.9 &&
+      Math.abs(model.positions[i + 1]) < 4.9
+    )
+      assert.ok(model.positions[i + 2] <= 3.01);
+  const concave = await buildPrintModel(
+    input([
+      building(
+        [
+          [-20, -20],
+          [20, -20],
+          [20, -10],
+          [-10, -10],
+          [-10, 20],
+          [-20, 20],
+        ],
+        { "roof:shape": "gabled", "roof:height": "3" },
+      ),
+    ]),
+  );
+  close(concave.dimensions.heightMm, 13);
+  assertClosedSolid(concave);
+});
+
+test("measured roof panels override flat tags and preserve their actual ridge heights", async () => {
+  const measured = (points: [number, number, number][]) =>
+    points.map(([x, y, elevation]) => {
+      const [lon, lat] = projection.unproject(x, y);
+      return { lon, lat, elevation };
+    });
+  const element = building(square, { "roof:shape": "flat" });
+  element.groundElevation = 100;
+  element.roofSurfaces = [
+    {
+      outer: measured([
+        [-20, -20, 107],
+        [20, -20, 107],
+        [20, 0, 110],
+        [-20, 0, 110],
+      ]),
+      holes: [],
+    },
+    {
+      outer: measured([
+        [-20, 0, 110],
+        [20, 0, 110],
+        [20, 20, 107],
+        [-20, 20, 107],
+      ]),
+      holes: [],
+    },
+  ];
+  const baseline = await buildPrintModel(input());
+  const model = await buildPrintModel(input([element]));
+  assert.equal(model.stats.realRoofCount, 1);
+  assert.equal(model.stats.taggedRoofCount, 0);
+  close(model.dimensions.heightMm, 13);
+  close(assertClosedSolid(model) - assertClosedSolid(baseline), 1600 * 8.5);
+  const flatInput = input([element]);
+  flatInput.settings.features.buildings.roofs = false;
+  const flat = await buildPrintModel(flatInput);
+  assert.equal(flat.stats.realRoofCount, 0);
+  close(assertClosedSolid(flat) - assertClosedSolid(baseline), 16000);
+});
+
+test("measured roof panel holes remain courtyards and incomplete data has a declared fallback", async () => {
+  const hole: Point2D[] = [
+    [-5, -5],
+    [5, -5],
+    [5, 5],
+    [-5, 5],
+  ];
+  const measured = (points: Point2D[]) =>
+    geometry(points).map((p) => ({ ...p, elevation: 110 }));
+  const element: OverpassElement = {
+    type: "relation",
+    id: 100,
+    tags: { type: "multipolygon", building: "yes", height: "10" },
+    groundElevation: 100,
+    roofSurfaces: [{ outer: measured(square), holes: [measured(hole)] }],
+    members: [
+      { type: "way", role: "outer", geometry: geometry(square) },
+      { type: "way", role: "inner", geometry: geometry(hole) },
+    ],
+  };
+  const baseline = await buildPrintModel(input());
+  const model = await buildPrintModel(input([element]));
+  assert.equal(model.stats.realRoofCount, 1);
+  close(assertClosedSolid(model) - assertClosedSolid(baseline), 15000);
+  const partial = building(square);
+  partial.groundElevation = 100;
+  partial.roofSurfaces = [
+    {
+      outer: measured([
+        [-20, -20],
+        [20, -20],
+        [20, 0],
+        [-20, 0],
+      ]),
+      holes: [],
+    },
+  ];
+  const fallback = await buildPrintModel(input([partial]));
+  assert.equal(fallback.stats.realRoofCount, 0);
+  assert.ok(
+    fallback.warnings.some((warning) =>
+      warning.includes("mesurée(s) incomplète(s)"),
+    ),
+  );
+  assertClosedSolid(fallback);
+});
+
+test("real Montpellier roof panels remove zero-volume survey shells before Float32 export", async () => {
+  const elements = JSON.parse(
+    readFileSync(
+      new URL("./fixtures/measured-roof-shell.json", import.meta.url),
+      "utf8",
+    ),
+  ) as OverpassElement[];
+  const data = input(elements);
+  data.bbox = [43.608, 3.872, 43.616, 3.884];
+  data.scale = 4830;
+  data.settings.base.grid = { cols: 2, rows: 2 };
+  const model = await buildPrintModel(data);
+  assert.equal(model.stats.realRoofCount, 1);
+  assert.equal(model.stats.components, 1);
+  assertClosedSolid(model);
+  for (const tile of model.tiles) assertClosedSolid(tile);
 });
 
 test("minimum printable footprints remove sub-resolution clutter", async () => {
@@ -420,4 +712,79 @@ test("production validation rejects open, reversed and collapsed exported faces"
     collinear.positions[c + axis] =
       (collinear.positions[a + axis] + collinear.positions[b + axis]) / 2;
   assert.throws(() => validatePrintMesh(collinear), /collinéaire/);
+});
+
+test("actual surveyed roofs and mapped streets omit only the detached fragment below print resolution", async () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL("./fixtures/montpellier-roof-road-contact.json", import.meta.url),
+      "utf8",
+    ),
+  ) as Pick<PrintInput, "bbox" | "scale" | "osmData" | "elevationGrid">;
+  const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
+  settings.base.topographyEnabled = true;
+  settings.base.grid = { cols: 2, rows: 2 };
+  const model = await buildPrintModel({ ...fixture, settings });
+  assert.equal(model.stats.components, 1);
+  assert.equal(
+    model.stats.buildingCount,
+    4,
+    "all four measured building outlines remain",
+  );
+  assert.ok(
+    model.stats.realRoofCount >= 1,
+    "actual roof panels remain in the print",
+  );
+  assert.ok(
+    model.warnings.some((warning) => /fragment.*écart/i.test(warning)),
+    "the discarded detached fragment is reported",
+  );
+  assert.ok(model.stats.discardedFeatures >= 1);
+  const volume = assertClosedSolid(model);
+  assert.equal(model.tiles.length, 4);
+  const tileVolume = model.tiles.reduce(
+    (sum, tile) => sum + assertClosedSolid(tile),
+    0,
+  );
+  assert.ok(
+    Math.abs(tileVolume - volume) / volume < 1e-4,
+    "the four closed tiles retain the complete printable volume",
+  );
+});
+
+test("neighbouring surveyed roofs keep their planes when a submicron contact film is opened", async () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        "./fixtures/montpellier-coplanar-roof-contact.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ) as Pick<PrintInput, "bbox" | "scale" | "osmData" | "elevationGrid">;
+  const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
+  settings.base.topographyEnabled = true;
+  settings.base.grid = { cols: 2, rows: 2 };
+  const model = await buildPrintModel({ ...fixture, settings });
+  assert.equal(model.stats.components, 1);
+  assert.equal(model.stats.buildingCount, 2);
+  assert.equal(
+    model.stats.realRoofCount,
+    2,
+    "both measured roofs remain without a flat fallback",
+  );
+  assert.equal(model.stats.discardedFeatures, 0);
+  assert.ok(
+    model.warnings.some((warning) =>
+      /contact.*ouverts.*localement/i.test(warning),
+    ),
+    "the local correction is reported",
+  );
+  const volume = assertClosedSolid(model);
+  assert.equal(model.tiles.length, 4);
+  const tileVolume = model.tiles.reduce(
+    (sum, tile) => sum + assertClosedSolid(tile),
+    0,
+  );
+  assert.ok(Math.abs(volume - tileVolume) / volume < 1e-4);
 });
