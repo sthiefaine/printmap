@@ -1,0 +1,267 @@
+import type { BBox, LatLon, OverpassElement } from "@/types/osm";
+import {
+  elementPolygons,
+  geographicPointInRing,
+  type GeographicPolygon,
+} from "@/lib/osm/relation-polygons";
+import { fetchWithTimeout } from "./request";
+import { parseLengthMeters } from "@/lib/osm/building-height";
+
+interface IGNFeature {
+  id: string;
+  geometry: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  };
+  properties: {
+    cleabs?: string;
+    hauteur?: number;
+    nombre_d_etages?: number;
+    etat_de_l_objet?: string;
+  };
+}
+
+export interface IGNBuildings {
+  features: IGNFeature[];
+  warnings: string[];
+}
+
+export async function fetchIGNBuildings(
+  bbox: BBox,
+  signal: AbortSignal,
+): Promise<IGNBuildings> {
+  const features: IGNFeature[] = [],
+    warnings: string[] = [];
+  const limit = 10000,
+    pageSize = 2500;
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(22000)]);
+  try {
+    for (let start = 0; start < limit; start += pageSize) {
+      const url = new URL("https://data.geopf.fr/wfs/ows");
+      const [south, west, north, east] = bbox;
+      for (const [key, value] of Object.entries({
+        SERVICE: "WFS",
+        VERSION: "2.0.0",
+        REQUEST: "GetFeature",
+        TYPENAMES: "BDTOPO_V3:batiment",
+        SRSNAME: "urn:ogc:def:crs:OGC:1.3:CRS84",
+        BBOX: `${west},${south},${east},${north},urn:ogc:def:crs:OGC:1.3:CRS84`,
+        COUNT: String(pageSize),
+        STARTINDEX: String(start),
+        OUTPUTFORMAT: "application/json",
+        SORTBY: "cleabs",
+      }))
+        url.searchParams.set(key, value);
+      const response = await fetchWithTimeout(
+        url.toString(),
+        {},
+        deadline,
+        14000,
+      );
+      if (!response.ok) throw new Error("IGN WFS indisponible");
+      const page = await response.json();
+      if (!Array.isArray(page.features))
+        throw new Error("Réponse IGN invalide");
+      features.push(
+        ...page.features.filter(
+          (f: IGNFeature) =>
+            f.properties?.etat_de_l_objet !== "Détruit" && f.geometry,
+        ),
+      );
+      if (
+        page.features.length < pageSize ||
+        (typeof page.numberMatched === "number" &&
+          start + pageSize >= page.numberMatched)
+      )
+        break;
+      if (start + pageSize >= limit)
+        warnings.push(
+          "Enrichissement IGN limité aux 10 000 premiers bâtiments ; les empreintes OSM restent complètes. Réduisez la zone pour enrichir toutes les hauteurs.",
+        );
+    }
+  } catch {
+    signal.throwIfAborted();
+    warnings.push(
+      features.length
+        ? "Enrichissement IGN partiel : certaines hauteurs restent estimées."
+        : "Hauteurs IGN indisponibles pour cette zone ; utilisation des données OSM et d’estimations signalées.",
+    );
+  }
+  return { features, warnings };
+}
+
+function featurePolygons(feature: IGNFeature): GeographicPolygon[] {
+  const polygons =
+    feature.geometry.type === "Polygon"
+      ? [feature.geometry.coordinates as number[][][]]
+      : (feature.geometry.coordinates as number[][][][]);
+  return polygons
+    .filter((poly) => poly[0]?.length >= 4)
+    .map((poly) => ({
+      outer: poly[0].map(([lon, lat]) => ({ lon, lat })),
+      holes: poly
+        .slice(1)
+        .map((ring) => ring.map(([lon, lat]) => ({ lon, lat }))),
+    }));
+}
+
+interface Footprint {
+  polygon: GeographicPolygon;
+  bounds: BBox;
+  center: LatLon;
+  element: OverpassElement;
+}
+
+function footprint(
+  polygon: GeographicPolygon,
+  element: OverpassElement,
+): Footprint {
+  const lat = polygon.outer.map((p) => p.lat),
+    lon = polygon.outer.map((p) => p.lon);
+  const bounds: BBox = [
+    Math.min(...lat),
+    Math.min(...lon),
+    Math.max(...lat),
+    Math.max(...lon),
+  ];
+  return {
+    polygon,
+    bounds,
+    center: {
+      lat: (bounds[0] + bounds[2]) / 2,
+      lon: (bounds[1] + bounds[3]) / 2,
+    },
+    element,
+  };
+}
+
+function overlap(a: Footprint, b: Footprint) {
+  const intersection =
+    Math.max(
+      0,
+      Math.min(a.bounds[2], b.bounds[2]) - Math.max(a.bounds[0], b.bounds[0]),
+    ) *
+    Math.max(
+      0,
+      Math.min(a.bounds[3], b.bounds[3]) - Math.max(a.bounds[1], b.bounds[1]),
+    );
+  const areaA = (a.bounds[2] - a.bounds[0]) * (a.bounds[3] - a.bounds[1]);
+  const areaB = (b.bounds[2] - b.bounds[0]) * (b.bounds[3] - b.bounds[1]);
+  if (intersection < Math.min(areaA, areaB) * 0.45) return 0;
+  if (
+    !geographicPointInRing(a.center, b.polygon.outer) &&
+    !geographicPointInRing(b.center, a.polygon.outer)
+  )
+    return 0;
+  return intersection / Math.max(areaA, areaB);
+}
+
+function bucketKeys(bounds: BBox) {
+  const keys: string[] = [];
+  for (
+    let y = Math.floor(bounds[0] * 1000);
+    y <= Math.floor(bounds[2] * 1000);
+    y++
+  )
+    for (
+      let x = Math.floor(bounds[1] * 1000);
+      x <= Math.floor(bounds[3] * 1000);
+      x++
+    )
+      keys.push(`${x}/${y}`);
+  return keys;
+}
+
+export function enrichWithIGN(
+  elements: OverpassElement[],
+  features: IGNFeature[],
+) {
+  const output: OverpassElement[] = elements.map((el) => ({
+    ...el,
+    tags: el.tags ? { ...el.tags } : undefined,
+  }));
+  const ways = new Map(
+    output.filter((el) => el.type === "way").map((el) => [el.id, el]),
+  );
+  const buckets = new Map<string, Footprint[]>();
+  for (const el of output) {
+    if (
+      (!el.tags?.building || el.tags.building === "no") &&
+      (!el.tags?.["building:part"] || el.tags["building:part"] === "no")
+    )
+      continue;
+    for (const polygon of elementPolygons(el, ways)) {
+      const item = footprint(polygon, el);
+      for (const key of bucketKeys(item.bounds))
+        buckets.set(key, [...(buckets.get(key) ?? []), item]);
+    }
+  }
+  let added = 0,
+    enriched = 0,
+    id = -1000000000000;
+  for (const feature of features) {
+    const height = feature.properties.hauteur;
+    const tags: Record<string, string> = {
+      building: "yes",
+      "roof:shape": "flat",
+      "printmap:source": "IGN BD TOPO",
+      "printmap:source_id": feature.properties.cleabs ?? feature.id,
+    };
+    if (typeof height === "number" && height > 0 && height < 1000) {
+      tags.height = String(height);
+      tags["printmap:height_source"] = "IGN · hauteur à la gouttière";
+    } else if (
+      feature.properties.nombre_d_etages &&
+      feature.properties.nombre_d_etages > 0
+    )
+      tags["building:levels"] = String(feature.properties.nombre_d_etages);
+    for (const polygon of featurePolygons(feature)) {
+      const synthetic: OverpassElement = {
+        type: "relation",
+        id: id--,
+        tags,
+        members: [
+          { type: "way", role: "outer", geometry: polygon.outer },
+          ...polygon.holes.map((geometry) => ({
+            type: "way",
+            role: "inner",
+            geometry,
+          })),
+        ],
+      };
+      const item = footprint(polygon, synthetic);
+      const candidates = [
+        ...new Set(
+          bucketKeys(item.bounds).flatMap((key) => buckets.get(key) ?? []),
+        ),
+      ];
+      const matches = candidates
+        .map((candidate) => ({ candidate, score: overlap(item, candidate) }))
+        .filter((match) => match.score > 0);
+      const best = matches.sort((a, b) => b.score - a.score)[0];
+      if (best) {
+        // Do not duplicate buildings from a different source. Replace only uncertain heights,
+        // and only when the footprints closely agree (different building parts stay independent).
+        const osmTags = best.candidate.element.tags!;
+        if (
+          best.score >= 0.6 &&
+          parseLengthMeters(osmTags.height) == null &&
+          parseLengthMeters(osmTags["building:height"]) == null &&
+          tags.height
+        ) {
+          const roofHeight = parseLengthMeters(osmTags["roof:height"]) ?? 0;
+          osmTags.height = String(Number(tags.height) + roofHeight);
+          osmTags["printmap:eave_height"] = tags.height;
+          osmTags["printmap:height_source"] = tags["printmap:height_source"];
+          enriched++;
+        }
+      } else {
+        output.push(synthetic);
+        added++;
+        for (const key of bucketKeys(item.bounds))
+          buckets.set(key, [...(buckets.get(key) ?? []), item]);
+      }
+    }
+  }
+  return { elements: output, added, enriched };
+}

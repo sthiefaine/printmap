@@ -1,0 +1,59 @@
+"use client";
+import { useMapStore } from "@/store/use-map-store";
+export function LoadingOverlay() {
+  const status = useMapStore((s) => s.status);
+  const error = useMapStore((s) => s.error);
+  const progress = useMapStore((s) => s.progress);
+  const label = useMapStore((s) => s.progressLabel);
+  const cancel = useMapStore((s) => s.cancel);
+  const generate = useMapStore((s) => s.generate);
+  const rebuild = useMapStore((s) => s.rebuild);
+  const hasData = useMapStore((s) => !!s.osmData);
+  if (status !== "fetching" && status !== "processing" && status !== "error")
+    return null;
+  return (
+    <div
+      className="job-panel"
+      role={status === "error" ? "alert" : "status"}
+      aria-live="polite"
+    >
+      {status === "error" ? (
+        <>
+          <span className="job-eyebrow">La préparation s’est interrompue</span>
+          <p>{error}</p>
+          <div className="job-actions">
+            <button
+              className="button button-primary"
+              onClick={() => void (hasData ? rebuild() : generate())}
+            >
+              Réessayer
+            </button>
+            <button className="button button-secondary" onClick={cancel}>
+              Fermer
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="job-title">
+            <span className="spinner" />
+            <span>
+              {status === "fetching"
+                ? "Récupération des données"
+                : "Construction du modèle"}
+            </span>
+          </div>
+          <p>{label}</p>
+          <progress
+            max={100}
+            value={progress}
+            aria-label="Progression de la préparation"
+          />
+          <button className="button button-quiet" onClick={cancel}>
+            Annuler
+          </button>
+        </>
+      )}
+    </div>
+  );
+}

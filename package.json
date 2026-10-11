@@ -1,0 +1,53 @@
+{
+  "name": "printmap",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "predev": "node scripts/setup-wasm.mjs",
+    "prebuild": "node scripts/setup-wasm.mjs",
+    "postinstall": "node scripts/setup-wasm.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:e2e": "playwright test",
+    "smoke:live": "tsx scripts/smoke-live.ts"
+  },
+  "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "@types/earcut": "^3.0.0",
+    "earcut": "^3.0.2",
+    "jszip": "^3.10.1",
+    "manifold-3d": "^3.5.4",
+    "maplibre-gl": "^6.13.0",
+    "next": "^16.4.0",
+    "pbf": "^5.1.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "terra-draw": "^1.24.0",
+    "terra-draw-maplibre-gl-adapter": "^1.3.0",
+    "three": "^0.182.0",
+    "zustand": "^5.0.11"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.182.0",
+    "eslint": "^9",
+    "eslint-config-next": "^16.4.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module"
+}

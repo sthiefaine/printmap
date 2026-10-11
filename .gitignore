@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+.env*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+public/manifold.wasm
+public/maplibre/
+*.log
+.vercel/
+artifacts/
