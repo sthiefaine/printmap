@@ -45,6 +45,7 @@ import { makeLidarRoof } from "./lidar-roof";
 import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
 import { preparePrintLayers } from "./fuse-print-layers";
+import { saintEtienneLandmark } from "../data/saint-etienne-landmarks";
 
 let runtime: Promise<ManifoldToplevel> | undefined;
 async function getRuntime(): Promise<ManifoldToplevel> {
@@ -532,6 +533,18 @@ function extractMesh(
       mesh.runIndex[run + 1] / 3,
     );
   }
+  // Ground-level colours partition the existing terrain all the way down.
+  // Its horizontal underside remains the neutral socle, rather than becoming
+  // a second road, garden or water surface at Z=0 in the 3MF.
+  for (let face = 0; face < faceLayers.length; face++) {
+    const start = face * 3;
+    if (
+      positions[mesh.triVerts[start] * 3 + 2] === 0 &&
+      positions[mesh.triVerts[start + 1] * 3 + 2] === 0 &&
+      positions[mesh.triVerts[start + 2] * 3 + 2] === 0
+    )
+      faceLayers[face] = PRINT_LAYERS.indexOf("basePlate");
+  }
   // MeshGL can duplicate geometrically identical vertices on original boundaries.
   // Follow its merge vectors so the 3MF indices themselves describe manifold edges.
   const parent = new Uint32Array(positions.length / 3);
@@ -712,6 +725,8 @@ export async function buildPrintModel(
     const clip = arena.keep(cad.CrossSection.square([width, depth], true));
     const terrain = makeTerrain(cad, arena, input, width, depth);
     const materialIds = new Map<number, PrintLayer>();
+    const landmarks: NonNullable<PrintModel["landmarks"]> = [];
+    const omittedLandmarks = new Set<string>();
     const tag = (solid: Manifold, layer: PrintLayer): Manifold => {
       const original = arena.keep(solid.asOriginal());
       materialIds.set(original.originalID(), layer);
@@ -863,7 +878,7 @@ export async function buildPrintModel(
         warnings.push(
           "La gravure a été limitée pour conserver au moins 1 mm de socle.",
         );
-      if (offset <= 0 && terrain.terraceCount) {
+      if (offset === 0 || (offset < 0 && terrain.terraceCount)) {
         if (offset < 0) {
           const loweredTerrain = arena.keep(
             terrain.solid.warp((vertex) => {
@@ -887,13 +902,13 @@ export async function buildPrintModel(
           );
           base = arena.keep(base.subtract(engravingCutter));
         }
-        // Keep the colour partition five microns inside the mapped boundary
-        // after its overlap. A terrace can have a vertical break on that exact
-        // boundary; cutting through it would recreate a coplanar contact film.
-        // The palette boundary remains outside the engraved step, so their
-        // edges cannot create coincident films while the ground is recoloured.
+        // Vertical terraces need their existing wider palette seam. Continuous
+        // terrain retains the one-micron overlap of its mapped contours, so
+        // a paved plaza keeps its complete area without a surrounding rim.
         const bounded = arena.keep(
-          arena.keep(section.offset(-0.01, "Miter")).intersect(clip),
+          terrain.terraceCount
+            ? arena.keep(section.offset(-0.01, "Miter")).intersect(clip)
+            : section.intersect(arena.keep(clip.offset(-0.002, "Miter"))),
         );
         if (bounded.isEmpty()) return;
         const prism = arena.keep(bounded.extrude(terrain.maxZ + 1));
@@ -901,11 +916,18 @@ export async function buildPrintModel(
         arena.keep(inside);
         arena.keep(outside);
         // Partition the current ground itself, including terrace corrections
-        // and cavities. Reusing a separate DEM skin can create coincident films
-        // along vertical walls. A five-micron overlap keeps the same volume and
-        // elevation while making the colour boundary robust to Float32 export.
+        // and cavities. Reusing a separate DEM skin also creates coincident
+        // films on sloping terrain, as in Saint-Étienne at 1:19261. A
+        // bounded horizontal overlap keeps the same volume and elevation while
+        // making the colour boundary robust to Float32 export.
         const overlappingSection = arena.keep(
-          arena.keep(bounded.offset(0.005, "Miter")).intersect(clip),
+          arena
+            .keep(bounded.offset(terrain.terraceCount ? 0.005 : 0.001, "Miter"))
+            .intersect(
+              terrain.terraceCount
+                ? clip
+                : arena.keep(clip.offset(-0.001, "Miter")),
+            ),
         );
         const overlappingPrism = arena.keep(
           overlappingSection.extrude(terrain.maxZ + 1),
@@ -953,6 +975,10 @@ export async function buildPrintModel(
       warnings.push(
         `${parsed.undergroundBuildingCount} bâtiment(s) ou partie(s) souterrains explicitement cartographiés ne sont pas extrudés au-dessus du terrain.`,
       );
+    if (parsed.sourceRoofPartIgnoredCount)
+      warnings.push(
+        `${parsed.sourceRoofPartIgnoredCount} partie(s) sans hauteur sont omises au profit de la toiture 3D source. Les débords uniquement cartographiés en plan ne reçoivent pas de volume estimé.`,
+      );
     if (settings.features.parks.enabled) {
       if (parsed.parkOutlineIgnoredCount)
         warnings.push(
@@ -984,13 +1010,19 @@ export async function buildPrintModel(
     if (settings.features.buildings.enabled)
       for (let i = 0; i < parsed.buildings.length; i++) {
         const building = parsed.buildings[i];
+        const landmark = saintEtienneLandmark(building.sourceId);
         let section = footprint(
           building.polygon,
           Math.max(
-            minBuildingAreaMm2,
+            // Preserve an identified civic landmark when its true footprint
+            // still passes the unchanged printable-width check below.
+            landmark
+              ? Math.min(minBuildingAreaMm2, minFeatureMm * minFeatureMm)
+              : minBuildingAreaMm2,
             settings.features.buildings.minAreaM2 * sf * sf,
           ),
-          !!building.measuredSolid ||
+          !!landmark ||
+            !!building.measuredSolid ||
             (settings.features.buildings.roofs &&
               !!building.roofSurfaces?.length),
         );
@@ -1003,11 +1035,13 @@ export async function buildPrintModel(
           totalHeight / sf < settings.features.buildings.minHeightM
         ) {
           stats.discardedFeatures++;
+          if (landmark) omittedLandmarks.add(landmark.name);
           continue;
         }
         const inset = arena.keep(section.offset(-minFeatureMm / 2, "Miter"));
         if (inset.isEmpty()) {
           stats.discardedFeatures++;
+          if (landmark) omittedLandmarks.add(landmark.name);
           continue;
         }
         // Exact corner contacts would give the STL four faces along one edge.
@@ -1617,6 +1651,8 @@ export async function buildPrintModel(
                   foundationZ: startZ,
                   footprint: measuredRoofFootprint ?? section,
                   minimumHeight: minBuildingHeightMm,
+                  landmark:
+                    building.tags["printmap:roof_refinement"] === "landmark",
                   fitToleranceM:
                     parseLengthMeters(
                       building.tags["printmap:roof_fit_tolerance_m"],
@@ -1645,7 +1681,13 @@ export async function buildPrintModel(
             : null;
         if (measuredSolid) {
           try {
-            const stabilized = stabilizeSolid(cad, arena, measuredSolid);
+            const stabilized = stabilizeSolid(
+              cad,
+              arena,
+              measuredSolid,
+              0.001,
+              building.tags["printmap:roof_refinement"] === "landmark",
+            );
             const pieces = stabilized
               .decompose()
               .map((piece) => arena.keep(piece));
@@ -2014,6 +2056,29 @@ export async function buildPrintModel(
             for (const part of roofParts) solids.push(tag(part, "buildings"));
           else solids.push(tag(solid, "buildings"));
         } else solids.push(tag(solid, "buildings"));
+        const landmark = saintEtienneLandmark(building.sourceId);
+        if (landmark) {
+          const bounds = solid.boundingBox();
+          landmarks.push({
+            ...landmark,
+            min: bounds.min as [number, number, number],
+            max: bounds.max as [number, number, number],
+            representation: measuredSolid
+              ? isMeasuredStructure
+                ? "surveyed-solid"
+                : building.tags["printmap:roof_reconstruction"] === "lidar"
+                  ? "lidar-roof"
+                  : "surveyed-roof"
+              : canRoof
+                ? "osm-roof"
+                : "footprint",
+            source: measuredSolid
+              ? (building.measuredSolid?.source ??
+                building.roofSource ??
+                "Relevé 3D")
+              : (building.heightSource ?? "OpenStreetMap · empreinte"),
+          });
+        }
         stats.buildingCount++;
         if (
           building.heightSource === "Estimation" ||
@@ -2404,6 +2469,10 @@ export async function buildPrintModel(
       warnings.push(
         `${stats.estimatedHeights} bâtiment(s) utilisent une hauteur estimée faute de mesure disponible.`,
       );
+    if (omittedLandmarks.size)
+      warnings.push(
+        `Repères trop petits ou exclus par vos seuils : ${[...omittedLandmarks].join(" ; ")}. Agrandissez la maquette ou choisissez un profil plus fin pour conserver une empreinte imprimable.`,
+      );
     if (supportedStructures)
       warnings.push(
         `${supportedStructures} pont(s) ou volume(s) surélevé(s) sont rattachés au socle pour éviter les pièces flottantes.`,
@@ -2415,6 +2484,7 @@ export async function buildPrintModel(
     onProgress(100, "Maquette prête à imprimer");
     return {
       ...mesh,
+      landmarks,
       tiles,
       dimensions: { widthMm, depthMm, heightMm: bounds.max[2] },
       stats,

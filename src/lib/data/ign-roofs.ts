@@ -461,10 +461,11 @@ function mergeLeafPieces(
 export function conformIGNRoofSurfaces(
   surfaces: RoofSurface[],
   toleranceM: number,
+  options: { landmark?: boolean } = {},
 ): RoofSurface[] | null {
   if (
     !surfaces.length ||
-    surfaces.length > 512 ||
+    surfaces.length > (options.landmark ? 4096 : 512) ||
     !Number.isFinite(toleranceM) ||
     toleranceM < 0 ||
     toleranceM > 10
@@ -529,7 +530,7 @@ export function conformIGNRoofSurfaces(
       if (
         !Array.isArray(ring) ||
         ring.length < 4 ||
-        (inputVertices += ring.length) > 4096
+        (inputVertices += ring.length) > (options.landmark ? 16384 : 4096)
       )
         return null;
       const occurrences: Occurrence[] = [];
@@ -669,6 +670,7 @@ export function reconstructIGNRoof(
   grid: IGNRoofGrid,
   ways?: Map<number, OverpassElement>,
   continueWork: () => boolean = () => true,
+  options: { landmark?: boolean } = {},
 ): {
   surfaces: RoofSurface[];
   groundElevation: number;
@@ -676,6 +678,10 @@ export function reconstructIGNRoof(
   triangleCount: number;
 } | null {
   if (!continueWork()) return null;
+  // The two locally acquired landmark roofs have a dedicated, bounded budget.
+  // Ordinary collection keeps its existing limits and quality thresholds.
+  const maxLeaves = options.landmark ? 2048 : 256;
+  const maxTriangles = options.landmark ? 4096 : MAX_BUILDING_SURFACES;
   const polygons = elementPolygons(element, ways);
   if (!polygons.length || polygons.length > 8) return null;
   const origin: Point = [grid.west, grid.south];
@@ -866,11 +872,11 @@ export function reconstructIGNRoof(
           quantile(residual, 0.5) <= 0.2 + res * 0.05
         ) {
           leaves.push({ bounds: box, plane: fit });
-          return leaves.length <= 256;
+          return leaves.length <= maxLeaves;
         }
       }
       if (!continueWork()) return false;
-      if (leaves.length >= 256) return false;
+      if (leaves.length >= maxLeaves) return false;
       if (depth >= 9 || Math.max(box[2] - box[0], box[3] - box[1]) < res * 3) {
         // A real height discontinuity cannot be forced into one inclined plane.
         // Preserve the measured raster cells here; the native/effective spacing
@@ -888,19 +894,25 @@ export function reconstructIGNRoof(
               Math.min(box[2], (cx + 1) * res),
               Math.min(box[3], (cy + 1) * res),
             ];
-            if (
-              cell[2] <= cell[0] ||
-              cell[3] <= cell[1] ||
-              !triangles.some((t) => area(clipBounds(t, cell)) > 1e-7)
-            )
-              continue;
-            const x = (cx + 0.5) * res,
-              y = (cy + 0.5) * res;
+            if (cell[2] <= cell[0] || cell[3] <= cell[1]) continue;
+            const pieces = triangles
+              .map((triangle) => clipBounds(triangle, cell))
+              .filter((piece) => piece.length >= 3 && area(piece) > 1e-7);
+            if (!pieces.length) continue;
             let nearest: Sample | undefined,
               distance = Infinity;
             for (const [index, sample] of samples.entries()) {
               if (index % 256 === 0 && !continueWork()) return false;
-              const d = Math.hypot(sample.x - x, sample.y - y);
+              // A partial cell's centre can lie outside the actual footprint.
+              // Apply the unchanged source-support radius to its clipped roof
+              // pieces, including concave corners and courtyard boundaries.
+              const d = Math.min(
+                ...pieces.map((piece) =>
+                  insidePolygon(sample.x, sample.y, [piece])
+                    ? 0
+                    : boundaryDistance(sample.x, sample.y, [piece]),
+                ),
+              );
               if (d < distance) {
                 nearest = sample;
                 distance = d;
@@ -908,7 +920,7 @@ export function reconstructIGNRoof(
             }
             if (!nearest || distance > res * 2) return false;
             leaves.push({ bounds: cell, plane: { a: 0, b: 0, c: nearest.z } });
-            if (leaves.length > 256) return false;
+            if (leaves.length > maxLeaves) return false;
           }
         return true;
       }
@@ -951,7 +963,7 @@ export function reconstructIGNRoof(
           flat.push(...ring.flat());
         }
         triangleCount += earcut(flat, holeIndices).length / 3;
-        if (triangleCount > MAX_BUILDING_SURFACES) return null;
+        if (triangleCount > maxTriangles) return null;
         function elevated(ring: Point[]): RoofSurface["outer"] | null {
           const result: RoofSurface["outer"] = [];
           for (const [x, y] of ring) {
@@ -1009,7 +1021,11 @@ export async function enrichIGNRoofs(
   elements: OverpassElement[],
   bbox: BBox,
   signal: AbortSignal,
-  options: { grid?: IGNRoofGrid; cpuBudgetMs?: number } = {},
+  options: {
+    grid?: IGNRoofGrid;
+    cpuBudgetMs?: number;
+    maxTriangles?: number;
+  } = {},
 ): Promise<IGNRoofEnrichment> {
   signal.throwIfAborted();
   const cpuBudgetMs = Math.max(
@@ -1017,6 +1033,9 @@ export async function enrichIGNRoofs(
     Math.min(12000, options.cpuBudgetMs ?? 12000),
   );
   const startedAt = Date.now();
+  const triangleBudget = Number.isFinite(options.maxTriangles)
+    ? Math.max(0, Math.min(MAX_SURFACES, Math.floor(options.maxTriangles!)))
+    : MAX_SURFACES;
   const result: IGNRoofEnrichment = {
     elements,
     buildingCount: 0,
@@ -1031,6 +1050,12 @@ export async function enrichIGNRoofs(
   if (!cpuBudgetMs) {
     result.warnings.push(
       "Reconstruction LiDAR non exécutée dans le temps de collecte disponible ; les données déjà acquises sont conservées.",
+    );
+    return result;
+  }
+  if (!triangleBudget) {
+    result.warnings.push(
+      "Reconstruction LiDAR non exécutée : le budget de triangles est réservé aux géométries déjà acquises.",
     );
     return result;
   }
@@ -1115,7 +1140,7 @@ export async function enrichIGNRoofs(
       timeExpired = true;
       break;
     }
-    if (result.triangleCount >= MAX_SURFACES) break;
+    if (result.triangleCount >= triangleBudget) break;
     processed++;
     const roof = reconstructIGNRoof(
       element,
@@ -1138,7 +1163,7 @@ export async function enrichIGNRoofs(
     const addedBuilding =
       element.roofSurfaces == null && element.measuredSolid == null ? 1 : 0;
     if (
-      result.triangleCount + roof.triangleCount > MAX_SURFACES ||
+      result.triangleCount + roof.triangleCount > triangleBudget ||
       importVertices + addedVertices > MAX_ROOF_VERTICES ||
       importBuildings + addedBuilding > MAX_ROOF_BUILDINGS
     ) {
@@ -1193,7 +1218,7 @@ export async function enrichIGNRoofs(
     );
   if (processed < selected.length)
     result.warnings.push(
-      `Reconstruction LiDAR bornée à ${processed} bâtiments examinés et ${MAX_SURFACES.toLocaleString("fr-FR")} triangles maximum ; les autres hauteurs et géométries restent disponibles.`,
+      `Reconstruction LiDAR bornée à ${processed} bâtiments examinés et ${triangleBudget.toLocaleString("fr-FR")} triangles maximum ; les autres hauteurs et géométries restent disponibles.`,
     );
   return result;
 }

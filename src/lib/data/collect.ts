@@ -10,6 +10,10 @@ import { parseLengthMeters } from "@/lib/osm/building-height";
 import { summarizePointLandmarks } from "./point-landmarks";
 import { enrichIGNRoofs, fetchIGNRoofGrid } from "./ign-roofs";
 import {
+  enrichIGNLandmarkRoofs,
+  fetchIGNLandmarkRoofGrids,
+} from "./ign-landmark-roofs";
+import {
   fetchCRAIGBuildings,
   CRAIG_BUILDINGS_SOURCE,
   CRAIG_BUILDINGS_REFERENCE,
@@ -31,8 +35,13 @@ export async function collectMapData(
   signal: AbortSignal,
 ): Promise<MapDataResponse> {
   const startedAt = Date.now();
+  const osmPending = fetchOverpass(bbox, signal);
+  const landmarkSignal = AbortSignal.any([signal, AbortSignal.timeout(79000)]);
+  const landmarkGridsPending = osmPending.then((osm) =>
+    fetchIGNLandmarkRoofGrids(osm.elements, bbox, landmarkSignal),
+  );
   const results = await Promise.allSettled([
-    fetchOverpass(bbox, signal),
+    osmPending,
     isMetropolitanFrance(bbox)
       ? fetchIGNBuildings(bbox, signal)
       : Promise.resolve({ features: [], warnings: [] }),
@@ -44,6 +53,7 @@ export async function collectMapData(
     isMetropolitanFrance(bbox)
       ? fetchIGNRoofGrid(bbox, signal)
       : Promise.resolve(null),
+    landmarkGridsPending,
   ]);
   signal.throwIfAborted();
   const [
@@ -55,6 +65,7 @@ export async function collectMapData(
     structuresResult,
     craigResult,
     roofGridResult,
+    landmarkGridsResult,
   ] = results;
   if (osmResult.status === "rejected") throw osmResult.reason;
   const osm = osmResult.value;
@@ -143,7 +154,32 @@ export async function collectMapData(
   }
   let lidarRoofBuildingCount = 0,
     lidarRoofSurfaceCount = 0,
-    lidarRoofResolutionM: number | null = null;
+    lidarRoofResolutionM: number | null = null,
+    lidarRoofMinResolutionM: number | null = null,
+    landmarkRoofBuildingCount = 0,
+    refinedTriangleCount = 0;
+  if (landmarkGridsResult.status === "fulfilled") {
+    warnings.push(...landmarkGridsResult.value.warnings);
+    const refined = await enrichIGNLandmarkRoofs(elements, bbox, signal, {
+      grids: landmarkGridsResult.value.grids,
+      cpuBudgetMs: Math.min(
+        4000,
+        Math.max(0, 80000 - (Date.now() - startedAt)),
+      ),
+    });
+    elements = refined.elements;
+    landmarkRoofBuildingCount = refined.buildingCount;
+    lidarRoofBuildingCount += refined.buildingCount;
+    lidarRoofSurfaceCount += refined.surfaceCount;
+    refinedTriangleCount = refined.triangleCount;
+    lidarRoofResolutionM = refined.resolutionM;
+    lidarRoofMinResolutionM = refined.resolutionM;
+    warnings.push(...refined.warnings);
+    sources.push(...refined.sources);
+  } else if (!signal.aborted)
+    warnings.push(
+      "Affinement local des repères indisponible ; les autres sources de bâtiments sont conservées.",
+    );
   if (roofGridResult.status === "fulfilled" && roofGridResult.value) {
     const reconstructed = await enrichIGNRoofs(elements, bbox, signal, {
       grid: roofGridResult.value,
@@ -152,11 +188,21 @@ export async function collectMapData(
         12000,
         Math.max(0, 80000 - (Date.now() - startedAt)),
       ),
+      maxTriangles: 60000 - refinedTriangleCount,
     });
     elements = reconstructed.elements;
-    lidarRoofBuildingCount = reconstructed.buildingCount;
-    lidarRoofSurfaceCount = reconstructed.surfaceCount;
-    lidarRoofResolutionM = reconstructed.resolutionM;
+    lidarRoofBuildingCount += reconstructed.buildingCount;
+    lidarRoofSurfaceCount += reconstructed.surfaceCount;
+    if (reconstructed.resolutionM != null) {
+      lidarRoofResolutionM = Math.max(
+        lidarRoofResolutionM ?? reconstructed.resolutionM,
+        reconstructed.resolutionM,
+      );
+      lidarRoofMinResolutionM = Math.min(
+        lidarRoofMinResolutionM ?? reconstructed.resolutionM,
+        reconstructed.resolutionM,
+      );
+    }
     warnings.push(...reconstructed.warnings);
     sources.push(...reconstructed.sources);
   } else if (isMetropolitanFrance(bbox))
@@ -250,7 +296,7 @@ export async function collectMapData(
     osmData: { ...osm, elements },
     elevationGrid,
     report: {
-      sources,
+      sources: [...new Set(sources)],
       warnings,
       fetchedAt: new Date().toISOString(),
       areaKm2: bboxDimensions(bbox).areaKm2,
@@ -278,6 +324,8 @@ export async function collectMapData(
       lidarRoofBuildingCount,
       lidarRoofSurfaceCount,
       lidarRoofResolutionM,
+      lidarRoofMinResolutionM,
+      landmarkRoofBuildingCount,
       municipalStructureCount,
       pointLandmarkCount: pointLandmarks.pointLandmarkCount,
       ...(roofYears.length === 1 ? { lod2Year: roofYears[0] } : {}),

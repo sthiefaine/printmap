@@ -6,6 +6,18 @@ import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { useMapStore } from "@/store/use-map-store";
 import { CityModel } from "./CityModel";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import type { PrintedLandmark } from "@/types/print";
+
+const LANDMARK_REPRESENTATIONS: Record<
+  PrintedLandmark["representation"],
+  string
+> = {
+  "surveyed-solid": "Volume 3D mesuré",
+  "surveyed-roof": "Toiture 3D mesurée · façades simplifiées",
+  "lidar-roof": "Toiture LiDAR reconstruite · façades simplifiées",
+  "osm-roof": "Forme de toiture renseignée · dimensions estimées",
+  footprint: "Volume simplifié · empreinte et hauteur",
+};
 
 const SHADOW_SETTINGS = {
   enabled: true,
@@ -15,9 +27,11 @@ const SHADOW_SETTINGS = {
 function CameraPosition({
   mode,
   revision,
+  landmarkId,
 }: {
   mode: "iso" | "top";
   revision: number;
+  landmarkId: string;
 }) {
   const model = useMapStore((s) => s.model);
   const camera = useThree((s) => s.camera);
@@ -30,8 +44,24 @@ function CameraPosition({
   useEffect(() => {
     if (!model) return;
     const d = model.dimensions;
+    const landmark = model.landmarks?.find((item) => item.id === landmarkId);
+    // Geometry metadata uses east/north/up; Three displays east/up/south.
+    const min = landmark
+      ? [landmark.min[0], landmark.min[2], -landmark.max[1]]
+      : [-d.widthMm / 2, 0, -d.depthMm / 2];
+    const max = landmark
+      ? [landmark.max[0], landmark.max[2], -landmark.min[1]]
+      : [d.widthMm / 2, d.heightMm, d.depthMm / 2];
     const aspect = viewport.width / Math.max(1, viewport.height);
-    const target = new THREE.Vector3(0, d.heightMm * 0.2, 0);
+    const target = landmark
+      ? new THREE.Vector3(
+          ...(min.map((value, axis) => (value + max[axis]) / 2) as [
+            number,
+            number,
+            number,
+          ]),
+        )
+      : new THREE.Vector3(0, d.heightMm * 0.2, 0);
     const direction = new THREE.Vector3(
       ...(mode === "top" ? [0, 1, 0.0001] : [0.7, 0.75, 0.85]),
     ).normalize();
@@ -44,15 +74,15 @@ function CameraPosition({
     const tanX = tanY * aspect;
     // Fit every corner, including perspective depth, so narrow screens keep
     // the complete printable plate inside the viewport.
-    let distance = 1;
-    for (const x of [-d.widthMm / 2, d.widthMm / 2])
-      for (const y of [0, d.heightMm])
-        for (const z of [-d.depthMm / 2, d.depthMm / 2]) {
+    let distance = landmark ? 10 : 1;
+    for (const x of [min[0], max[0]])
+      for (const y of [min[1], max[1]])
+        for (const z of [min[2], max[2]]) {
           const corner = new THREE.Vector3(x, y, z).sub(target);
           distance = Math.max(
             distance,
             corner.dot(direction) +
-              1.12 *
+              (landmark ? 1.6 : 1.12) *
                 Math.max(
                   Math.abs(corner.dot(right)) / tanX,
                   Math.abs(corner.dot(up)) / tanY,
@@ -70,6 +100,7 @@ function CameraPosition({
     controls,
     mode,
     revision,
+    landmarkId,
     viewport.width,
     viewport.height,
     invalidate,
@@ -152,6 +183,9 @@ function StudioLighting() {
 export function Scene3D() {
   const [mode, setMode] = useState<"iso" | "top">("iso");
   const [revision, setRevision] = useState(0);
+  const [landmarkId, setLandmarkId] = useState("");
+  const landmarks = useMapStore((s) => s.model?.landmarks);
+  const selectedLandmark = landmarks?.find((item) => item.id === landmarkId);
   return (
     <ErrorBoundary>
       <div className="scene-view">
@@ -176,13 +210,18 @@ export function Scene3D() {
             maxDistance={10000}
             maxPolarAngle={Math.PI / 2.03}
           />
-          <CameraPosition mode={mode} revision={revision} />
+          <CameraPosition
+            mode={mode}
+            revision={revision}
+            landmarkId={landmarkId}
+          />
         </Canvas>
         <div className="camera-tools" aria-label="Vue 3D">
           <button
             className={mode === "iso" ? "active" : ""}
             onClick={() => {
               setMode("iso");
+              setLandmarkId("");
               setRevision((v) => v + 1);
             }}
           >
@@ -192,18 +231,44 @@ export function Scene3D() {
             className={mode === "top" ? "active" : ""}
             onClick={() => {
               setMode("top");
+              setLandmarkId("");
               setRevision((v) => v + 1);
             }}
           >
             Dessus
           </button>
           <button
-            onClick={() => setRevision((v) => v + 1)}
+            onClick={() => {
+              setLandmarkId("");
+              setRevision((v) => v + 1);
+            }}
             aria-label="Recadrer le modèle"
           >
             ⊞
           </button>
         </div>
+        {landmarks?.length ? (
+          <div className="landmark-view">
+            <label>
+              Repères de Saint-Étienne
+              <select
+                aria-label="Voir un monument de Saint-Étienne"
+                value={selectedLandmark ? landmarkId : ""}
+                onChange={(event) => setLandmarkId(event.target.value)}
+              >
+                <option value="">Vue d’ensemble</option>
+                {landmarks.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedLandmark ? (
+              <p>{LANDMARK_REPRESENTATIONS[selectedLandmark.representation]}</p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="scene-hint">
           <span className="desktop-hint">
             Glisser pour tourner · molette pour zoomer

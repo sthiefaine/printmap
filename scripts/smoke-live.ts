@@ -10,6 +10,10 @@ import {
   useSceneStore,
 } from "../src/store/use-scene-store";
 import { getBboxDimensions } from "../src/lib/mesh/base-plate-mesh";
+import {
+  salonPrintLayouts,
+  salonLayoutSettings,
+} from "../src/lib/print-layout";
 import type { BBox, MapDataResponse } from "../src/types/osm";
 import { assertClosedSolid } from "../tests/helpers/solid";
 
@@ -60,7 +64,7 @@ else {
   data = await response.json();
 }
 assert.ok(data.osmData.elements.length > 0, "real data is available");
-const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
+let settings = structuredClone(DEFAULT_MODEL_SETTINGS);
 if (args.includes("--detail")) {
   settings.print = { ...PRINT_PROFILES.detail.print };
   settings.features.roads.filter = "all";
@@ -75,9 +79,19 @@ if (args.includes("--engrave")) {
 settings.base.topographyEnabled = !coast;
 settings.base.grid = { cols: 2, rows: 2 };
 const geographic = getBboxDimensions(bbox, 1000);
-const size = args.includes("--size") ? Number(option("--size")) : 200;
+let size = args.includes("--size") ? Number(option("--size")) : 200;
 assert.ok(Number.isFinite(size) && size >= 20 && size <= 1000);
-const scale = (Math.max(geographic.widthMm, geographic.heightMm) * 1000) / size;
+let scale = (Math.max(geographic.widthMm, geographic.heightMm) * 1000) / size;
+if (args.includes("--salon-plates")) {
+  const count = Number(option("--salon-plates"));
+  const layout = salonPrintLayouts(bbox).find(
+    (layout) => layout.count === count,
+  );
+  assert.ok(layout, "salon format must contain 2, 4, 6 or 9 plates");
+  settings = salonLayoutSettings(settings, layout);
+  size = layout.longSideMm;
+  scale = layout.scale;
+}
 const start = performance.now();
 const model = await buildPrintModel(
   { ...data, bbox, scale, settings },
@@ -144,10 +158,16 @@ await writeFile(
       report: data.report,
       dimensions: model.dimensions,
       stats: model.stats,
+      tiles: model.tiles.map(({ col, row, widthMm, depthMm }) => ({
+        col,
+        row,
+        widthMm,
+        depthMm,
+      })),
+      landmarks: model.landmarks,
       warnings: model.warnings,
       buildSeconds: (performance.now() - start) / 1000,
-      verification:
-        "Full model and all four tiles have closed, consistently oriented boundaries and positive volume.",
+      verification: `Full model and all ${model.tiles.length} tiles have closed, consistently oriented boundaries and positive volume.`,
     },
     null,
     2,
@@ -160,6 +180,7 @@ console.log(
       seconds: (performance.now() - start) / 1000,
       dimensions: model.dimensions,
       stats: model.stats,
+      landmarks: model.landmarks,
       report: data.report,
       warnings: model.warnings,
     },

@@ -34,6 +34,8 @@ export interface LidarRoofOptions {
   minimumHeight: number;
   /** Residual acceptance of the reconstructed planes, in source metres. */
   fitToleranceM: number;
+  /** A declared local landmark acquisition; native output/check caps stay fixed. */
+  landmark?: boolean;
 }
 
 /**
@@ -59,6 +61,7 @@ export function makeLidarRoof(
     footprint,
     minimumHeight,
     fitToleranceM,
+    landmark,
   } = options;
   if (
     ![
@@ -76,7 +79,9 @@ export function makeLidarRoof(
     fitToleranceM > 2
   )
     return null;
-  const conformed = conformIGNRoofSurfaces(surfaces, fitToleranceM);
+  const conformed = conformIGNRoofSurfaces(surfaces, fitToleranceM, {
+    landmark,
+  });
   if (!conformed?.length) return null;
   const highest = Math.max(
     ...conformed.flatMap((surface) =>
@@ -371,9 +376,21 @@ export function makeLidarRoof(
       Math.max(0.02, footprint.area() * 0.02)
     )
       return null;
+    // The skin uses canonical Lambert-93 XY (within 1 mm), then Float32.
+    // The selection remains Float64. Clipping exactly along both versions of
+    // the same outline can detach a numerical roof sliver, as on Saint-Charles
+    // at 1:19261. Accommodate only that representation uncertainty in the mask;
+    // the native skin, its holes and all roof heights are never inflated.
+    let maximumXY = 1;
+    for (const [x, y] of positions)
+      maximumXY = Math.max(maximumXY, Math.abs(x), Math.abs(y));
+    const clipTolerance = 0.001 * scaleFactor + maximumXY * 0.00000012;
+    const clipFootprint = arena.keep(footprint.offset(clipTolerance));
     const clip = arena.keep(
       arena
-        .keep(footprint.extrude(surfaceZ + relative * factor - foundationZ + 1))
+        .keep(
+          clipFootprint.extrude(surfaceZ + relative * factor - foundationZ + 1),
+        )
         .translate([0, 0, foundationZ]),
     );
     const clipped = arena.keep(native.intersect(clip));

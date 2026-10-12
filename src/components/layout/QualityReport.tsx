@@ -131,10 +131,21 @@ export function QualityReport() {
         report?.lidarRoofResolutionM ? (
           <p>
             Toits LiDAR : grille utilisée de{" "}
+            {report.lidarRoofMinResolutionM != null &&
+            report.lidarRoofMinResolutionM < report.lidarRoofResolutionM
+              ? `${report.lidarRoofMinResolutionM.toLocaleString("fr-FR")} à `
+              : ""}
             {report.lidarRoofResolutionM.toLocaleString("fr-FR")} m, issue d’une
             source au pas de 0,5 m. Les pentes et volumes sont reconstruits
             depuis la surface ; les façades et parties masquées nécessitent un
             relevé 3D dédié.
+          </p>
+        ) : null}
+        {report?.landmarkRoofBuildingCount ? (
+          <p>
+            Données acquises pour {report.landmarkRoofBuildingCount} repères :
+            grille LiDAR locale de 1 m. Le niveau de détail conservé dépend de
+            l’échelle et des réglages d’impression.
           </p>
         ) : null}
         <p>

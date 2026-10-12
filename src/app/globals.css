@@ -936,6 +936,43 @@ input[type="checkbox"] {
 .camera-tools button:hover {
   background: #ffffff12;
 }
+.landmark-view {
+  position: absolute;
+  z-index: 2;
+  top: 22px;
+  right: 24px;
+  max-width: 245px;
+  padding: 10px 12px;
+  border: 1px solid #ffffff1a;
+  border-radius: 7px;
+  background: #252c29e8;
+  color: #dce5d5;
+  font-size: 10px;
+}
+.landmark-view label {
+  display: grid;
+  gap: 6px;
+}
+.landmark-view select {
+  width: 100%;
+  background: #303b35;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  padding: 5px;
+  color: #edf0e8;
+  font-size: 11px;
+}
+.landmark-view p {
+  margin: 7px 0 0;
+  line-height: 1.5;
+}
+@media (max-width: 850px) {
+  .landmark-view {
+    top: 68px;
+    right: 12px;
+    max-width: 220px;
+  }
+}
 .scene-hint {
   position: absolute;
   bottom: 17px;

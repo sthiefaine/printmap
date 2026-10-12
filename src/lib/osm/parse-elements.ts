@@ -108,6 +108,8 @@ export interface BridgeData {
 export interface ParsedOSMData {
   buildings: BuildingData[];
   undergroundBuildingCount: number;
+  /** Unmeasured parts omitted because they duplicate a documented source roof. */
+  sourceRoofPartIgnoredCount: number;
   roads: RoadData[];
   roadAreas: RoadAreaData[];
   waterAreas: WaterPolygonData[];
@@ -314,7 +316,7 @@ function pointOnRing(point: Point2D, ring: Point2D[]): boolean {
   return false;
 }
 
-function containsVegetation(park: Polygon2D, vegetation: Polygon2D): boolean {
+function containsPolygon(park: Polygon2D, vegetation: Polygon2D): boolean {
   const contains = (point: Point2D) =>
     (pointInPolygon(point[0], point[1], park.outer) ||
       pointOnRing(point, park.outer)) &&
@@ -405,7 +407,7 @@ function retainParkSurfaces(
         candidate.box[3] > box[3] + 1e-7
       )
         continue;
-      if (containsVegetation(area.polygon, candidate.polygon)) {
+      if (containsPolygon(area.polygon, candidate.polygon)) {
         hasVegetation = true;
         break;
       }
@@ -479,14 +481,29 @@ function isUndergroundBuilding(tags: Record<string, string> = {}): boolean {
   );
 }
 
-function removeCoveredBuildingOutlines(
-  buildings: BuildingData[],
-): BuildingData[] {
-  const parts = buildings.filter(
-    (building) =>
-      building.tags["building:part"] && building.tags["building:part"] !== "no",
-  );
-  if (!parts.length) return buildings;
+function removeCoveredBuildingOutlines(buildings: BuildingData[]): {
+  buildings: BuildingData[];
+  ignoredPartCount: number;
+} {
+  const isPart = (building: BuildingData) =>
+    !!building.tags["building:part"] && building.tags["building:part"] !== "no";
+  const geometryRank = (building: BuildingData) =>
+    building.measuredSolid?.surfaces.length
+      ? 3
+      : building.roofSurfaces?.length
+        ? building.tags["printmap:roof_reconstruction"] === "lidar"
+          ? 1
+          : 2
+        : 0;
+  const hasDeclaredHeight = (building: BuildingData) =>
+    ["height", "building:height", "printmap:eave_height", "roof:height"].some(
+      (key) => (parseLengthMeters(building.tags[key]) ?? 0) > 0,
+    ) ||
+    ["building:levels", "roof:levels"].some(
+      (key) => Number(building.tags[key]) > 0,
+    );
+  const parts = buildings.filter(isPart);
+  if (!parts.length) return { buildings, ignoredPartCount: 0 };
   const bounds = (building: BuildingData) => {
     const xs = building.polygon.outer.map((p) => p[0]),
       ys = building.polygon.outer.map((p) => p[1]);
@@ -503,20 +520,17 @@ function removeCoveredBuildingOutlines(
   for (const part of parts)
     for (const key of keys(bounds(part)))
       buckets.set(key, [...(buckets.get(key) ?? []), part]);
+  const sourceEnvelopes = new Map<string, BuildingData[]>();
+  for (const building of buildings) {
+    if (isPart(building) || !geometryRank(building)) continue;
+    for (const key of keys(bounds(building)))
+      sourceEnvelopes.set(key, [...(sourceEnvelopes.get(key) ?? []), building]);
+  }
   const contains = (building: BuildingData, x: number, y: number) =>
     pointInPolygon(x, y, building.polygon.outer) &&
     !building.polygon.holes.some((hole) => pointInPolygon(x, y, hole));
-  return buildings.filter((building) => {
-    if (
-      building.tags["building:part"] &&
-      building.tags["building:part"] !== "no"
-    )
-      return true;
-    const box = bounds(building),
-      candidates = [
-        ...new Set(keys(box).flatMap((key) => buckets.get(key) ?? [])),
-      ];
-    if (!candidates.length) return true;
+  const coveredBy = (building: BuildingData, candidates: BuildingData[]) => {
+    const box = bounds(building);
     let samples = 0,
       covered = 0;
     for (let x = 0; x < 9; x++)
@@ -527,9 +541,43 @@ function removeCoveredBuildingOutlines(
         samples++;
         if (candidates.some((part) => contains(part, px, py))) covered++;
       }
-    // Full 3D parts supersede an envelope, whose global height would mask low wings.
-    return samples < 12 || covered / samples < 0.9;
+    return samples >= 12 && covered / samples >= 0.9;
+  };
+  let ignoredPartCount = 0;
+  const retained = buildings.filter((building) => {
+    const box = bounds(building);
+    if (isPart(building)) {
+      if (geometryRank(building) || hasDeclaredHeight(building)) return true;
+      const sources = new Set(
+        keys(box).flatMap((key) => sourceEnvelopes.get(key) ?? []),
+      );
+      // An unmeasured roof part has no upper altitude. Extruding its default
+      // height inside a documented roof would duplicate or mask that roof.
+      // Smaller, partly overlapping parts remain separate: their role is
+      // ambiguous, and containment must respect courtyards and recesses.
+      const duplicatesSource = [...sources].some(
+        (source) =>
+          containsPolygon(source.polygon, building.polygon) ||
+          (building.tags["building:part"] === "roof" &&
+            coveredBy(source, [building])),
+      );
+      // An altitude-free roof outline may also extend beyond its source
+      // building, as at the Zenith. Its overhang is mapped in XY only: report
+      // the omission rather than manufacture a nine-metre roof volume.
+      if (duplicatesSource) ignoredPartCount++;
+      return !duplicatesSource;
+    }
+    const rank = geometryRank(building),
+      candidates = [
+        ...new Set(keys(box).flatMap((key) => buckets.get(key) ?? [])),
+      ].filter((part) => !rank || geometryRank(part) >= rank);
+    if (!candidates.length) return true;
+    // Documented 3D parts can supersede a source envelope only at equal or
+    // greater source fidelity. The existing coverage rule still separates
+    // fully mapped wings of envelopes without source roof geometry.
+    return !coveredBy(building, candidates);
   });
+  return { buildings: retained, ignoredPartCount };
 }
 
 export function parseElements(
@@ -543,6 +591,7 @@ export function parseElements(
   const result: ParsedOSMData = {
     buildings: [],
     undergroundBuildingCount: 0,
+    sourceRoofPartIgnoredCount: 0,
     roads: [],
     roadAreas: [],
     waterAreas: [],
@@ -776,7 +825,9 @@ export function parseElements(
     }
   }
 
-  result.buildings = removeCoveredBuildingOutlines(result.buildings);
+  const resolvedBuildings = removeCoveredBuildingOutlines(result.buildings);
+  result.buildings = resolvedBuildings.buildings;
+  result.sourceRoofPartIgnoredCount = resolvedBuildings.ignoredPartCount;
   retainParkSurfaces(parkAreas, result, sf);
   return result;
 }

@@ -94,6 +94,8 @@ export interface DataReport {
   lidarRoofBuildingCount?: number;
   lidarRoofSurfaceCount?: number;
   lidarRoofResolutionM?: number | null;
+  lidarRoofMinResolutionM?: number | null;
+  landmarkRoofBuildingCount?: number;
   municipalStructureCount?: number;
   /** Located landmarks whose point data does not provide printable 3D geometry. */
   pointLandmarkCount?: number;

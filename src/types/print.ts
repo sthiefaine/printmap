@@ -28,7 +28,24 @@ export interface PrintTile extends PrintMesh {
   depthMm: number;
 }
 
+export interface PrintedLandmark {
+  id: string;
+  name: string;
+  /** Bounds of the retained solid, in the printable model coordinate system. */
+  min: [number, number, number];
+  max: [number, number, number];
+  representation:
+    | "surveyed-solid"
+    | "surveyed-roof"
+    | "lidar-roof"
+    | "osm-roof"
+    | "footprint";
+  source: string;
+}
+
 export interface PrintModel extends PrintMesh {
+  /** Only landmarks actually retained by the printable geometry pipeline. */
+  landmarks?: PrintedLandmark[];
   colors: Record<PrintLayer, string>;
   dimensions: { widthMm: number; depthMm: number; heightMm: number };
   stats: {

@@ -10,6 +10,10 @@ import {
 } from "../../src/lib/data/montpellier-lod2";
 import { assertClosedSolid } from "../helpers/solid";
 import {
+  salonPrintLayouts,
+  SAINT_ETIENNE_STADIUM_BBOX,
+} from "../../src/lib/print-layout";
+import {
   IGN_ROOF_SOURCE,
   reconstructIGNRoof,
   type IGNRoofGrid,
@@ -497,6 +501,85 @@ for (const preset of [
       expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(145, 2);
     }
   });
+
+test("Saint-Étienne switches between two and four 150 mm plates using the same collected city", async ({
+  page,
+}) => {
+  let collections = 0;
+  await page.route("**/api/map-data", async (route) => {
+    collections++;
+    const request = route.request().postDataJSON();
+    expect(request.bbox).toEqual(SAINT_ETIENNE_STADIUM_BBOX);
+    await route.fulfill({ json: enclosedDemoData(request.bbox) });
+  });
+  await page
+    .getByRole("button", {
+      name: "Saint-Étienne · centre, Expo et stade",
+      exact: true,
+    })
+    .click();
+  for (const count of [2, 4, 2]) {
+    const layout = salonPrintLayouts(SAINT_ETIENNE_STADIUM_BBOX).find(
+      (item) => item.count === count,
+    )!;
+    const choice = page.getByRole("button", {
+      name: `${count} plaques`,
+      exact: true,
+    });
+    await choice.click();
+    await expect(choice).toHaveAttribute("aria-pressed", "true");
+    if (collections === 0)
+      await page
+        .getByRole("button", {
+          name: "Récupérer et construire",
+          exact: true,
+        })
+        .click();
+    await expect(
+      page.getByRole("button", {
+        name: "Télécharger le 3MF",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    const saved = JSON.parse(
+      (await download(page, "Enregistrer")).bytes.toString(),
+    );
+    expect(saved.snapshot.bbox).toEqual(SAINT_ETIENNE_STADIUM_BBOX);
+    expect(saved.settings.base.grid).toEqual(layout.grid);
+    expect(saved.settings.base.elevationExaggeration).toBe(1);
+    expect(saved.settings.features.buildings.buildingScale).toBe(1);
+    expect(saved.scale).toBeCloseTo(layout.scale, 6);
+    const zip = await JSZip.loadAsync(
+      (await download(page, "Télécharger le 3MF")).bytes,
+    );
+    const pieces = Object.values(zip.files).filter((file) =>
+      file.name.endsWith(".3mf"),
+    );
+    expect(pieces).toHaveLength(count);
+    let totalVolume = 0;
+    for (const piece of pieces) {
+      const child = await JSZip.loadAsync(await piece.async("nodebuffer"));
+      const mesh = meshFrom3MF(
+        await child.file("3D/3dmodel.model")!.async("string"),
+      );
+      totalVolume += assertClosedSolid(mesh);
+      const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < mesh.positions.length; i += 3) {
+        bounds[0] = Math.min(bounds[0], mesh.positions[i]);
+        bounds[1] = Math.min(bounds[1], mesh.positions[i + 1]);
+        bounds[2] = Math.max(bounds[2], mesh.positions[i]);
+        bounds[3] = Math.max(bounds[3], mesh.positions[i + 1]);
+      }
+      expect(bounds[2] - bounds[0]).toBeCloseTo(layout.tileWidthMm, 3);
+      expect(bounds[3] - bounds[1]).toBeCloseTo(layout.tileHeightMm, 3);
+      expect(
+        Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1]),
+      ).toBeLessThan(150);
+    }
+    expect(totalVolume).toBeGreaterThan(0);
+    expect(collections).toBe(1);
+  }
+});
 
 test("real Expo raster roofs survive the browser worker and four 3MF exports", async ({
   page,

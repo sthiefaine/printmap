@@ -16,11 +16,17 @@ import { GenerateButton } from "@/components/controls/GenerateButton";
 import { SliderInput } from "@/components/controls/SliderInput";
 import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
 import { bboxDimensions } from "@/lib/data/bbox";
+import {
+  SAINT_ETIENNE_STADIUM_BBOX,
+  salonPrintLayouts,
+  salonLayoutSettings,
+  salonLayoutDimensions,
+  type SalonPrintLayout,
+} from "@/lib/print-layout";
 import type { BBox } from "@/types/osm";
 
 const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
 const SAINT_ETIENNE_BBOX: BBox = [45.4288, 4.3702, 45.454, 4.406];
-const SAINT_ETIENNE_STADIUM_BBOX: BBox = [45.4288, 4.3702, 45.4628, 4.406];
 const SAINT_ETIENNE_ROOFS_BBOX: BBox = [45.43085, 4.38145, 45.4379, 4.3945];
 
 function quickZone(
@@ -126,6 +132,7 @@ export function SidePanel() {
   const size = useSceneStore((s) => s.tileSize);
   const profile = useSceneStore((s) => s.profile);
   const print = useSceneStore((s) => s.modelSettings.print);
+  const grid = useSceneStore((s) => s.modelSettings.base.grid);
   const setProfile = useSceneStore((s) => s.setProfile);
   const setSize = useSceneStore((s) => s.setTileSize);
   const updatePrint = useSceneStore((s) => s.updatePrintSettings);
@@ -134,6 +141,36 @@ export function SidePanel() {
   const isPeyrouSelection =
     selectedCity?.name === "Peyrou · Arc et aqueduc" &&
     bbox?.every((coordinate, index) => coordinate === PEYROU_BBOX[index]);
+  const salonLayouts = bbox?.every(
+    (coordinate, index) => coordinate === SAINT_ETIENNE_STADIUM_BBOX[index],
+  )
+    ? salonPrintLayouts(bbox)
+    : null;
+  const salonLayoutButton = (layout: SalonPrintLayout) => {
+    const active =
+      grid.cols === layout.grid.cols &&
+      grid.rows === layout.grid.rows &&
+      Math.abs(size - layout.longSideMm) < 0.001 &&
+      Math.abs(scale - layout.scale) / layout.scale < 0.000001;
+    return (
+      <button
+        key={layout.count}
+        className={active ? "selected" : ""}
+        aria-pressed={active}
+        disabled={status === "fetching" || status === "processing"}
+        onClick={() => {
+          const scene = useSceneStore.getState();
+          useSceneStore.setState({
+            tileSize: layout.longSideMm,
+            scale: layout.scale,
+            modelSettings: salonLayoutSettings(scene.modelSettings, layout),
+          });
+        }}
+      >
+        {layout.count} plaques
+      </button>
+    );
+  };
   return (
     <aside className="side-panel" aria-label="Réglages du modèle">
       <section className="workflow-section">
@@ -268,6 +305,58 @@ export function SidePanel() {
             mm imprimé. Pour mieux voir l’architecture, choisissez une zone plus
             petite ou une pièce plus grande.
           </p>
+        ) : null}
+        {salonLayouts ? (
+          <div className="settings-stack">
+            <p className="field-hint">
+              Maquette de salon · plateau 15 × 15 cm. Chaque plaque mesure au
+              maximum 145 mm, avec 5 mm de marge sur le plateau. La zone centre,
+              Parc Expo et stade reste la même.
+            </p>
+            <div className="profiles" role="group" aria-label="Format salon">
+              {salonLayouts
+                .filter((layout) => layout.count <= 4)
+                .map(salonLayoutButton)}
+            </div>
+            <p className="field-hint">
+              {salonLayouts
+                .filter((layout) => layout.count <= 4)
+                .map((layout) => (
+                  <span key={layout.count}>
+                    {salonLayoutDimensions(layout)}
+                    <br />
+                  </span>
+                ))}
+              2 plaques donnent une maquette plus compacte avec moins de
+              détails. 4 plaques agrandissent la même zone de 48 % et conservent
+              davantage de petites empreintes imprimables. Relief et bâtiments
+              conservent leurs proportions, avec les toits activés.
+            </p>
+            <details className="advanced-settings">
+              <summary>Formats plus grands : 6 ou 9 plaques</summary>
+              <div
+                className="profiles"
+                role="group"
+                aria-label="Grands formats salon"
+              >
+                {salonLayouts
+                  .filter((layout) => layout.count > 4)
+                  .map(salonLayoutButton)}
+              </div>
+              <p className="field-hint">
+                {salonLayouts
+                  .filter((layout) => layout.count > 4)
+                  .map((layout) => (
+                    <span key={layout.count}>
+                      {salonLayoutDimensions(layout)}
+                      <br />
+                    </span>
+                  ))}
+                Par rapport à 4 plaques, les détails gagnent 35 % avec 6 plaques
+                et 50 % avec 9.
+              </p>
+            </details>
+          </div>
         ) : null}
         <div className="profiles" aria-label="Niveau de détail">
           {(Object.keys(PRINT_PROFILES) as PrintProfile[]).map((id) => (

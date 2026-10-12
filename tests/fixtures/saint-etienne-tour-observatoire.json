@@ -1,0 +1,55 @@
+{
+  "source": "https://www.openstreetmap.org/way/172156092",
+  "license": "© OpenStreetMap contributors · ODbL 1.0",
+  "fetchedAt": "2026-10-12T15:48:44.006Z",
+  "element": {
+    "type": "way",
+    "id": 172156092,
+    "bounds": {
+      "minlat": 45.450833,
+      "minlon": 4.3853548,
+      "maxlat": 45.4509589,
+      "maxlon": 4.3855124
+    },
+    "nodes": [
+      1830940152,
+      1830940154,
+      1830940150,
+      1830940146,
+      1830940152
+    ],
+    "geometry": [
+      {
+        "lat": 45.4509416,
+        "lon": 4.3853548
+      },
+      {
+        "lat": 45.4509589,
+        "lon": 4.3854828
+      },
+      {
+        "lat": 45.4508503,
+        "lon": 4.3855124
+      },
+      {
+        "lat": 45.450833,
+        "lon": 4.3853844
+      },
+      {
+        "lat": 45.4509416,
+        "lon": 4.3853548
+      }
+    ],
+    "tags": {
+      "alt_name": "Tour Geipel",
+      "architect": "Finn Geipel",
+      "building": "yes",
+      "height": "31",
+      "man_made": "tower",
+      "name": "Tour observatoire",
+      "tourism": "viewpoint",
+      "tower:construction": "lattice",
+      "tower:type": "observation"
+    }
+  }
+}
