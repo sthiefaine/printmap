@@ -1,4 +1,38 @@
-import type { ManifoldToplevel, Mesh, MeshOptions } from "manifold-3d";
+import type {
+  Manifold,
+  ManifoldToplevel,
+  Mesh,
+  MeshOptions,
+} from "manifold-3d";
+
+interface Handles {
+  keep<T extends { delete(): void }>(handle: T): T;
+}
+
+/** Cancel numerical sheets before deciding whether a contact needs a real cut. */
+export function removeCoincidentSheets(
+  cad: ManifoldToplevel,
+  owner: Handles,
+  solid: Manifold,
+): Manifold {
+  const mesh = solid.getMesh();
+  const cleaned = repairCoincident(cad, mesh);
+  // Preserve the native coordinates and topology if no faces were cancelled.
+  if (cleaned.triVerts.length === mesh.triVerts.length) return solid;
+  const result = owner.keep(new cad.Manifold(cleaned));
+  const numericalVolumeTolerance = Math.max(
+    0.000001,
+    Math.abs(solid.volume()) * 1e-8,
+  );
+  if (
+    result.status() !== "NoError" ||
+    Math.abs(result.volume() - solid.volume()) > numericalVolumeTolerance
+  )
+    throw new Error(
+      "L’annulation des faces numériques dépasse la précision autorisée.",
+    );
+  return result;
+}
 
 /** Cancel coincident opposite internal sheets after the kernel's simplification. */
 export function repairCoincident(cad: ManifoldToplevel, mesh: Mesh): Mesh {

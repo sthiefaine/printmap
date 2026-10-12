@@ -2,6 +2,9 @@ import type { BBox, ElevationGrid } from "@/types/osm";
 import { bboxDimensions, isMetropolitanFrance } from "./bbox";
 import { abortableDelay, fetchWithTimeout } from "./request";
 
+const IGN_ELEVATION_URL =
+  "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json";
+
 function validElevations(value: unknown, count: number): value is number[] {
   return (
     Array.isArray(value) &&
@@ -53,6 +56,7 @@ export async function fetchElevation(
   bbox: BBox,
   signal: AbortSignal,
 ): Promise<ElevationGrid> {
+  signal.throwIfAborted();
   if (isMetropolitanFrance(bbox)) {
     const dimensions = bboxDimensions(bbox);
     // Sample small sites more densely so terraces and approaches survive.
@@ -61,8 +65,48 @@ export async function fetchElevation(
     const smallSite = Math.max(dimensions.widthM, dimensions.heightM) <= 800;
     const grid = makeGrid(bbox, smallSite ? 5 : 20, smallSite ? 128 : 65);
     try {
+      // This resource is listed by IGN's /altimetrie/resources catalogue.
+      // Its advertised bbox is stale: live Montpellier points are covered.
+      // Use the actual response, never assume coverage from the catalogue bbox.
       const response = await fetchWithTimeout(
-        "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json",
+        IGN_ELEVATION_URL,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lon: grid.lon.map((v) => v.toFixed(7)).join("|"),
+            lat: grid.lat.map((v) => v.toFixed(7)).join("|"),
+            resource: "ign_lidar_hd_mnt_mono_wld",
+            delimiter: "|",
+            zonly: "true",
+          }),
+        },
+        signal,
+        12000,
+      );
+      if (!response.ok) throw new Error("LiDAR IGN indisponible");
+      const data = await response.json();
+      // Reprojection can interpolate the -99999 no-data sentinel. A single
+      // missing/outlying cell rejects the whole LiDAR grid rather than mixing
+      // this fine terrain with a 90 m DEM without telling the user.
+      if (
+        !validElevations(data.elevations, grid.lat.length) ||
+        data.elevations.some((z: number) => z < -500)
+      )
+        throw new Error("Couverture LiDAR IGN incomplète");
+      return finishGrid(
+        bbox,
+        grid,
+        data.elevations,
+        `IGN · LiDAR HD MNT (source 0,5 m, ${bbox[0] < 43.2 && bbox[3] > 8.3 ? "IGN78C" : "IGN69"}) · Licence Ouverte 2.0 · https://data.geopf.fr/altimetrie/resources/ign_lidar_hd_mnt_mono_wld`,
+        Math.max(0.5, grid.sampleSpacingM),
+      );
+    } catch {
+      signal.throwIfAborted();
+    }
+    try {
+      const response = await fetchWithTimeout(
+        IGN_ELEVATION_URL,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -113,10 +157,13 @@ export async function fetchElevation(
           : "IGN · RGE ALTI",
         Math.max(1, grid.sampleSpacingM),
       );
+      result.warnings = [
+        "Le MNT LiDAR HD IGN est indisponible ou incomplet sur cette zone ; le relief se replie sur RGE ALTI.",
+      ];
       if (invalid.length)
-        result.warnings = [
+        result.warnings.push(
           `${invalid.length} points de relief IGN manquants ont été remplacés par le DEM Copernicus à 90 m ; le reste de la grille conserve les altitudes IGN.`,
-        ];
+        );
       return result;
     } catch {
       signal.throwIfAborted();
@@ -125,13 +172,18 @@ export async function fetchElevation(
 
   const grid = makeGrid(bbox, 90, 32);
   const points = await fetchGlobalPoints(grid.lat, grid.lon, signal);
-  return finishGrid(
+  const result = finishGrid(
     bbox,
     grid,
     points,
     "Open-Meteo · Copernicus DEM GLO-90",
     Math.max(90, grid.sampleSpacingM),
   );
+  if (isMetropolitanFrance(bbox))
+    result.warnings = [
+      "Le MNT LiDAR HD IGN et RGE ALTI sont indisponibles ou incomplets sur cette zone ; le relief utilise le DEM Copernicus à 90 m.",
+    ];
+  return result;
 }
 
 async function fetchGlobalPoints(

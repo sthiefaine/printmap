@@ -7,6 +7,7 @@ import { fetchWaterPolygons } from "./ocean";
 import { parseElements } from "@/lib/osm/parse-elements";
 import { selectComplementaryWater } from "./water-coverage";
 import { parseLengthMeters } from "@/lib/osm/building-height";
+import { summarizePointLandmarks } from "./point-landmarks";
 import {
   enrichWithMunicipalRoofs,
   fetchMontpellierRoofs,
@@ -143,6 +144,8 @@ export async function collectMapData(
     warnings.push(
       "Couverture marine indisponible : les lacs et rivières OSM sont conservés, mais la mer n’est pas extrapolée depuis le trait de côte.",
     );
+  const pointLandmarks = summarizePointLandmarks(elements, bbox);
+  warnings.push(...pointLandmarks.warnings);
   const buildings = parseElements(elements, bbox, 5000).buildings;
   const measuredBuildingCount = buildings.filter(
     (building) =>
@@ -203,6 +206,7 @@ export async function collectMapData(
         (building) => building.measuredSolid?.surfaces.length,
       ).length,
       municipalStructureCount,
+      pointLandmarkCount: pointLandmarks.pointLandmarkCount,
       ...(buildings.some((building) => building.roofSurfaces?.length)
         ? { lod2Year: 2020 }
         : {}),

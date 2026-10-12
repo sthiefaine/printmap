@@ -1,5 +1,6 @@
 import type { BBox, OverpassResponse } from "@/types/osm";
 import { fetchWithTimeout } from "./request";
+import { LANDMARK_SELECTORS } from "./point-landmarks";
 
 export function buildOverpassQuery(bbox: BBox) {
   const bb = bbox.join(",");
@@ -19,7 +20,8 @@ export function buildOverpassQuery(bbox: BBox) {
       wr["leisure"="swimming_pool"](${bb});
       way["natural"="coastline"](${bb});
       wr["man_made"~"^(pier|dock|bridge|aqueduct|embankment)$"](${bb});
-      wr["historic"~"^(city_gate|monument|aqueduct|ruins|castle|fort)$"](${bb});
+      wr["historic"~"^(city_gate|aqueduct|ruins|castle|fort)$"](${bb});
+      ${LANDMARK_SELECTORS.map((selector) => `${selector}(${bb});`).join("\n      ")}
       way["barrier"~"^(wall|retaining_wall|city_wall)$"](${bb});
       wr["bridge"]["bridge"!="no"](${bb});
     ); out body geom;`;

@@ -20,6 +20,12 @@ export interface EdgeContactRepair {
   removedVolumeMm3: number;
 }
 
+interface EdgeContactOptions {
+  coplanarFootprint?:
+    "faces" | "bounds" | ((originalId: number) => "faces" | "bounds");
+  lineContactSegments?: 4 | 12;
+}
+
 /**
  * Open only line contacts which would weld to more than two export faces.
  * A narrow cut removes material around each detected edge, keeping existing
@@ -32,6 +38,7 @@ export function openEdgeContacts(
   owner: Handles,
   solid: Manifold,
   clearanceMm = 0.005,
+  options: EdgeContactOptions = {},
 ): EdgeContactRepair {
   if (!Number.isFinite(clearanceMm) || clearanceMm <= 0 || clearanceMm > 0.01)
     throw new Error(
@@ -39,15 +46,72 @@ export function openEdgeContacts(
     );
   const contacts = findContacts(solid.getMesh());
   if (!contacts.length) return { solid, repairedCount: 0, removedVolumeMm3: 0 };
+  const shortFaceContacts: number[] = [];
+  const first = tryOpeningContacts(
+    cad,
+    owner,
+    solid,
+    contacts,
+    clearanceMm,
+    options,
+    undefined,
+    shortFaceContacts,
+  );
+  if (first) return first;
+  // A noncoplanar film around a sub-clearance edge can make the native
+  // difference reinterpret adjacent planes. Keep the initial source immutable
+  // and replace only one rejected short film cut by an inscribed line prism.
+  // Existing successful cuts remain unchanged; every candidate keeps exactly
+  // the same clearance and volume guards, and at most three alternatives run.
+  if (options.lineContactSegments === 4) {
+    for (const index of shortFaceContacts.slice(0, 3)) {
+      const retry = tryOpeningContacts(
+        cad,
+        owner,
+        solid,
+        contacts,
+        clearanceMm,
+        options,
+        index,
+      );
+      if (retry) return retry;
+    }
+  }
+  throw new Error(
+    "L’ouverture du contact dépasse le volume de correction autorisé.",
+  );
+}
+
+function tryOpeningContacts(
+  cad: ManifoldToplevel,
+  owner: Handles,
+  solid: Manifold,
+  contacts: EdgeContact[],
+  clearanceMm: number,
+  options: EdgeContactOptions,
+  lineEdgeIndex?: number,
+  shortFaceContacts?: number[],
+): EdgeContactRepair | null {
   const cutters: Manifold[] = [];
   let maximumRemovedVolume = 0;
-  for (const edge of contacts) {
-    let positioned = makeCoplanarContactCut(cad, owner, edge, clearanceMm);
+  for (const [edgeIndex, edge] of contacts.entries()) {
+    const footprint =
+      typeof options.coplanarFootprint === "function"
+        ? options.coplanarFootprint(edge.originalId)
+        : (options.coplanarFootprint ?? "faces");
+    let positioned = makeCoplanarContactCut(
+      cad,
+      owner,
+      edge,
+      clearanceMm,
+      footprint,
+    );
     if (!positioned) {
       const delta = subtract(edge.b, edge.a);
       const length = Math.hypot(...delta);
       if (length === 0) continue;
-      if (length <= clearanceMm * 2) {
+      if (length <= clearanceMm * 2 && edgeIndex !== lineEdgeIndex) {
+        if (footprint === "faces") shortFaceContacts?.push(edgeIndex);
         // On a sub-clearance edge, a cylindrical cut can stop inside the thin
         // adjacent film and create another four-face edge. Clear those faces'
         // full micron-thick sheets, with the same volume bounds below.
@@ -67,7 +131,10 @@ export function openEdgeContacts(
             length + clearanceMm * 2,
             clearanceMm,
             clearanceMm,
-            12,
+            // Fewer facets stay inscribed in the same clearance circle and
+            // avoid tiny intersections along a global roof contact. The
+            // default remains unchanged for local roofs and tile cuts.
+            options.lineContactSegments ?? 12,
           ),
         );
         positioned = owner.keep(
@@ -121,9 +188,7 @@ export function openEdgeContacts(
     Math.abs(volumeDifference - removedVolumeMm3) > numericalVolumeTolerance ||
     removedVolumeMm3 > Math.max(0.000001, Math.abs(solid.volume()) * 0.0001)
   )
-    throw new Error(
-      "L’ouverture du contact dépasse le volume de correction autorisé.",
-    );
+    return null;
   return {
     solid: result,
     repairedCount: cutters.length,
@@ -149,6 +214,7 @@ function makeCoplanarContactCut(
   owner: Handles,
   edge: EdgeContact,
   clearanceMm: number,
+  footprint: "faces" | "bounds",
 ): Manifold | null {
   for (let i = 0; i < edge.faces.length; i++) {
     const first = edge.faces[i];
@@ -194,7 +260,15 @@ function makeCoplanarContactCut(
         )
       )
         continue;
-      const u = unit(subtract(edge.b, edge.a)),
+      const edgeDelta = subtract(edge.b, edge.a);
+      const inPlane =
+        footprint === "bounds"
+          ? (edgeDelta.map(
+              (value, axis) => value - normal[axis] * dot(edgeDelta, normal),
+            ) as Point)
+          : edgeDelta;
+      if (Math.hypot(...inPlane) < 1e-12) continue;
+      const u = unit(inPlane),
         v = cross(normal, u);
       const rings = [first.points, second.points].map((triangle) =>
         triangle.map((point) => {
@@ -209,8 +283,50 @@ function makeCoplanarContactCut(
       // Ordinary coplanar neighbours meet only along their shared edge. They
       // must not be removed as a thin film merely because their planes match.
       if (overlap.area() <= 1e-12) continue;
-      const section = owner.keep(cad.CrossSection.union(sections));
-      const expanded = owner.keep(section.offset(clearanceMm, "Round", 2, 12));
+      let expanded;
+      if (footprint === "bounds") {
+        // A Float32 terrain film may have different triangulations on its two
+        // sides. Clearing only the first overlapping pair leaves the other
+        // faces behind; rounded borders then carry the contact onto further
+        // micron-scale triangles. Bound all incident coplanar faces in this
+        // plane instead. The cut stays within their projected rectangle plus
+        // the same clearance, and its thickness and volume guards are unchanged.
+        const projected = edge.faces
+          .filter(({ points }) =>
+            points.every(
+              (point) =>
+                Math.abs(dot(subtract(point, a), normal)) <=
+                coordinateTolerance,
+            ),
+          )
+          .flatMap(({ points }) =>
+            points.map((point) => {
+              const delta = subtract(point, a);
+              return [dot(delta, u), dot(delta, v)] as [number, number];
+            }),
+          );
+        const minX =
+            Math.min(...projected.map((point) => point[0])) - clearanceMm,
+          maxX = Math.max(...projected.map((point) => point[0])) + clearanceMm,
+          minY = Math.min(...projected.map((point) => point[1])) - clearanceMm,
+          maxY = Math.max(...projected.map((point) => point[1])) + clearanceMm;
+        expanded = owner.keep(
+          new cad.CrossSection(
+            [
+              [
+                [minX, minY],
+                [maxX, minY],
+                [maxX, maxY],
+                [minX, maxY],
+              ],
+            ],
+            "EvenOdd",
+          ),
+        );
+      } else {
+        const section = owner.keep(cad.CrossSection.union(sections));
+        expanded = owner.keep(section.offset(clearanceMm, "Round", 2, 12));
+      }
       const prism = owner.keep(expanded.extrude(clearanceMm * 2));
       return owner.keep(
         prism.warp((vertex) => {

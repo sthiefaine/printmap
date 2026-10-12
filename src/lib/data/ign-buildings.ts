@@ -30,13 +30,16 @@ export async function fetchIGNBuildings(
   bbox: BBox,
   signal: AbortSignal,
 ): Promise<IGNBuildings> {
+  signal.throwIfAborted();
   const features: IGNFeature[] = [],
     warnings: string[] = [];
-  const limit = 10000,
+  const seen = new Set<string>();
+  const limit = 20000,
     pageSize = 2500;
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(22000)]);
   try {
     for (let start = 0; start < limit; start += pageSize) {
+      deadline.throwIfAborted();
       const url = new URL("https://data.geopf.fr/wfs/ows");
       const [south, west, north, east] = bbox;
       for (const [key, value] of Object.entries({
@@ -62,12 +65,19 @@ export async function fetchIGNBuildings(
       const page = await response.json();
       if (!Array.isArray(page.features))
         throw new Error("Réponse IGN invalide");
-      features.push(
-        ...page.features.filter(
-          (f: IGNFeature) =>
-            f.properties?.etat_de_l_objet !== "Détruit" && f.geometry,
-        ),
-      );
+      // Stable sorting and source IDs keep successive pages independent, even
+      // when the provider updates its matched count during this collection.
+      for (const feature of page.features.slice(0, pageSize) as IGNFeature[]) {
+        if (
+          feature.properties?.etat_de_l_objet === "Détruit" ||
+          !feature.geometry
+        )
+          continue;
+        const key = feature.properties?.cleabs ?? feature.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        features.push(feature);
+      }
       if (
         page.features.length < pageSize ||
         (typeof page.numberMatched === "number" &&
@@ -76,7 +86,7 @@ export async function fetchIGNBuildings(
         break;
       if (start + pageSize >= limit)
         warnings.push(
-          "Enrichissement IGN limité aux 10 000 premiers bâtiments ; les empreintes OSM restent complètes. Réduisez la zone pour enrichir toutes les hauteurs.",
+          "Enrichissement IGN limité aux 20 000 premiers bâtiments ; les empreintes OSM restent complètes. Réduisez la zone pour enrichir toutes les hauteurs.",
         );
     }
   } catch {

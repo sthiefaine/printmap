@@ -167,7 +167,26 @@ export function makeMeasuredRoof(
     // Minor survey/OSM edge disagreement can be clipped, but missing roof panels
     // must not silently create a partly empty building.
     if (missing.area() > Math.max(0.02, footprint.area() * 0.02)) return null;
-    const union = arena.keep(cad.Manifold.union(solids));
+    let unionOperands = solids;
+    const allHorizontal = surfaces.every(
+      ({ outer, holes }) =>
+        outer.length > 0 &&
+        [outer, ...holes].every((ring) =>
+          ring.every((point) => point.elevation === outer[0].elevation),
+        ),
+    );
+    if (allHorizontal && solids.length > 8) {
+      // Many terrace prisms share the same foundation plane. One large native
+      // union can retain a four-face seam there after Float32 conversion.
+      // Materialise small unions first without moving any source coordinates
+      // or heights. Inclined surveys retain their existing construction.
+      unionOperands = [];
+      for (let first = 0; first < solids.length; first += 8)
+        unionOperands.push(
+          arena.keep(cad.Manifold.union(solids.slice(first, first + 8))),
+        );
+    }
+    const union = arena.keep(cad.Manifold.union(unionOperands));
     const maxZ = surfaceZ + maximumRelative * factor;
     const clip = arena.keep(
       arena

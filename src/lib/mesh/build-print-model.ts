@@ -17,7 +17,10 @@ import type { ElevationGrid } from "@/types/osm";
 import { createProjectionForBbox } from "../projection";
 import { sampleElevation } from "../elevation/sample-grid";
 import { makeStairFlight, type StairFlight } from "./stair-solid";
-import { makeMeasuredSolid } from "./measured-solid";
+import {
+  makeMeasuredSolid,
+  makeMeasuredRoofFallbackFootprint,
+} from "./measured-solid";
 import { makeSurveyedArch } from "./bridge-solid";
 import { makeMeasuredBridgeApproach } from "./measured-bridge-approach";
 import { removeNumericalShells } from "./retain-shells";
@@ -38,8 +41,9 @@ import {
 import { simplifyPolyline } from "../polygon/simplify";
 import { pointInPolygon } from "../polygon/point-in-polygon";
 import { makeRoof, makeMeasuredRoof } from "./roof-solid";
-import { repairCoincident } from "./repair-coincident";
+import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
+import { preparePrintLayers } from "./fuse-print-layers";
 
 let runtime: Promise<ManifoldToplevel> | undefined;
 async function getRuntime(): Promise<ManifoldToplevel> {
@@ -555,6 +559,7 @@ function stabilizeSolid(
   arena: Arena,
   solid: Manifold,
   minimumTolerance = 0.001,
+  preserveNativeTolerance = false,
 ): Manifold {
   const mesh = solid.getMesh();
   let maxCoordinate = 1;
@@ -569,9 +574,18 @@ function stabilizeSolid(
   // Contract only native edges with a valid link and unchanged neighbouring
   // winding, while retaining separate shells and export contact clearances.
   const rounded = arena.keep(
-    new cad.Manifold(contractShortEdges(cad, mesh, tolerance)),
+    new cad.Manifold(
+      contractShortEdges(cad, mesh, tolerance, preserveNativeTolerance),
+    ),
   );
-  const simplified = arena.keep(rounded.simplify(tolerance));
+  // The explicit contractions already use the requested bound. Increasing the
+  // kernel's own tolerance again can retriangulate a surveyed horizontal roof
+  // through a much lower wall vertex, as on the Polygone's stepped roof.
+  const simplified = arena.keep(
+    rounded.simplify(
+      preserveNativeTolerance ? Math.min(tolerance, mesh.tolerance) : tolerance,
+    ),
+  );
   return arena.keep(
     new cad.Manifold(
       repairNumericalTriangles(
@@ -728,6 +742,7 @@ export async function buildPrintModel(
     const footprint = (
       polygon: Polygon2D,
       minArea = minFeatureMm * minFeatureMm,
+      preserveMeasuredContour = false,
     ): CrossSection | null => {
       const outer = cleanRing(polygon.outer);
       if (outer.length < 3) return null;
@@ -738,9 +753,13 @@ export async function buildPrintModel(
         new cad.CrossSection([outer, ...holes], "EvenOdd"),
       );
       const clipped = arena.keep(section.intersect(clip));
-      const simplified = arena.keep(clipped.simplify(simplifyMm));
-      if (simplified.isEmpty() || simplified.area() < minArea) return null;
-      return simplified;
+      // Simplification can fill surveyed indentations and make complete roofs
+      // appear to miss their footprint. Measured surfaces retain the exact clip.
+      const prepared = preserveMeasuredContour
+        ? clipped
+        : arena.keep(clipped.simplify(simplifyMm));
+      if (prepared.isEmpty() || prepared.area() < minArea) return null;
+      return prepared;
     };
     const corridor = (
       line: Point2D[],
@@ -955,6 +974,9 @@ export async function buildPrintModel(
             minBuildingAreaMm2,
             settings.features.buildings.minAreaM2 * sf * sf,
           ),
+          !!building.measuredSolid ||
+            (settings.features.buildings.roofs &&
+              !!building.roofSurfaces?.length),
         );
         const totalHeight =
           (building.wallHeight + building.roofHeight) *
@@ -1555,6 +1577,15 @@ export async function buildPrintModel(
               })
             : null;
         const isMeasuredStructure = !!measuredSolid;
+        const measuredRoofFootprint =
+          !measuredSolid && hasMeasuredRoof && building.measuredSolid
+            ? makeMeasuredRoofFallbackFootprint(
+                cad,
+                arena,
+                building.measuredSolid,
+                { project: projection.project, scaleFactor: sf, clip },
+              )
+            : null;
         measuredSolid ??=
           hasMeasuredRoof && building.groundElevation != null
             ? makeMeasuredRoof(
@@ -1567,7 +1598,7 @@ export async function buildPrintModel(
                 settings.features.buildings.buildingScale,
                 surfaceZ,
                 startZ,
-                section,
+                measuredRoofFootprint ?? section,
                 minBuildingHeightMm,
               )
             : null;
@@ -1594,29 +1625,101 @@ export async function buildPrintModel(
                 stabilized,
                 (piece) => Math.abs(piece.volume()) > 0.000001,
               );
-              const localRepair = openEdgeContacts(cad, arena, printable);
-              if (localRepair.repairedCount) {
-                const closed = arena.keep(
-                  new cad.Manifold(
-                    repairNumericalTriangles(
-                      cad,
-                      repairCollinear(
-                        cad,
-                        repairCoincident(cad, localRepair.solid.getMesh()),
-                      ),
-                    ),
-                  ),
-                );
-                printable = removeNumericalShells(
+              const repairVolume = printable.volume();
+              const uncutSurvey = printable;
+              let removedVolume = 0;
+              let localContacts = 0;
+              let useContactBounds = false;
+              let closed = false;
+              let failure: unknown;
+              // Converting a local cut back to Float32 can expose a second
+              // contact, as on Sainte-Anne at a 200 mm neighbourhood scale.
+              // Check the actual boundary after each of three bounded passes,
+              // rather than replacing its nave by the bell tower's height.
+              for (let pass = 0; pass < 3; pass++) {
+                const beforeVolume = printable.volume();
+                const localRepair = openEdgeContacts(
                   cad,
                   arena,
-                  closed,
-                  (piece) => Math.abs(piece.volume()) > 0.000001,
+                  printable,
+                  0.005,
+                  useContactBounds
+                    ? { coplanarFootprint: "bounds" }
+                    : undefined,
                 );
+                localContacts += localRepair.repairedCount;
+                if (localRepair.repairedCount) {
+                  const repaired = arena.keep(
+                    new cad.Manifold(
+                      repairNumericalTriangles(
+                        cad,
+                        repairCollinear(
+                          cad,
+                          repairCoincident(cad, localRepair.solid.getMesh()),
+                        ),
+                      ),
+                    ),
+                  );
+                  printable = removeNumericalShells(
+                    cad,
+                    arena,
+                    repaired,
+                    (piece) => Math.abs(piece.volume()) > 0.000001,
+                  );
+                }
+                removedVolume += Math.max(0, beforeVolume - printable.volume());
+                if (
+                  removedVolume >
+                  repairVolume * 0.0001 +
+                    3 * Math.max(0.000001, repairVolume * 0.00000001)
+                )
+                  throw new Error(
+                    "La réparation du relevé dépasse la précision autorisée.",
+                  );
+                try {
+                  validatePrintMesh(extractMesh(printable, new Map()));
+                  closed = true;
+                  break;
+                } catch (error) {
+                  failure = error;
+                }
+                if (pass > 0 && !localRepair.repairedCount) {
+                  if (
+                    pass === 1 &&
+                    failure instanceof Error &&
+                    /face collinéaire/.test(failure.message)
+                  ) {
+                    // A face-shaped cut can leave a collinear Float32 sliver
+                    // without a remaining contact to cut. Use the last attempt
+                    // for the bounded footprint, starting from the immutable
+                    // survey rather than accumulating cuts on that candidate.
+                    printable = uncutSurvey;
+                    useContactBounds = true;
+                    // The abandoned candidate contributes no material changes
+                    // or reported contacts to the ultimately retained survey.
+                    removedVolume = 0;
+                    localContacts = 0;
+                    continue;
+                  }
+                  break;
+                }
               }
-              validatePrintMesh(extractMesh(printable, new Map()));
+              if (!closed) throw failure;
+              const repairedPieces = printable
+                .decompose()
+                .map((piece) => arena.keep(piece));
+              if (
+                repairedPieces.some(
+                  (piece) =>
+                    piece.volume() > 0.000001 &&
+                    piece.boundingBox().min[2] > startZ + 0.0001,
+                )
+              )
+                throw new Error(
+                  "La réparation du relevé a laissé des détails sans fondation.",
+                );
               measuredSolid = printable;
-              repairedBuildingContacts += localRepair.repairedCount;
+              repairedBuildingContacts += localContacts;
             }
           } catch {
             measuredSolid = null;
@@ -1820,7 +1923,7 @@ export async function buildPrintModel(
       }
       if (unavailableStructures)
         warnings.push(
-          `${unavailableStructures} coque(s) 3D mesurée(s) n’ont pas pu être fermées ; leurs ouvertures et dessous ne sont pas garantis dans l’enveloppe de repli.`,
+          `${unavailableStructures} coque(s) 3D mesurée(s) n’ont pas pu être fermées. Le repli conserve les toitures mesurées lorsqu’elles sont utilisables et leurs fondations ; les ouvertures et dessous ne sont pas reproduits par ce repli.`,
         );
       if (repairedStructureSeams)
         warnings.push(
@@ -1828,7 +1931,7 @@ export async function buildPrintModel(
         );
       if (repairedBuildingContacts)
         warnings.push(
-          `${repairedBuildingContacts} contact(s) de précision dans les relevés de bâtiments ont été ouverts localement sur 0,005 mm pour conserver leurs toitures détaillées.`,
+          `${repairedBuildingContacts} contact(s) de précision dans les relevés de bâtiments ont été ouverts localement sur 0,005 mm, en trois passages au maximum et avec un retrait cumulé limité à 0,01 % du volume de chaque relevé, pour conserver leurs toitures détaillées. Les cavités sont conservées.`,
         );
       if (replacedSurveyedFoundations)
         warnings.push(
@@ -1918,7 +2021,10 @@ export async function buildPrintModel(
       }
     }
     onProgress(72, "Fusion du socle et des détails en un seul solide");
-    let union = arena.keep(cad.Manifold.union([base, ...solids]));
+    // Preserve the mixed terrain palette while limiting each added layer's
+    // ancestry before decomposing the many zero-volume DEM boundary shells.
+    const layerSolids = preparePrintLayers(cad, arena, solids, materialIds);
+    let union = arena.keep(cad.Manifold.union([base, ...layerSolids]));
     // Carve source ramp faces after adding the surveyed shells, so the source
     // ramps cannot cover the printable treads built on the same landings.
     if (stairs.length) {
@@ -1948,7 +2054,7 @@ export async function buildPrintModel(
     const cleanUnion = removeNumericalShells(cad, arena, union, hasMaterial);
     // The renderer/STL stores Float32 coordinates. Remove intersections smaller
     // than a micron before conversion so they cannot collapse into zero-area faces.
-    const merged = stabilizeSolid(cad, arena, cleanUnion);
+    const merged = stabilizeSolid(cad, arena, cleanUnion, 0.001, true);
     if (merged.status() !== "NoError" || merged.isEmpty())
       throw new Error(
         "Le moteur n’a pas pu produire un solide fermé. Réduisez la zone ou choisissez un profil plus épuré.",
@@ -1991,6 +2097,13 @@ export async function buildPrintModel(
         "Le modèle contient des détails détachés du socle. Réduisez la zone ou désactivez les détails concernés.",
       );
     let result = removeNumericalShells(cad, arena, merged, retained);
+    // Shell concatenation retains separate native vertex identities. Opposite
+    // boundaries can then coincide at Float32 export precision, as at the
+    // Vialleton outlet. Cancel those zero-thickness sheets before cutting a
+    // supposed contact: otherwise the unnecessary cut moves the singularity
+    // onto the terrace and creates further numerical triangles. Negative
+    // cavity shells keep their winding; no cavity is filled by this cleanup.
+    result = removeCoincidentSheets(cad, arena, result);
     const repairVolume = result.volume();
     let removedVolume = 0;
     let contactRepairs = 0;
@@ -1998,7 +2111,18 @@ export async function buildPrintModel(
     let failure: unknown;
     for (let pass = 0; pass < 3; pass++) {
       const beforeVolume = result.volume();
-      const contactRepair = openEdgeContacts(cad, arena, result);
+      const contactRepair = openEdgeContacts(cad, arena, result, 0.005, {
+        // Only terrain/road films require the full coplanar face bounds.
+        // Roofs keep their smaller face footprints and the same volume guards.
+        // Native source IDs are mapped to layers, never treated as layer indices.
+        coplanarFootprint: (originalId) => {
+          const layer = materialIds.get(originalId) ?? "basePlate";
+          return layer === "basePlate" || layer === "roads"
+            ? "bounds"
+            : "faces";
+        },
+        lineContactSegments: 4,
+      });
       contactRepairs += contactRepair.repairedCount;
       // Check the actual Float32 export after each local cut. Its new vertices
       // can expose another contact, as on the clipped Comedie roof. Keep the
@@ -2083,7 +2207,10 @@ export async function buildPrintModel(
             const localCut = arena.keep(
               cut.translate([-minX - tileWidth / 2, -minY - tileDepth / 2, 0]),
             );
-            let tile = stabilizeSolid(cad, arena, localCut, tolerance);
+            // Keep the parent's native plane tolerance at the cut boundary.
+            // Widening it to the requested contraction bound can lower a real
+            // surveyed roof and create contacts absent from the native cut.
+            let tile = stabilizeSolid(cad, arena, localCut, tolerance, true);
             if (tile.status() !== "NoError" || tile.isEmpty())
               throw new Error("Échec de la fermeture d’une tuile.");
             const repairVolume = tile.volume();

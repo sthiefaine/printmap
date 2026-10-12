@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import earcut from "earcut";
 import {
   buildPrintModel,
   validatePrintMesh,
 } from "../src/lib/mesh/build-print-model";
 import { createProjectionForBbox } from "../src/lib/projection";
+import { pointInPolygon } from "../src/lib/polygon/point-in-polygon";
 import { DEFAULT_MODEL_SETTINGS } from "../src/store/use-scene-store";
 import type { BBox, OverpassElement } from "../src/types/osm";
 import type { Point2D } from "../src/types/geometry";
@@ -714,7 +716,7 @@ test("production validation rejects open, reversed and collapsed exported faces"
   assert.throws(() => validatePrintMesh(collinear), /collinéaire/);
 });
 
-test("actual surveyed roofs and mapped streets omit only the detached fragment below print resolution", async () => {
+test("actual surveyed roofs and mapped streets retain measured planes after omitting a sub-resolution fragment", async () => {
   const fixture = JSON.parse(
     readFileSync(
       new URL("./fixtures/montpellier-roof-road-contact.json", import.meta.url),
@@ -731,15 +733,121 @@ test("actual surveyed roofs and mapped streets omit only the detached fragment b
     4,
     "all four measured building outlines remain",
   );
-  assert.ok(
-    model.stats.realRoofCount >= 1,
-    "actual roof panels remain in the print",
-  );
-  assert.ok(
-    model.warnings.some((warning) => /fragment.*écart/i.test(warning)),
-    "the discarded detached fragment is reported",
-  );
-  assert.ok(model.stats.discardedFeatures >= 1);
+  assert.equal(model.stats.realRoofCount, 4);
+  assert.equal(model.stats.roadCount, 3);
+  assert.equal(model.stats.discardedFeatures, 1);
+  assert.ok(model.warnings.some((warning) => /fragment.*écart/i.test(warning)));
+  type Point = [number, number, number];
+  type Triangle = [Point, Point, Point];
+  const sf = 1000 / fixture.scale;
+  const project = createProjectionForBbox(fixture.bbox);
+  const upperTriangles: Triangle[] = [];
+  for (let at = 0; at < model.indices.length; at += 3) {
+    if (PRINT_LAYERS[model.faceLayers[at / 3]] !== "buildings") continue;
+    const triangle = Array.from(
+      model.indices.subarray(at, at + 3),
+      (id) => Array.from(model.positions.subarray(id * 3, id * 3 + 3)) as Point,
+    ) as Triangle;
+    const [a, b, c] = triangle;
+    if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 1e-12)
+      upperTriangles.push(triangle);
+  }
+  const topAt = (triangles: Triangle[], x: number, y: number) => {
+    let highest = -Infinity;
+    for (const [a, b, c] of triangles) {
+      const det = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (Math.abs(det) < 1e-12) continue;
+      const u = ((x - a[0]) * (c[1] - a[1]) - (y - a[1]) * (c[0] - a[0])) / det;
+      const v = ((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])) / det;
+      if (u >= -1e-8 && v >= -1e-8 && u + v <= 1 + 1e-8)
+        highest = Math.max(
+          highest,
+          a[2] + u * (b[2] - a[2]) + v * (c[2] - a[2]),
+        );
+    }
+    return highest;
+  };
+  for (const building of fixture.osmData.elements.filter(
+    (item) => item.roofSurfaces,
+  )) {
+    const triangles: Triangle[] = [];
+    for (const panel of building.roofSurfaces!) {
+      const points = [panel.outer, ...panel.holes]
+        .flat()
+        .map((point): Point => {
+          const [x, y] = project.project(point.lon, point.lat);
+          return [
+            x * sf,
+            y * sf,
+            settings.base.basePlateThicknessMm +
+              (point.elevation - fixture.elevationGrid!.minElev) * sf,
+          ];
+        });
+      const holeIndices: number[] = [];
+      let offset = panel.outer.length;
+      for (const hole of panel.holes) {
+        holeIndices.push(offset);
+        offset += hole.length;
+      }
+      const indices = earcut(
+        points.flatMap(([x, y]) => [x, y]),
+        holeIndices,
+      );
+      for (let at = 0; at < indices.length; at += 3)
+        triangles.push(
+          indices.slice(at, at + 3).map((id) => points[id]) as Triangle,
+        );
+    }
+    // The dense-scene memory optimisation must leave this small site's native
+    // order unchanged. Its one tiny detached fragment remains omitted and
+    // reported; the actual measured building planes remain intact.
+    const candidates = triangles
+      .map((triangle) => {
+        const [a, b, c] = triangle;
+        const area = Math.abs(
+          (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]),
+        );
+        return { triangle, area };
+      })
+      .sort((a, b) => b.area - a.area);
+    let checked = false;
+    for (const { triangle, area } of candidates) {
+      if (area < 0.001) continue;
+      const probes = [
+        [1 / 3, 1 / 3, 1 / 3],
+        [1 / 2, 1 / 4, 1 / 4],
+      ].map(
+        (weights) =>
+          [0, 1, 2].map((axis) =>
+            triangle.reduce(
+              (sum, point, k) => sum + point[axis] * weights[k],
+              0,
+            ),
+          ) as Point,
+      );
+      if (
+        probes.some(
+          ([x, y, z]) =>
+            Math.abs(x) > model.dimensions.widthMm / 2 - 0.03 ||
+            Math.abs(y) > model.dimensions.depthMm / 2 - 0.03 ||
+            Math.abs(topAt(triangles, x, y) - z) > 1e-6,
+        )
+      )
+        continue;
+      const heights = probes.map(([x, y, z]) => {
+        const height = topAt(upperTriangles, x, y);
+        close(height, z, 0.03);
+        return height;
+      });
+      close(heights[1] - heights[0], probes[1][2] - probes[0][2], 0.02);
+      checked = true;
+      break;
+    }
+    assert.ok(
+      checked,
+      `${building.tags!["printmap:source_id"]} has an interior measured plane in the exported solid`,
+    );
+  }
   const volume = assertClosedSolid(model);
   assert.equal(model.tiles.length, 4);
   const tileVolume = model.tiles.reduce(
@@ -752,7 +860,7 @@ test("actual surveyed roofs and mapped streets omit only the detached fragment b
   );
 });
 
-test("neighbouring surveyed roofs keep their planes when a submicron contact film is opened", async () => {
+test("neighbouring surveyed roofs keep their measured heights and slopes with exact source contours", async () => {
   const fixture = JSON.parse(
     readFileSync(
       new URL(
@@ -774,12 +882,101 @@ test("neighbouring surveyed roofs keep their planes when a submicron contact fil
     "both measured roofs remain without a flat fallback",
   );
   assert.equal(model.stats.discardedFeatures, 0);
-  assert.ok(
-    model.warnings.some((warning) =>
-      /contact.*ouverts.*localement/i.test(warning),
-    ),
-    "the local correction is reported",
-  );
+  type Point = [number, number, number];
+  type Triangle = [Point, Point, Point];
+  const sf = 1000 / fixture.scale;
+  const project = createProjectionForBbox(fixture.bbox);
+  const upperTriangles: Triangle[] = [];
+  const sourceFootprints = fixture.osmData.elements.map((building) => {
+    const rings = (building.members ?? []).map((member) => ({
+      role: member.role,
+      ring: (member.geometry ?? []).map((point): Point2D => {
+        const [x, y] = project.project(point.lon, point.lat);
+        return [x * sf, y * sf];
+      }),
+    }));
+    return (x: number, y: number) =>
+      rings.some(
+        ({ role, ring }) => role === "outer" && pointInPolygon(x, y, ring),
+      ) &&
+      !rings.some(
+        ({ role, ring }) => role === "inner" && pointInPolygon(x, y, ring),
+      );
+  });
+  for (let at = 0; at < model.indices.length; at += 3) {
+    if (PRINT_LAYERS[model.faceLayers[at / 3]] !== "buildings") continue;
+    const triangle = Array.from(
+      model.indices.subarray(at, at + 3),
+      (id) => Array.from(model.positions.subarray(id * 3, id * 3 + 3)) as Point,
+    ) as Triangle;
+    const [a, b, c] = triangle;
+    if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 1e-12)
+      upperTriangles.push(triangle);
+  }
+  const surfaceAt = (triangles: Triangle[], x: number, y: number) => {
+    let top = -Infinity;
+    for (const [a, b, c] of triangles) {
+      const det = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (Math.abs(det) < 1e-12) continue;
+      const u = ((x - a[0]) * (c[1] - a[1]) - (y - a[1]) * (c[0] - a[0])) / det;
+      const v = ((b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])) / det;
+      if (u >= -1e-7 && v >= -1e-7 && u + v <= 1 + 1e-7)
+        top = Math.max(top, a[2] + u * (b[2] - a[2]) + v * (c[2] - a[2]));
+    }
+    return top;
+  };
+  // Interior source triangles from two inclined panels on each building.
+  // These vertex indices avoid courtyards, overhanging edges and vertical faces;
+  // they are independent of the triangulation or repair used by the generator.
+  const probes = [
+    { building: 0, panel: 30, vertices: [4, 5, 6] },
+    { building: 0, panel: 31, vertices: [7, 9, 10] },
+    { building: 1, panel: 4, vertices: [6, 0, 1] },
+    { building: 1, panel: 5, vertices: [2, 5, 0] },
+  ];
+  for (const probe of probes) {
+    const source = fixture.osmData.elements[probe.building];
+    const panel = source.roofSurfaces![probe.panel];
+    const triangle = probe.vertices.map((index): Point => {
+      const point = panel.outer[index];
+      const [x, y] = project.project(point.lon, point.lat);
+      return [
+        x * sf,
+        y * sf,
+        settings.base.basePlateThicknessMm +
+          (point.elevation - fixture.elevationGrid!.minElev) * sf,
+      ];
+    }) as Triangle;
+    const [a, b, c] = triangle;
+    assert.ok(
+      Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) >
+        0.001,
+    );
+    const expected: number[] = [],
+      actual: number[] = [];
+    for (const weights of [
+      [1 / 3, 1 / 3, 1 / 3],
+      [1 / 2, 1 / 4, 1 / 4],
+    ]) {
+      const [x, y, z] = [0, 1, 2].map((axis) =>
+        triangle.reduce(
+          (sum, point, index) => sum + point[axis] * weights[index],
+          0,
+        ),
+      );
+      assert.ok(Math.abs(x) < model.dimensions.widthMm / 2 - 0.03);
+      assert.ok(Math.abs(y) < model.dimensions.depthMm / 2 - 0.03);
+      assert.ok(
+        sourceFootprints[probe.building](x, y),
+        "the probe is inside the exact source footprint and outside its courtyard",
+      );
+      const height = surfaceAt(upperTriangles, x, y);
+      close(height, z, 0.03);
+      expected.push(z);
+      actual.push(height);
+    }
+    close(actual[1] - actual[0], expected[1] - expected[0], 0.02);
+  }
   const volume = assertClosedSolid(model);
   assert.equal(model.tiles.length, 4);
   const tileVolume = model.tiles.reduce(

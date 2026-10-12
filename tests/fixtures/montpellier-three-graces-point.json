@@ -1,0 +1,28 @@
+{
+  "source": "https://api.openstreetmap.org/api/0.6/node/4324886075.json",
+  "license": "OpenStreetMap contributors · ODbL 1.0 · https://www.openstreetmap.org/copyright",
+  "retrievedAt": "2026-10-12",
+  "elements": [
+    {
+      "type": "node",
+      "id": 4324886075,
+      "lat": 43.6084697,
+      "lon": 3.8795,
+      "tags": {
+        "amenity": "fountain",
+        "heritage": "2",
+        "heritage:operator": "mhs",
+        "historic": "yes",
+        "mhs:inscription_date": "1963-12-05",
+        "name": "Fontaine des Trois Grâces",
+        "ref:mhs": "PA00103542",
+        "source:heritage": "data.gouv.fr, Ministère de la Culture - 2016",
+        "start_date": "C18",
+        "tourism": "attraction",
+        "wheelchair": "yes",
+        "wikidata": "Q3076244",
+        "wikipedia": "fr:Fontaine des Trois Grâces"
+      }
+    }
+  ]
+}

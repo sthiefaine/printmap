@@ -1,0 +1,18 @@
+{
+  "description": "Two opposing Float32 ground faces captured before contact repair at the northern Vialleton outlet. Coordinates are model millimetres; the enclosing solid used in the test is synthetic.",
+  "bbox": [43.6099, 3.8677, 43.6131, 3.8745],
+  "scale": 1824.8671371451785,
+  "sources": [
+    "OpenStreetMap contributors · ODbL 1.0 · https://www.openstreetmap.org/copyright",
+    "IGN · RGE ALTI · Licence Ouverte 2.0 · https://geoservices.ign.fr/rgealti"
+  ],
+  "vertProperties": [
+    52.817161560058594, -6.79087495803833, 10.36657428741455, 52.62760543823242,
+    -6.775430679321289, 10.701997756958008, 51.982215881347656,
+    -6.722846984863281, 10.666574478149414, 52.817161560058594,
+    -6.79087495803833, 10.36657428741455, 51.982215881347656,
+    -6.722846984863281, 10.666574478149414, 52.62760543823242,
+    -6.775430679321289, 10.701997756958008
+  ],
+  "triVerts": [0, 1, 2, 3, 4, 5]
+}

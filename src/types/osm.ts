@@ -30,6 +30,9 @@ export interface OverpassElement {
   type: "way" | "relation" | "node";
   id: number;
   tags?: Record<string, string>;
+  /** Position of an OSM node; it does not imply a printable footprint. */
+  lat?: number;
+  lon?: number;
   geometry?: LatLon[];
   nodes?: number[];
   roofSurfaces?: RoofSurface[];
@@ -88,6 +91,8 @@ export interface DataReport {
   lod2Year?: number;
   lod2SolidCount?: number;
   municipalStructureCount?: number;
+  /** Located landmarks whose point data does not provide printable 3D geometry. */
+  pointLandmarkCount?: number;
 }
 
 export interface MapDataResponse {

@@ -12,6 +12,7 @@ export function contractShortEdges(
   cad: ManifoldToplevel,
   mesh: Mesh,
   maximumDisplacementMm: number,
+  preserveNativeTolerance = false,
 ): Mesh {
   if (!Number.isFinite(maximumDisplacementMm) || maximumDisplacementMm <= 0)
     throw new Error("La précision de contraction est invalide.");
@@ -213,6 +214,11 @@ export function contractShortEdges(
     triVerts: new Uint32Array(indices),
     runIndex: new Uint32Array(runIndex),
     runOriginalID: new Uint32Array(runOriginalID),
-    tolerance: Math.max(mesh.tolerance, maximumDisplacementMm),
+    // City unions and tile cuts must not infer new coplanar faces at the
+    // contraction bound: that can join a tall wall to its surveyed roof.
+    // Source-local repairs retain their established tolerance.
+    tolerance: preserveNativeTolerance
+      ? mesh.tolerance
+      : Math.max(mesh.tolerance, maximumDisplacementMm),
   });
 }

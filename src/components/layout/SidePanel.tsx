@@ -19,9 +19,11 @@ import { bboxDimensions } from "@/lib/data/bbox";
 import type { BBox } from "@/types/osm";
 
 const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
+const SAINT_ETIENNE_BBOX: BBox = [45.4288, 4.3702, 45.454, 4.406];
 
 function quickZone(
-  type: "city" | "coast" | "peyrou" | "nearby" | "architecture",
+  type:
+    "city" | "coast" | "peyrou" | "saint-etienne" | "nearby" | "architecture",
 ) {
   const store = useMapStore.getState();
   if (type === "city") {
@@ -50,6 +52,20 @@ function quickZone(
       footpathsEnabled: true,
     });
     store.setBbox(PEYROU_BBOX);
+  } else if (type === "saint-etienne") {
+    store.setSelectedCity({
+      name: "Saint-Étienne · centre et Parc Expo",
+      lat: (SAINT_ETIENNE_BBOX[0] + SAINT_ETIENNE_BBOX[2]) / 2,
+      lng: (SAINT_ETIENNE_BBOX[1] + SAINT_ETIENNE_BBOX[3]) / 2,
+    });
+    const scene = useSceneStore.getState();
+    scene.setProfile("balanced");
+    scene.setTileSize(290);
+    scene.updateBaseSettings({
+      topographyEnabled: true,
+      grid: { cols: 2, rows: 2 },
+    });
+    store.setBbox(SAINT_ETIENNE_BBOX);
   } else {
     const city = store.selectedCity || {
       name: "Montpellier",
@@ -110,6 +126,9 @@ export function SidePanel() {
           <button onClick={() => quickZone("peyrou")}>
             Peyrou · Arc et aqueduc
           </button>
+          <button onClick={() => quickZone("saint-etienne")}>
+            Saint-Étienne · centre et Parc Expo
+          </button>
         </div>
         <div className="selection-actions">
           <SelectionTools />
@@ -153,8 +172,8 @@ export function SidePanel() {
         {isPeyrouSelection ? (
           <p className="field-hint selection-context">
             Arc de triomphe, pont Vialleton, château d’eau et départ de
-            l’aqueduc. Relief et allées activés pour cette sélection. L’Arc et le
-            château d’eau utilisent le relevé 3D municipal ; les voûtes de
+            l’aqueduc. Relief et allées activés pour cette sélection. L’Arc et
+            le château d’eau utilisent le relevé 3D municipal ; les voûtes de
             l’aqueduc sont reconstituées d’après un plan historique, avec des
             dimensions et un placement approchés indiqués dans le rapport.
           </p>

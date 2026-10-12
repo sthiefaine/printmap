@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import { buildPrintModel } from "../src/lib/mesh/build-print-model";
+import { createProjectionForBbox } from "../src/lib/projection";
 import { DEFAULT_MODEL_SETTINGS } from "../src/store/use-scene-store";
 import {
   PRINT_LAYERS,
@@ -88,12 +89,13 @@ test("clipped surveyed roof wings keep both heights when numeric overlap would c
   settings.base.grid = { cols: 2, rows: 2 };
   const model = await buildPrintModel({ ...clippedFixture, settings });
   assert.equal(model.stats.buildingCount, 2);
-  assert.equal(model.stats.realRoofCount, 1);
+  assert.equal(model.stats.realRoofCount, 2);
   assert.equal(model.stats.measuredStructureCount, 0);
   assert.equal(model.stats.components, 1);
   assert.equal(model.stats.discardedFeatures, 0);
   // B140305's two narrow wings meet the north selection edge at different
-  // surveyed elevations. The neighbouring B140304 is retained as context.
+  // surveyed elevations. B140304 also retains its measured roof: simplifying
+  // that neighbouring footprint used to discard its 25 source panels.
   for (const [x, y, elevation] of [
     [-85.1, 36.3, 49.398],
     [-85.08, 36.3, 45.574],
@@ -107,6 +109,30 @@ test("clipped surveyed roof wings keep both heights when numeric overlap would c
       `the source wing stays at elevation ${elevation} m`,
     );
   }
+  const neighbour = clippedFixture.osmData.elements.find(
+    (element) => element.id === -3000000000836,
+  )!;
+  const summit = neighbour.roofSurfaces!.find((panel) =>
+    panel.outer.every((point) => point.elevation === 65.453),
+  )!;
+  const sample = summit.outer.slice(0, 3);
+  const projection = createProjectionForBbox(clippedFixture.bbox);
+  const [x, y] = projection
+    .project(
+      sample.reduce((sum, point) => sum + point.lon, 0) / 3,
+      sample.reduce((sum, point) => sum + point.lat, 0) / 3,
+    )
+    .map((coordinate) => (coordinate * 1000) / clippedFixture.scale);
+  const expectedNeighbourRoof =
+    3 +
+    ((65.453 - clippedFixture.elevationGrid!.minElev) * 1000) /
+      clippedFixture.scale;
+  assert.ok(
+    roofAt(model, x, y).some(
+      (z) => Math.abs(z - expectedNeighbourRoof) < 0.001,
+    ),
+    "the neighbouring source summit stays at elevation 65.453 m",
+  );
   const volume = assertClosedSolid(model);
   assert.equal(model.tiles.length, 4);
   const tileVolume = model.tiles.reduce(

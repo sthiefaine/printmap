@@ -424,6 +424,51 @@ test("Peyrou preset collects relief and all park access routes, then saves its e
   expect(collections).toBe(1);
 });
 
+test("Saint-Étienne shortcut selects the centre and exports four plates below 150 mm", async ({
+  page,
+}) => {
+  let request: { bbox: BBox; relief: boolean } | undefined;
+  await page.route("**/api/map-data", async (route) => {
+    request = route.request().postDataJSON() as typeof request;
+    await route.fulfill({ json: enclosedDemoData(request!.bbox) });
+  });
+  await page
+    .getByRole("button", {
+      name: "Saint-Étienne · centre et Parc Expo",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("spinbutton", { name: /Long côté de la pièce/ }),
+  ).toHaveValue("290");
+  await expect(
+    page.getByRole("spinbutton", { name: "Colonnes de tuiles", exact: true }),
+  ).toHaveValue("2");
+  await expect(
+    page.getByRole("spinbutton", { name: "Lignes de tuiles", exact: true }),
+  ).toHaveValue("2");
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  expect(request?.bbox).toEqual([45.4288, 4.3702, 45.454, 4.406]);
+  expect(request?.relief).toBe(true);
+  const exported = await download(page, "Télécharger le STL");
+  expect(exported.name).toMatch(/tuiles\.zip$/);
+  const zip = await JSZip.loadAsync(exported.bytes);
+  const pieces = Object.values(zip.files).filter((file) =>
+    file.name.endsWith(".stl"),
+  );
+  expect(pieces).toHaveLength(4);
+  for (const piece of pieces) {
+    const bounds = stlBounds(await piece.async("nodebuffer"));
+    expect(bounds.min[2]).toBe(0);
+    expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(145, 2);
+  }
+});
+
 test("terrain can be recovered after a flat collection without replacing the stairs or source date", async ({
   page,
 }) => {

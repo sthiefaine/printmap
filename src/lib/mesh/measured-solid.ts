@@ -29,6 +29,89 @@ export interface MeasuredSolidOptions {
   onRepair?: (count: number) => void;
 }
 
+/**
+ * An invalid architectural shell may still supply complete surveyed roofs.
+ * Its convex selection envelope also contains courtyards and space between
+ * wings, so it cannot be used to test roof coverage. Keep the actual roof and
+ * ground projections, including holes. makeMeasuredRoof still checks that
+ * these ground contacts are covered; no missing roof is manufactured here.
+ */
+export function makeMeasuredRoofFallbackFootprint(
+  cad: ManifoldToplevel,
+  owner: Handles,
+  data: MeasuredBuildingSolid,
+  options: Pick<MeasuredSolidOptions, "project" | "scaleFactor" | "clip">,
+): CrossSection | null {
+  if (
+    !Array.isArray(data?.surfaces) ||
+    !data.surfaces.length ||
+    data.surfaces.length > 5000 ||
+    !Number.isFinite(options.scaleFactor) ||
+    options.scaleFactor <= 0
+  )
+    return null;
+  const temporary: { delete(): void }[] = [];
+  const keep = <T extends { delete(): void }>(handle: T): T => {
+    temporary.push(handle);
+    return handle;
+  };
+  let output: CrossSection | null = null;
+  try {
+    const sections: CrossSection[] = [];
+    let roofs = 0,
+      grounds = 0,
+      vertices = 0;
+    for (const surface of data.surfaces) {
+      if (surface.kind !== "roof" && surface.kind !== "ground") continue;
+      if (
+        !Array.isArray(surface.outer) ||
+        !Array.isArray(surface.holes) ||
+        [surface.outer, ...surface.holes].some(
+          (ring) => !Array.isArray(ring) || ring.length < 3,
+        )
+      )
+        return null;
+      const rings: Point2D[][] = [];
+      for (const ring of [surface.outer, ...surface.holes]) {
+        const points: Point2D[] = [];
+        for (const point of ring) {
+          if (
+            !point ||
+            ![point.lat, point.lon, point.elevation].every(Number.isFinite) ||
+            ++vertices > 200000
+          )
+            return null;
+          const projected = options.project(point.lon, point.lat);
+          const xy: Point2D = [
+            projected[0] * options.scaleFactor,
+            projected[1] * options.scaleFactor,
+          ];
+          if (!xy.every(Number.isFinite)) return null;
+          points.push(xy);
+        }
+        rings.push(points);
+      }
+      const section = keep(new cad.CrossSection(rings, "EvenOdd"));
+      if (section.isEmpty()) continue;
+      sections.push(section);
+      if (surface.kind === "roof") roofs++;
+      else grounds++;
+    }
+    if (!roofs || !grounds) return null;
+    const bounded = keep(
+      keep(cad.CrossSection.union(sections)).intersect(options.clip),
+    );
+    if (bounded.isEmpty()) return null;
+    output = owner.keep(bounded);
+    return output;
+  } catch {
+    return null;
+  } finally {
+    for (let i = temporary.length - 1; i >= 0; i--)
+      if (temporary[i] !== output) temporary[i].delete();
+  }
+}
+
 function cross(a: Vec3, b: Vec3): Vec3 {
   return [
     a[1] * b[2] - a[2] * b[1],

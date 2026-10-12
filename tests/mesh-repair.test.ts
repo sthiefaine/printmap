@@ -3,7 +3,10 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import Module, { type Mesh } from "manifold-3d";
 import { repairCollinear } from "../src/lib/mesh/repair-collinear";
-import { repairCoincident } from "../src/lib/mesh/repair-coincident";
+import {
+  repairCoincident,
+  removeCoincidentSheets,
+} from "../src/lib/mesh/repair-coincident";
 import { repairNumericalTriangles } from "../src/lib/mesh/repair-numerical-triangles";
 import { contractShortEdges } from "../src/lib/mesh/contract-short-edges";
 import { assertClosedSolid } from "./helpers/solid";
@@ -27,6 +30,89 @@ function boundary(mesh: Mesh) {
     faceLayers: new Uint8Array(mesh.triVerts.length / 3),
   };
 }
+
+test("captured Vialleton ground sheets cancel before contact cuts while an internal cavity stays exact", async () => {
+  const cad = await runtime;
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        "./fixtures/montpellier-vialleton-opposite-ground-faces.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ) as { vertProperties: number[]; triVerts: number[]; sources: string[] };
+  const handles: { delete(): void }[] = [];
+  const owner = {
+    keep<T extends { delete(): void }>(handle: T): T {
+      handles.push(handle);
+      return handle;
+    },
+  };
+  try {
+    const outside = owner.keep(
+      owner.keep(cad.Manifold.cube([20, 15, 20])).translate([40, -15, 0]),
+    );
+    const inside = owner.keep(
+      owner.keep(cad.Manifold.cube([12, 7, 16])).translate([44, -11, 2]),
+    );
+    const cavity = owner.keep(outside.subtract(inside));
+    const cavityMesh = repairCoincident(cad, cavity.getMesh());
+    const offset = cavityMesh.vertProperties.length / 3;
+    // Concatenating oriented shell buffers keeps native vertex identities.
+    // In a Float32 boundary snapshot those identities can describe opposing
+    // coincident faces, as in this real terrain pair. They need cancellation,
+    // not a cut that transports the apparent contact to another ground face.
+    const snapshot = new cad.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array([
+        ...cavityMesh.vertProperties,
+        ...fixture.vertProperties,
+      ]),
+      triVerts: new Uint32Array([
+        ...cavityMesh.triVerts,
+        ...fixture.triVerts.map((vertex) => vertex + offset),
+      ]),
+      runIndex: new Uint32Array([
+        0,
+        cavityMesh.triVerts.length,
+        cavityMesh.triVerts.length + fixture.triVerts.length,
+      ]),
+      runOriginalID: new Uint32Array([77, 31]),
+      tolerance: 0.00001,
+    });
+    const cleaned = repairCoincident(cad, snapshot);
+    assert.equal(cleaned.triVerts.length, cavityMesh.triVerts.length);
+    assert.deepEqual(Array.from(cleaned.runOriginalID), [77]);
+    const result = owner.keep(new cad.Manifold(cleaned));
+    assert.equal(result.status(), "NoError");
+    assert.equal(assertClosedSolid(boundary(result.getMesh())), 4656);
+    assert.equal(result.volume(), cavity.volume());
+    const negative = result.decompose();
+    try {
+      assert.equal(negative.filter((shell) => shell.volume() < 0).length, 1);
+      const cavityShell = negative.find((shell) => shell.volume() < 0)!;
+      assert.ok(
+        Math.abs(cavityShell.volume() + 1344) < 1e-9,
+        "the negative cavity shell keeps its full volume and winding",
+      );
+      assert.deepEqual(cavityShell.boundingBox(), {
+        min: [44, -11, 2],
+        max: [56, -4, 18],
+      });
+    } finally {
+      for (const shell of negative) shell.delete();
+    }
+    assert.equal(
+      removeCoincidentSheets(cad, owner, result),
+      result,
+      "an already clean boundary keeps its native geometry unchanged",
+    );
+    assert.match(fixture.sources.join(" "), /OpenStreetMap.*IGN/);
+  } finally {
+    for (const handle of handles.reverse()) handle.delete();
+  }
+});
 
 test("a submicron terrain triangle contracts with its link and leaves a separate cavity unchanged", async () => {
   const cad = await runtime;

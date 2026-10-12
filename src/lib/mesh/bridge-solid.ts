@@ -6,7 +6,7 @@ interface Handles {
 }
 
 export interface SurveyedArchOptions {
-  /** Surveyed bridge outline in model millimetres. */
+  /** Mapped bridge outline in model millimetres. */
   footprint: CrossSection;
   clip: CrossSection;
   center: Point2D;
@@ -26,7 +26,7 @@ export interface SurveyedArch {
   solid: Manifold;
   /** Remove terrain inside the passage, while preserving the common socle. */
   cutter: Manifold;
-  /** Dimensions are measured; the missing spring-line curvature is approximate. */
+  /** Span and clearance are documented; the spring-line curvature is approximate. */
   approximateProfile: true;
 }
 
@@ -99,7 +99,8 @@ export function makeSurveyedArch(
       [half, foundationZ - 0.02],
       [half, groundZ],
     ];
-    // The upper curve is measured in height and width; use enough facets that
+    // Only span and clearance are documented; the ellipse is an approximation.
+    // Use enough facets that
     // the chord error stays far below the 0.12 mm printable stair threshold.
     const facets = Math.max(16, Math.min(96, Math.ceil(spanMm / 0.15)));
     for (let i = 1; i <= facets; i++) {
@@ -126,7 +127,7 @@ export function makeSurveyedArch(
     );
     const solid = arena.keep(block.subtract(passage));
     if (solid.status() !== "NoError" || solid.isEmpty()) return null;
-    // Keep the surveyed underpass floor at groundZ. Cutting down to the common
+    // Keep the reference underpass floor at groundZ. Cutting down to the common
     // foundation would artificially increase the documented clear height.
     const aboveGround = arena.keep(passage.trimByPlane([0, 0, 1], groundZ));
     const cutter = arena.keep(aboveGround.intersect(block));
