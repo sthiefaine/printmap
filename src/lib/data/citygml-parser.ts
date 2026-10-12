@@ -114,7 +114,9 @@ function completeSolid(xml: string): MeasuredSolid | undefined {
   };
 }
 
-function convexEnvelope(points: LatLon[]): GeographicPolygon | undefined {
+export function convexEnvelope(
+  points: LatLon[],
+): GeographicPolygon | undefined {
   const sorted = [
     ...new Map(points.map((p) => [`${p.lon}/${p.lat}`, p])).values(),
   ].sort((a, b) => a.lon - b.lon || a.lat - b.lat);

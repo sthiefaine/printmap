@@ -9,6 +9,11 @@ import {
   MONTPELLIER_LOD2_SOURCE,
 } from "../../src/lib/data/montpellier-lod2";
 import { assertClosedSolid } from "../helpers/solid";
+import {
+  IGN_ROOF_SOURCE,
+  reconstructIGNRoof,
+  type IGNRoofGrid,
+} from "../../src/lib/data/ign-roofs";
 import type {
   BBox,
   MapDataResponse,
@@ -424,49 +429,175 @@ test("Peyrou preset collects relief and all park access routes, then saves its e
   expect(collections).toBe(1);
 });
 
-test("Saint-Étienne shortcut selects the centre and exports four plates below 150 mm", async ({
+for (const preset of [
+  {
+    name: "Saint-Étienne · centre et Parc Expo",
+    bbox: [45.4288, 4.3702, 45.454, 4.406],
+  },
+  {
+    name: "Saint-Étienne · centre, Expo et stade",
+    bbox: [45.4288, 4.3702, 45.4628, 4.406],
+  },
+  {
+    name: "Saint-Étienne · toitures détaillées",
+    bbox: [45.43085, 4.38145, 45.4379, 4.3945],
+  },
+])
+  test(`${preset.name} selects its zone and exports four plates below 150 mm`, async ({
+    page,
+  }) => {
+    let request: { bbox: BBox; relief: boolean } | undefined;
+    await page.route("**/api/map-data", async (route) => {
+      request = route.request().postDataJSON() as typeof request;
+      await route.fulfill({ json: enclosedDemoData(request!.bbox) });
+    });
+    await page
+      .getByRole("button", {
+        name: preset.name,
+        exact: true,
+      })
+      .click();
+    if (preset.bbox[2] > 45.46)
+      await expect(
+        page.getByText("Geoffroy-Guichard", { exact: true }),
+      ).toBeInViewport();
+    await expect(
+      page.getByRole("spinbutton", { name: /Long côté de la pièce/ }),
+    ).toHaveValue("290");
+    await expect(
+      page.getByRole("spinbutton", { name: "Colonnes de tuiles", exact: true }),
+    ).toHaveValue("2");
+    await expect(
+      page.getByRole("spinbutton", { name: "Lignes de tuiles", exact: true }),
+    ).toHaveValue("2");
+    await expect(
+      page.getByRole("button", {
+        name: preset.name.includes("détaillées") ? "Détaillé" : "Équilibré",
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page
+      .getByRole("button", { name: "Récupérer et construire", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+    ).toBeEnabled();
+    expect(request?.bbox).toEqual(preset.bbox);
+    expect(request?.relief).toBe(true);
+    const exported = await download(page, "Télécharger le STL");
+    expect(exported.name).toMatch(/tuiles\.zip$/);
+    const zip = await JSZip.loadAsync(exported.bytes);
+    const pieces = Object.values(zip.files).filter((file) =>
+      file.name.endsWith(".stl"),
+    );
+    expect(pieces).toHaveLength(4);
+    for (const piece of pieces) {
+      const bounds = stlBounds(await piece.async("nodebuffer"));
+      expect(bounds.min[2]).toBe(0);
+      expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(145, 2);
+    }
+  });
+
+test("real Expo raster roofs survive the browser worker and four 3MF exports", async ({
   page,
 }) => {
-  let request: { bbox: BBox; relief: boolean } | undefined;
+  const fixture = JSON.parse(
+    await readFile("tests/fixtures/saint-etienne-ign-roofs.json", "utf8"),
+  ) as {
+    elements: OverpassElement[];
+    grid: Omit<IGNRoofGrid, "mns" | "mnt"> & { mns: number[]; mnt: number[] };
+  };
+  const grid: IGNRoofGrid = {
+    ...fixture.grid,
+    mns: Float32Array.from(fixture.grid.mns),
+    mnt: Float32Array.from(fixture.grid.mnt),
+  };
+  const elements = fixture.elements.map((element) => {
+    const roof = reconstructIGNRoof(element, grid);
+    expect(roof).toBeTruthy();
+    return {
+      ...element,
+      tags: {
+        ...element.tags,
+        height: String(roof!.maxElevation - roof!.groundElevation),
+        "printmap:roof_reconstruction": "lidar",
+        "printmap:roof_resolution_m": String(grid.resolutionM),
+        "printmap:roof_fit_tolerance_m": String(0.35 + 0.12 * grid.resolutionM),
+      },
+      roofSurfaces: roof!.surfaces,
+      groundElevation: roof!.groundElevation,
+      roofSource: IGN_ROOF_SOURCE,
+    };
+  });
   await page.route("**/api/map-data", async (route) => {
-    request = route.request().postDataJSON() as typeof request;
-    await route.fulfill({ json: enclosedDemoData(request!.bbox) });
+    const { bbox } = route.request().postDataJSON() as { bbox: BBox };
+    const datum = Math.min(
+      ...elements.map((element) => element.groundElevation),
+    );
+    const data: MapDataResponse = {
+      osmData: { elements },
+      elevationGrid: {
+        rows: 2,
+        cols: 2,
+        points: Array(4).fill(datum),
+        minElev: datum,
+        maxElev: datum,
+        south: bbox[0],
+        west: bbox[1],
+        north: bbox[2],
+        east: bbox[3],
+        source: "IGN69 · flat datum control for actual source roofs",
+      },
+      report: {
+        ...createDemoData().report,
+        sources: [IGN_ROOF_SOURCE],
+        warnings: [],
+        buildingCount: elements.length,
+        elementCount: elements.length,
+        lidarRoofBuildingCount: elements.length,
+        lidarRoofSurfaceCount: elements.reduce(
+          (sum, e) => sum + e.roofSurfaces.length,
+          0,
+        ),
+        lidarRoofResolutionM: grid.resolutionM,
+      },
+    };
+    await route.fulfill({ json: data });
   });
   await page
     .getByRole("button", {
-      name: "Saint-Étienne · centre et Parc Expo",
+      name: "Saint-Étienne · centre, Expo et stade",
       exact: true,
     })
     .click();
-  await expect(
-    page.getByRole("spinbutton", { name: /Long côté de la pièce/ }),
-  ).toHaveValue("290");
-  await expect(
-    page.getByRole("spinbutton", { name: "Colonnes de tuiles", exact: true }),
-  ).toHaveValue("2");
-  await expect(
-    page.getByRole("spinbutton", { name: "Lignes de tuiles", exact: true }),
-  ).toHaveValue("2");
   await page
     .getByRole("button", { name: "Récupérer et construire", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
   ).toBeEnabled();
-  expect(request?.bbox).toEqual([45.4288, 4.3702, 45.454, 4.406]);
-  expect(request?.relief).toBe(true);
-  const exported = await download(page, "Télécharger le STL");
-  expect(exported.name).toMatch(/tuiles\.zip$/);
-  const zip = await JSZip.loadAsync(exported.bytes);
-  const pieces = Object.values(zip.files).filter((file) =>
-    file.name.endsWith(".stl"),
+  await page.locator(".quality-report > summary").click();
+  await expect(
+    page.getByText(/2 reconstructions depuis le LiDAR IGN/),
+  ).toBeVisible();
+  const exported = await JSZip.loadAsync(
+    (await download(page, "Télécharger le 3MF")).bytes,
+  );
+  const pieces = Object.values(exported.files).filter((file) =>
+    file.name.endsWith(".3mf"),
   );
   expect(pieces).toHaveLength(4);
+  let buildingFaces = 0;
   for (const piece of pieces) {
-    const bounds = stlBounds(await piece.async("nodebuffer"));
-    expect(bounds.min[2]).toBe(0);
-    expect(Math.max(...bounds.size.slice(0, 2))).toBeCloseTo(145, 2);
+    const zip = await JSZip.loadAsync(await piece.async("nodebuffer"));
+    const xml = await zip.file("3D/3dmodel.model")!.async("string");
+    const mesh = meshFrom3MF(xml);
+    assertClosedSolid(mesh);
+    buildingFaces += Array.from(mesh.faceLayers).filter(
+      (layer) => layer === 1,
+    ).length;
   }
+  expect(buildingFaces).toBeGreaterThan(50);
 });
 
 test("terrain can be recovered after a flat collection without replacing the stairs or source date", async ({

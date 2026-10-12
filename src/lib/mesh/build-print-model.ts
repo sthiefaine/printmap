@@ -41,6 +41,7 @@ import {
 import { simplifyPolyline } from "../polygon/simplify";
 import { pointInPolygon } from "../polygon/point-in-polygon";
 import { makeRoof, makeMeasuredRoof } from "./roof-solid";
+import { makeLidarRoof } from "./lidar-roof";
 import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
 import { preparePrintLayers } from "./fuse-print-layers";
@@ -482,13 +483,23 @@ function cleanRing(ring: Point2D[]): Point2D[] {
 }
 
 function roadIncluded(
-  road: Pick<RoadData, "isUnderground" | "roadType" | "roadClass">,
+  road: Pick<RoadData, "isUnderground" | "roadType" | "roadClass"> & {
+    tags?: Record<string, string>;
+  },
   input: PrintInput,
 ): boolean {
   const settings = input.settings.features.roads;
   if (road.isUnderground || settings.roadTypeEnabled[road.roadType] === false)
     return false;
-  if (road.roadType === "steps") return settings.filter !== "major";
+  if (road.roadType === "steps") {
+    const indoor = road.tags?.indoor?.trim().toLowerCase();
+    const location = road.tags?.location?.trim().toLowerCase();
+    // An indoor escalator does not replace the outside terrain. Its full-height
+    // ramp cutter would otherwise remove surveyed roofs above the mapped route.
+    if (indoor === "yes" || indoor === "steps" || location === "indoor")
+      return false;
+    return settings.filter !== "major";
+  }
   if (!settings.footpathsEnabled && road.roadClass === "pedestrian")
     return false;
   return (
@@ -719,6 +730,7 @@ export async function buildPrintModel(
       volumeMm3: 0,
       estimatedHeights: 0,
       realRoofCount: 0,
+      lidarRoofCount: 0,
       taggedRoofCount: 0,
       staircaseCount: 0,
       measuredStructureCount: 0,
@@ -937,6 +949,10 @@ export async function buildPrintModel(
       base = arena.keep(base.add(insert));
     };
     const parsed = parseElements(input.osmData.elements, bbox, scale);
+    if (parsed.undergroundBuildingCount)
+      warnings.push(
+        `${parsed.undergroundBuildingCount} bâtiment(s) ou partie(s) souterrains explicitement cartographiés ne sont pas extrudés au-dessus du terrain.`,
+      );
     if (settings.features.parks.enabled) {
       if (parsed.parkOutlineIgnoredCount)
         warnings.push(
@@ -1548,10 +1564,13 @@ export async function buildPrintModel(
       let flattenedRoofs = 0;
       let approximateRoofs = 0;
       let unavailableMeasuredRoofs = 0;
+      let unavailableLidarRoofs = 0;
       let unavailableStructures = 0;
       let repairedStructureSeams = 0;
       let repairedBuildingContacts = 0;
       let replacedSurveyedFoundations = 0;
+      let replacedRoofFoundations = 0;
+      const measuredRoofGroundCuts: Manifold[] = [];
       for (let i = 0; i < preparedBuildings.length; i++) {
         const { building, section, height } = preparedBuildings[i];
         const polygons = section.toPolygons();
@@ -1588,19 +1607,41 @@ export async function buildPrintModel(
             : null;
         measuredSolid ??=
           hasMeasuredRoof && building.groundElevation != null
-            ? makeMeasuredRoof(
-                cad,
-                arena,
-                building.roofSurfaces!,
-                building.groundElevation,
-                projection.project,
-                sf,
-                settings.features.buildings.buildingScale,
-                surfaceZ,
-                startZ,
-                measuredRoofFootprint ?? section,
-                minBuildingHeightMm,
-              )
+            ? building.tags["printmap:roof_reconstruction"] === "lidar"
+              ? makeLidarRoof(cad, arena, building.roofSurfaces!, {
+                  groundElevation: building.groundElevation,
+                  project: projection.project,
+                  scaleFactor: sf,
+                  buildingScale: settings.features.buildings.buildingScale,
+                  surfaceZ,
+                  foundationZ: startZ,
+                  footprint: measuredRoofFootprint ?? section,
+                  minimumHeight: minBuildingHeightMm,
+                  fitToleranceM:
+                    parseLengthMeters(
+                      building.tags["printmap:roof_fit_tolerance_m"],
+                    ) ??
+                    0.35 +
+                      (parseLengthMeters(
+                        building.tags["printmap:roof_resolution_m"],
+                      ) ??
+                        input.report?.lidarRoofResolutionM ??
+                        2) *
+                        0.12,
+                })
+              : makeMeasuredRoof(
+                  cad,
+                  arena,
+                  building.roofSurfaces!,
+                  building.groundElevation,
+                  projection.project,
+                  sf,
+                  settings.features.buildings.buildingScale,
+                  surfaceZ,
+                  startZ,
+                  measuredRoofFootprint ?? section,
+                  minBuildingHeightMm,
+                )
             : null;
         if (measuredSolid) {
           try {
@@ -1727,7 +1768,11 @@ export async function buildPrintModel(
         }
         if (building.measuredSolid && (!measuredSolid || !isMeasuredStructure))
           unavailableStructures++;
-        if (hasMeasuredRoof && !measuredSolid) unavailableMeasuredRoofs++;
+        if (hasMeasuredRoof && !measuredSolid) {
+          if (building.tags["printmap:roof_reconstruction"] === "lidar")
+            unavailableLidarRoofs++;
+          else unavailableMeasuredRoofs++;
+        }
         const explicitRoof = settings.features.buildings.roofs
           ? building.tags["roof:shape"]?.trim().toLowerCase()
           : undefined;
@@ -1748,7 +1793,9 @@ export async function buildPrintModel(
               .translate([0, 0, startZ]),
           );
         if (measuredSolid) {
-          stats.realRoofCount++;
+          if (building.tags["printmap:roof_reconstruction"] === "lidar")
+            stats.lidarRoofCount = (stats.lidarRoofCount ?? 0) + 1;
+          else stats.realRoofCount++;
           if (isMeasuredStructure) stats.measuredStructureCount++;
           if (isMeasuredStructure) repairedStructureSeams += sourceRepairs;
           if (isMeasuredStructure) {
@@ -1798,6 +1845,68 @@ export async function buildPrintModel(
               );
               base = arena.keep(base.subtract(cutter));
               replacedSurveyedFoundations++;
+            }
+          } else if (
+            building.groundElevation != null &&
+            settings.base.topographyEnabled &&
+            terrain.gridVertices.length &&
+            input.elevationGrid?.source?.includes("IGN")
+          ) {
+            // A coarse terrain cell may be higher than a measured low roof.
+            // The survey floor owns only its actual support footprint. Preserve
+            // courtyards and surrounding ground, and leave roof elevations intact.
+            const supports = building.measuredSolid
+              ? building.measuredSolid.surfaces
+                  .filter((surface) => surface.kind === "ground")
+                  .map((surface) =>
+                    arena.keep(
+                      new cad.CrossSection(
+                        [surface.outer, ...surface.holes].map((ring) =>
+                          ring.map(
+                            (point) =>
+                              projection
+                                .project(point.lon, point.lat)
+                                .map((value) => value * sf) as Point2D,
+                          ),
+                        ),
+                        "EvenOdd",
+                      ),
+                    ),
+                  )
+                  .filter((shape) => !shape.isEmpty())
+              : [section];
+            if (supports.length) {
+              const support = arena.keep(
+                arena
+                  .keep(cad.CrossSection.union(supports))
+                  .offset(0.005, "Miter"),
+              );
+              const bounded = arena.keep(support.intersect(clip));
+              const cutter = arena.keep(
+                arena
+                  .keep(bounded.extrude(terrain.maxZ + 1))
+                  .translate([0, 0, Math.max(startZ + 0.01, surfaceZ)]),
+              );
+              const lowestRoof = building.roofSurfaces!.reduce(
+                (lowest, surface) =>
+                  surface.outer.reduce(
+                    (height, point) => Math.min(height, point.elevation),
+                    lowest,
+                  ),
+                Infinity,
+              );
+              const lowestRoofZ =
+                surfaceZ +
+                (lowestRoof - building.groundElevation) *
+                  sf *
+                  settings.features.buildings.buildingScale;
+              if (
+                footprintSurfaceMaximum(bounded, terrain, startZ) >
+                lowestRoofZ + 0.000001
+              ) {
+                measuredRoofGroundCuts.push(cutter);
+                replacedRoofFoundations++;
+              }
             }
           }
         } else if (canRoof && roofHeight > 0.02) {
@@ -1921,6 +2030,10 @@ export async function buildPrintModel(
             "Construction des bâtiments et des cours",
           );
       }
+      if (measuredRoofGroundCuts.length)
+        base = arena.keep(
+          base.subtract(arena.keep(cad.Manifold.union(measuredRoofGroundCuts))),
+        );
       if (unavailableStructures)
         warnings.push(
           `${unavailableStructures} coque(s) 3D mesurée(s) n’ont pas pu être fermées. Le repli conserve les toitures mesurées lorsqu’elles sont utilisables et leurs fondations ; les ouvertures et dessous ne sont pas reproduits par ce repli.`,
@@ -1937,6 +2050,10 @@ export async function buildPrintModel(
         warnings.push(
           `${replacedSurveyedFoundations} appui(s) de coques mesurées remplacent le terrain sous leurs seules faces de fondation, avec raccord de précision de 0,005 mm. Les trous et passages architecturaux sont conservés.`,
         );
+      if (replacedRoofFoundations)
+        warnings.push(
+          `${replacedRoofFoundations} emprise(s) de bâtiments à toiture 3D remplacent le terrain grossier au-dessus de leur sol sourcé. Les cours et le terrain extérieur sont conservés ; les altitudes des toits ne sont pas modifiées.`,
+        );
       if (flattenedRoofs)
         warnings.push(
           `${flattenedRoofs} forme(s) de toiture non prise(s) en charge représentée(s) à plat.`,
@@ -1948,6 +2065,10 @@ export async function buildPrintModel(
       if (unavailableMeasuredRoofs)
         warnings.push(
           `${unavailableMeasuredRoofs} toiture(s) mesurée(s) incomplète(s) ou invalide(s) utilisent la représentation de repli renseignée dans les données.`,
+        );
+      if (unavailableLidarRoofs)
+        warnings.push(
+          `${unavailableLidarRoofs} reconstruction(s) de toiture LiDAR incompatibles avec le solide imprimable utilisent la représentation de repli renseignée dans les données.`,
         );
     }
     if (settings.base.frame.enabled) {
@@ -2129,9 +2250,12 @@ export async function buildPrintModel(
       // same clearance and total material budget; never simplify these cuts.
       const recleaned = arena.keep(
         new cad.Manifold(
-          repairNumericalTriangles(
+          repairCollinear(
             cad,
-            repairCollinear(
+            // Contract a submicron edge before retriangulating a collinear
+            // sheet. Reversing these operations lets CAD recreate a tiny face
+            // at touching surveyed roof corners after the contact was opened.
+            repairNumericalTriangles(
               cad,
               repairCoincident(cad, contactRepair.solid.getMesh()),
             ),

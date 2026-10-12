@@ -74,6 +74,33 @@ export function MapView() {
       "bottom-right",
     );
     mapRef.current = map;
+    // On mobile the settings panel temporarily hides the whole stage. Resize
+    // and frame the chosen zone when the map receives its visible dimensions.
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (
+        !entries.some(
+          (entry) =>
+            entry.contentRect.width > 0 && entry.contentRect.height > 0,
+        )
+      )
+        return;
+      map.resize();
+      const selected = useMapStore.getState().bbox;
+      if (selected) frameSelection(map, selected);
+    });
+    resizeObserver.observe(containerRef.current);
+    // Cartographic reference at the centre of OSM pitch way/147027148;
+    // this label is only on the map and never becomes exported geometry.
+    const stadiumLabel = document.createElement("div");
+    stadiumLabel.className = "map-landmark";
+    stadiumLabel.textContent = "Geoffroy-Guichard";
+    const stadiumMarker = new maplibregl.Marker({
+      element: stadiumLabel,
+      anchor: "bottom",
+    })
+      .setLngLat([4.39014, 45.46078])
+      .addTo(map);
+    let initialStyle = true;
     map.on("error", () => setMapError(true));
     map.on("style.load", () => {
       setMapError(false);
@@ -118,11 +145,15 @@ export function MapView() {
       drawRef.current = draw;
       const selected = useMapStore.getState().bbox;
       if (selected) updateSelection(map, selected);
+      if (initialStyle && selected) frameSelection(map, selected);
+      initialStyle = false;
       setMapReady(true);
     });
     return () => {
+      resizeObserver.disconnect();
       drawRef.current?.stop();
       drawRef.current = null;
+      stadiumMarker.remove();
       map.remove();
       mapRef.current = null;
     };
@@ -139,8 +170,11 @@ export function MapView() {
     else selection.setData({ type: "FeatureCollection", features: [] });
   }, [bbox]);
   useEffect(() => {
-    if (selectedCity)
-      mapRef.current?.flyTo({
+    const map = mapRef.current;
+    const selected = useMapStore.getState().bbox;
+    if (map && selected) frameSelection(map, selected);
+    else if (selectedCity)
+      map?.flyTo({
         center: [selectedCity.lng, selectedCity.lat],
         zoom: 14.5,
         duration: 1000,
@@ -152,7 +186,12 @@ export function MapView() {
   }, [drawingRevision]);
   useEffect(() => {
     if (viewMode === "map")
-      requestAnimationFrame(() => mapRef.current?.resize());
+      requestAnimationFrame(() => {
+        const map = mapRef.current;
+        map?.resize();
+        const selected = useMapStore.getState().bbox;
+        if (map && selected) frameSelection(map, selected);
+      });
   }, [viewMode]);
   return (
     <div className="map-view">
@@ -195,6 +234,27 @@ export function MapView() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Large presets must show both their northern and southern edges. */
+function frameSelection(
+  map: maplibregl.Map,
+  bbox: [number, number, number, number],
+) {
+  if (!map.getContainer().clientWidth || !map.getContainer().clientHeight)
+    return;
+  const [south, west, north, east] = bbox;
+  map.fitBounds(
+    [
+      [west, south],
+      [east, north],
+    ],
+    {
+      padding: { top: 120, bottom: 48, left: 48, right: 48 },
+      maxZoom: 17,
+      duration: 0,
+    },
   );
 }
 function updateSelection(

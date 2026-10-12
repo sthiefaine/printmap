@@ -1,5 +1,8 @@
 import type { OverpassElement } from "@/types/osm";
 
+export const MAX_ROOF_VERTICES = 400000;
+export const MAX_ROOF_BUILDINGS = 15000;
+
 /** Import boundary: bound the total work and reject malformed measured roof geometry. */
 export function validateRoofData(elements: OverpassElement[]): void {
   let vertices = 0,
@@ -11,7 +14,7 @@ export function validateRoofData(elements: OverpassElement[]): void {
         (!Array.isArray(element.roofSurfaces) ||
           !element.roofSurfaces.length ||
           element.roofSurfaces.length > 5000)) ||
-      ++buildings > 15000 ||
+      ++buildings > MAX_ROOF_BUILDINGS ||
       !Number.isFinite(element.groundElevation) ||
       element.groundElevation! < -100 ||
       element.groundElevation! > 1000
@@ -60,7 +63,7 @@ export function validateRoofData(elements: OverpassElement[]): void {
         if (!Array.isArray(ring) || ring.length < 4 || ring.length > 20000)
           throw new Error("Contour de toiture invalide.");
         vertices += ring.length;
-        if (vertices > 400000)
+        if (vertices > MAX_ROOF_VERTICES)
           throw new Error("Le projet contient trop de détails de toiture.");
         for (const point of ring)
           if (

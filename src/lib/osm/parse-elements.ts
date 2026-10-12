@@ -107,6 +107,7 @@ export interface BridgeData {
 
 export interface ParsedOSMData {
   buildings: BuildingData[];
+  undergroundBuildingCount: number;
   roads: RoadData[];
   roadAreas: RoadAreaData[];
   waterAreas: WaterPolygonData[];
@@ -466,6 +467,18 @@ function featureCategory(tags?: Record<string, string>): string | null {
   return null;
 }
 
+/** A negative layer alone is only a relative ordering, not a depth measurement. */
+function isUndergroundBuilding(tags: Record<string, string> = {}): boolean {
+  return (
+    tags.location === "underground" ||
+    tags.building === "underground" ||
+    tags["building:part"] === "underground" ||
+    (/^0(?:[.,]0+)?$/.test(tags["building:levels"]?.trim() ?? "") &&
+      Number(tags.layer) < 0 &&
+      !(Number(tags["roof:levels"]) > 0))
+  );
+}
+
 function removeCoveredBuildingOutlines(
   buildings: BuildingData[],
 ): BuildingData[] {
@@ -529,6 +542,7 @@ export function parseElements(
 
   const result: ParsedOSMData = {
     buildings: [],
+    undergroundBuildingCount: 0,
     roads: [],
     roadAreas: [],
     waterAreas: [],
@@ -579,7 +593,9 @@ export function parseElements(
     const isBuilding =
       (el.tags?.building && el.tags.building !== "no") ||
       (el.tags?.["building:part"] && el.tags["building:part"] !== "no");
-    if (isBuilding) {
+    if (isBuilding && isUndergroundBuilding(el.tags)) {
+      result.undergroundBuildingCount++;
+    } else if (isBuilding) {
       for (const polygon of elementPolygons(el, ways)) {
         const building = processWayBuilding(
           { ...el, geometry: polygon.outer },

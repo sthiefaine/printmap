@@ -8,6 +8,12 @@ import { parseElements } from "@/lib/osm/parse-elements";
 import { selectComplementaryWater } from "./water-coverage";
 import { parseLengthMeters } from "@/lib/osm/building-height";
 import { summarizePointLandmarks } from "./point-landmarks";
+import { enrichIGNRoofs, fetchIGNRoofGrid } from "./ign-roofs";
+import {
+  fetchCRAIGBuildings,
+  CRAIG_BUILDINGS_SOURCE,
+  CRAIG_BUILDINGS_REFERENCE,
+} from "./craig-buildings";
 import {
   enrichWithMunicipalRoofs,
   fetchMontpellierRoofs,
@@ -24,6 +30,7 @@ export async function collectMapData(
   relief: boolean,
   signal: AbortSignal,
 ): Promise<MapDataResponse> {
+  const startedAt = Date.now();
   const results = await Promise.allSettled([
     fetchOverpass(bbox, signal),
     isMetropolitanFrance(bbox)
@@ -33,6 +40,10 @@ export async function collectMapData(
     fetchWaterPolygons(bbox, signal),
     fetchMontpellierRoofs(bbox, signal),
     fetchMontpellierStructures(bbox, signal),
+    fetchCRAIGBuildings(bbox, signal),
+    isMetropolitanFrance(bbox)
+      ? fetchIGNRoofGrid(bbox, signal)
+      : Promise.resolve(null),
   ]);
   signal.throwIfAborted();
   const [
@@ -42,6 +53,8 @@ export async function collectMapData(
     oceanResult,
     municipalResult,
     structuresResult,
+    craigResult,
+    roofGridResult,
   ] = results;
   if (osmResult.status === "rejected") throw osmResult.reason;
   const osm = osmResult.value;
@@ -80,6 +93,24 @@ export async function collectMapData(
       "Modèle municipal 3D indisponible ; utilisation des empreintes et toitures OSM.",
     );
   let municipalStructureCount = 0;
+  if (craigResult.status === "fulfilled") {
+    warnings.push(...craigResult.value.warnings);
+    if (craigResult.value.buildings.length) {
+      elements = enrichWithMunicipalRoofs(
+        elements,
+        craigResult.value.buildings,
+        {
+          source: CRAIG_BUILDINGS_SOURCE,
+          prefix: "CRAIG/2021",
+          heightSource: "CRAIG · géométrie LoD2.2 mesurée",
+          year: 2021,
+        },
+      ).elements;
+      sources.push(
+        `${CRAIG_BUILDINGS_SOURCE} · Licence Ouverte 2.0 · ${CRAIG_BUILDINGS_REFERENCE}`,
+      );
+    }
+  }
   if (structuresResult.status === "fulfilled") {
     warnings.push(...structuresResult.value.warnings);
     if (structuresResult.value.elements.length) {
@@ -110,6 +141,28 @@ export async function collectMapData(
         );
     }
   }
+  let lidarRoofBuildingCount = 0,
+    lidarRoofSurfaceCount = 0,
+    lidarRoofResolutionM: number | null = null;
+  if (roofGridResult.status === "fulfilled" && roofGridResult.value) {
+    const reconstructed = await enrichIGNRoofs(elements, bbox, signal, {
+      grid: roofGridResult.value,
+      // Optional reconstruction must leave time for the mandatory response.
+      cpuBudgetMs: Math.min(
+        12000,
+        Math.max(0, 80000 - (Date.now() - startedAt)),
+      ),
+    });
+    elements = reconstructed.elements;
+    lidarRoofBuildingCount = reconstructed.buildingCount;
+    lidarRoofSurfaceCount = reconstructed.surfaceCount;
+    lidarRoofResolutionM = reconstructed.resolutionM;
+    warnings.push(...reconstructed.warnings);
+    sources.push(...reconstructed.sources);
+  } else if (isMetropolitanFrance(bbox))
+    warnings.push(
+      "Toitures LiDAR IGN indisponibles ; les géométries 3D existantes et les hauteurs habituelles sont conservées.",
+    );
   const elevationGrid =
     elevationResult.status === "fulfilled" ? elevationResult.value : null;
   if (elevationGrid?.source) sources.push(elevationGrid.source);
@@ -155,9 +208,24 @@ export async function collectMapData(
   const roofBuildings = [
     ...new Map(
       buildings
-        .filter((building) => building.roofSurfaces?.length)
+        .filter(
+          (building) =>
+            building.roofSurfaces?.length &&
+            building.tags["printmap:roof_reconstruction"] !== "lidar",
+        )
         .map((building) => [building.sourceId, building]),
     ).values(),
+  ];
+  const roofYears = [
+    ...new Set(
+      roofBuildings
+        .map((building) =>
+          Number(
+            building.tags["printmap:roof_year"] ?? building.measuredSolid?.year,
+          ),
+        )
+        .filter(Number.isInteger),
+    ),
   ];
   if (buildings.length > measuredBuildingCount)
     warnings.push(
@@ -196,7 +264,9 @@ export async function collectMapData(
       seaCoverage:
         oceanResult.status === "fulfilled" ? "available" : "unavailable",
       lod2BuildingCount: buildings.filter(
-        (building) => building.roofSurfaces?.length,
+        (building) =>
+          building.roofSurfaces?.length &&
+          building.tags["printmap:roof_reconstruction"] !== "lidar",
       ).length,
       lod2RoofSurfaceCount: roofBuildings.reduce(
         (sum, building) => sum + (building.roofSurfaces?.length ?? 0),
@@ -205,11 +275,12 @@ export async function collectMapData(
       lod2SolidCount: buildings.filter(
         (building) => building.measuredSolid?.surfaces.length,
       ).length,
+      lidarRoofBuildingCount,
+      lidarRoofSurfaceCount,
+      lidarRoofResolutionM,
       municipalStructureCount,
       pointLandmarkCount: pointLandmarks.pointLandmarkCount,
-      ...(buildings.some((building) => building.roofSurfaces?.length)
-        ? { lod2Year: 2020 }
-        : {}),
+      ...(roofYears.length === 1 ? { lod2Year: roofYears[0] } : {}),
     },
   };
 }

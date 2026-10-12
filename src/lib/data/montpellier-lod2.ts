@@ -374,6 +374,12 @@ const bucketKeys = (bbox: BBox) => {
 export function enrichWithMunicipalRoofs(
   elements: OverpassElement[],
   buildings: Lod2Building[],
+  provenance = {
+    source: MONTPELLIER_LOD2_SOURCE,
+    prefix: "MMM",
+    heightSource: "Montpellier · géométrie LoD2 mesurée",
+    year: 2020,
+  },
 ) {
   if (!buildings.length) return { elements, replaced: 0, added: 0 };
   const buckets = new Map<string, Lod2Building[]>();
@@ -440,14 +446,15 @@ export function enrichWithMunicipalRoofs(
       id: id--,
       roofSurfaces: building.roofSurfaces,
       groundElevation: building.groundElevation,
-      roofSource: MONTPELLIER_LOD2_SOURCE,
+      roofSource: provenance.source,
       measuredSolid: building.measuredSolid,
       tags: {
         building: "yes",
         height: String(building.height),
-        "printmap:source": MONTPELLIER_LOD2_SOURCE,
-        "printmap:source_id": `MMM/${building.id}`,
-        "printmap:height_source": "Montpellier · géométrie LoD2 mesurée",
+        "printmap:source": provenance.source,
+        "printmap:source_id": `${provenance.prefix}/${building.id}`,
+        "printmap:height_source": provenance.heightSource,
+        "printmap:roof_year": String(provenance.year),
       },
       members: [
         { type: "way", role: "outer", geometry: footprint.outer },

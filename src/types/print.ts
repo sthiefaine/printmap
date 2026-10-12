@@ -44,6 +44,8 @@ export interface PrintModel extends PrintMesh {
     volumeMm3: number;
     estimatedHeights: number;
     realRoofCount: number;
+    /** Reconstructed from IGN MNS/MNT; not a measured LoD2 building geometry. */
+    lidarRoofCount?: number;
     taggedRoofCount: number;
     staircaseCount: number;
     measuredStructureCount: number;

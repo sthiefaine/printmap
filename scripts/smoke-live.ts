@@ -6,6 +6,7 @@ import { createSTLBuffer } from "../src/lib/export/stl-export";
 import { create3MFBuffer } from "../src/lib/export/threemf-export";
 import {
   DEFAULT_MODEL_SETTINGS,
+  PRINT_PROFILES,
   useSceneStore,
 } from "../src/store/use-scene-store";
 import { getBboxDimensions } from "../src/lib/mesh/base-plate-mesh";
@@ -61,6 +62,7 @@ else {
 assert.ok(data.osmData.elements.length > 0, "real data is available");
 const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
 if (args.includes("--detail")) {
+  settings.print = { ...PRINT_PROFILES.detail.print };
   settings.features.roads.filter = "all";
   settings.features.roads.footpathsEnabled = true;
 }
@@ -115,7 +117,12 @@ await writeFile(
   resolve(directory, "SOURCES.txt"),
   `${model.sources.join("\n")}\nCollecte : ${model.fetchedAt}\nTuiles : lignes du sud au nord, colonnes de l’ouest à l’est. Unités : millimètres.\n${model.warnings.join("\n")}\n`,
 );
-useSceneStore.setState({ scale, tileSize: size, modelSettings: settings });
+useSceneStore.setState({
+  scale,
+  tileSize: size,
+  profile: args.includes("--detail") ? "detail" : "balanced",
+  modelSettings: settings,
+});
 await writeFile(
   resolve(directory, `${name}.printmap.json`),
   useSceneStore.getState().saveProject({

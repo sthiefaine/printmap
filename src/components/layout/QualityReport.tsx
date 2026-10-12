@@ -104,20 +104,37 @@ export function QualityReport() {
         ) : null}
         <p>
           <strong>Toitures</strong> · {model.stats.realRoofCount} géométries 3D
-          mesurées · {model.stats.taggedRoofCount} formes renseignées
+          mesurées
+          {model.stats.lidarRoofCount ? (
+            <>
+              {" "}
+              · {model.stats.lidarRoofCount} reconstructions depuis le LiDAR IGN
+            </>
+          ) : null}{" "}
+          · {model.stats.taggedRoofCount} formes renseignées
           {!isDemo ? " dans OpenStreetMap" : " dans la démo"}.{" "}
           {Math.max(
             0,
             model.stats.buildingCount -
               model.stats.realRoofCount -
+              (model.stats.lidarRoofCount ?? 0) -
               model.stats.taggedRoofCount,
           )}{" "}
           volumes sans toiture 3D reconstruite.
         </p>
         {report?.lod2Year ? (
           <p>
-            Les toitures 3D municipales correspondent au relevé{" "}
-            {report.lod2Year}.
+            Les toitures 3D mesurées correspondent au relevé {report.lod2Year}.
+          </p>
+        ) : null}
+        {(model.stats.lidarRoofCount ?? 0) > 0 &&
+        report?.lidarRoofResolutionM ? (
+          <p>
+            Toits LiDAR : grille utilisée de{" "}
+            {report.lidarRoofResolutionM.toLocaleString("fr-FR")} m, issue d’une
+            source au pas de 0,5 m. Les pentes et volumes sont reconstruits
+            depuis la surface ; les façades et parties masquées nécessitent un
+            relevé 3D dédié.
           </p>
         ) : null}
         <p>

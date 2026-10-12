@@ -85,11 +85,15 @@ export interface DataReport {
   elevationResolutionM: number | null;
   osmTimestamp?: string;
   seaCoverage: "available" | "unavailable";
-  /** Number of municipal buildings carrying measured roof surfaces. */
+  /** Number of public surveyed buildings carrying measured roof surfaces. */
   lod2BuildingCount?: number;
   lod2RoofSurfaceCount?: number;
   lod2Year?: number;
   lod2SolidCount?: number;
+  /** Roofs reconstructed from a LiDAR surface raster, distinct from surveyed LoD2. */
+  lidarRoofBuildingCount?: number;
+  lidarRoofSurfaceCount?: number;
+  lidarRoofResolutionM?: number | null;
   municipalStructureCount?: number;
   /** Located landmarks whose point data does not provide printable 3D geometry. */
   pointLandmarkCount?: number;

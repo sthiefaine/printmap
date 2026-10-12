@@ -20,10 +20,19 @@ import type { BBox } from "@/types/osm";
 
 const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
 const SAINT_ETIENNE_BBOX: BBox = [45.4288, 4.3702, 45.454, 4.406];
+const SAINT_ETIENNE_STADIUM_BBOX: BBox = [45.4288, 4.3702, 45.4628, 4.406];
+const SAINT_ETIENNE_ROOFS_BBOX: BBox = [45.43085, 4.38145, 45.4379, 4.3945];
 
 function quickZone(
   type:
-    "city" | "coast" | "peyrou" | "saint-etienne" | "nearby" | "architecture",
+    | "city"
+    | "coast"
+    | "peyrou"
+    | "saint-etienne"
+    | "saint-etienne-stadium"
+    | "saint-etienne-roofs"
+    | "nearby"
+    | "architecture",
 ) {
   const store = useMapStore.getState();
   if (type === "city") {
@@ -52,20 +61,36 @@ function quickZone(
       footpathsEnabled: true,
     });
     store.setBbox(PEYROU_BBOX);
-  } else if (type === "saint-etienne") {
+  } else if (
+    type === "saint-etienne" ||
+    type === "saint-etienne-stadium" ||
+    type === "saint-etienne-roofs"
+  ) {
+    const withStadium = type === "saint-etienne-stadium";
+    const withRoofs = type === "saint-etienne-roofs";
+    const saintEtienneBbox = withRoofs
+      ? SAINT_ETIENNE_ROOFS_BBOX
+      : withStadium
+        ? SAINT_ETIENNE_STADIUM_BBOX
+        : SAINT_ETIENNE_BBOX;
     store.setSelectedCity({
-      name: "Saint-Étienne · centre et Parc Expo",
-      lat: (SAINT_ETIENNE_BBOX[0] + SAINT_ETIENNE_BBOX[2]) / 2,
-      lng: (SAINT_ETIENNE_BBOX[1] + SAINT_ETIENNE_BBOX[3]) / 2,
+      name: withRoofs
+        ? "Saint-Étienne · Badouillière, toitures mesurées"
+        : withStadium
+          ? "Saint-Étienne · centre, Parc Expo et Geoffroy-Guichard"
+          : "Saint-Étienne · centre et Parc Expo",
+      lat: (saintEtienneBbox[0] + saintEtienneBbox[2]) / 2,
+      lng: (saintEtienneBbox[1] + saintEtienneBbox[3]) / 2,
     });
     const scene = useSceneStore.getState();
-    scene.setProfile("balanced");
+    scene.setProfile(withRoofs ? "detail" : "balanced");
     scene.setTileSize(290);
     scene.updateBaseSettings({
       topographyEnabled: true,
       grid: { cols: 2, rows: 2 },
     });
-    store.setBbox(SAINT_ETIENNE_BBOX);
+    scene.updateFeatureSettings("buildings", { roofs: true });
+    store.setBbox(saintEtienneBbox);
   } else {
     const city = store.selectedCity || {
       name: "Montpellier",
@@ -128,6 +153,12 @@ export function SidePanel() {
           </button>
           <button onClick={() => quickZone("saint-etienne")}>
             Saint-Étienne · centre et Parc Expo
+          </button>
+          <button onClick={() => quickZone("saint-etienne-stadium")}>
+            Saint-Étienne · centre, Expo et stade
+          </button>
+          <button onClick={() => quickZone("saint-etienne-roofs")}>
+            Saint-Étienne · toitures détaillées
           </button>
         </div>
         <div className="selection-actions">

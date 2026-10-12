@@ -94,6 +94,60 @@ test("open water, parks and piers never gain phantom triangular surfaces", () =>
   assert.equal(parsed.pierLines.length, 1);
 });
 
+test("explicit underground buildings cannot mask a surface envelope; a negative layer alone and roof-only levels remain above ground", () => {
+  const elements: OverpassElement[] = [
+    {
+      type: "way",
+      id: 1,
+      tags: { building: "yes", height: "4" },
+      geometry: ring,
+    },
+    {
+      type: "way",
+      id: 2,
+      tags: { "building:part": "yes", "building:levels": "0", layer: "-1" },
+      geometry: ring,
+    },
+    {
+      type: "way",
+      id: 3,
+      tags: { building: "parking", location: "underground", height: "12" },
+      geometry: ring,
+    },
+    { type: "way", id: 4, tags: { building: "underground" }, geometry: ring },
+    {
+      type: "way",
+      id: 5,
+      tags: { "building:part": "underground" },
+      geometry: ring,
+    },
+    {
+      type: "way",
+      id: 6,
+      tags: { building: "yes", layer: "-1", height: "6" },
+      geometry: ring,
+    },
+    {
+      type: "way",
+      id: 7,
+      tags: {
+        building: "yes",
+        "building:levels": "0",
+        "roof:levels": "1",
+        layer: "-1",
+      },
+      geometry: ring,
+    },
+  ];
+  const parsed = parseElements(elements, bbox, 5000);
+  assert.equal(parsed.undergroundBuildingCount, 4);
+  assert.deepEqual(
+    parsed.buildings.map((building) => building.sourceId),
+    ["way/1", "way/6", "way/7"],
+  );
+  assert.equal(parsed.buildings[0].wallHeight, 0.8);
+});
+
 test("roads respect measured widths and tunnel/bridge tags; extended green areas are recognised", () => {
   const parsed = parseElements(
     [
