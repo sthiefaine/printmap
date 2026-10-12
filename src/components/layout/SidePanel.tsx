@@ -18,6 +18,7 @@ import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
 import { bboxDimensions } from "@/lib/data/bbox";
 import {
   SAINT_ETIENNE_STADIUM_BBOX,
+  SAINT_ETIENNE_TWO_PLATE_BBOX,
   salonPrintLayouts,
   salonLayoutSettings,
   salonLayoutDimensions,
@@ -36,6 +37,7 @@ function quickZone(
     | "peyrou"
     | "saint-etienne"
     | "saint-etienne-stadium"
+    | "saint-etienne-two-plates"
     | "saint-etienne-roofs"
     | "nearby"
     | "architecture",
@@ -70,21 +72,27 @@ function quickZone(
   } else if (
     type === "saint-etienne" ||
     type === "saint-etienne-stadium" ||
+    type === "saint-etienne-two-plates" ||
     type === "saint-etienne-roofs"
   ) {
     const withStadium = type === "saint-etienne-stadium";
+    const withTwoPlates = type === "saint-etienne-two-plates";
     const withRoofs = type === "saint-etienne-roofs";
     const saintEtienneBbox = withRoofs
       ? SAINT_ETIENNE_ROOFS_BBOX
-      : withStadium
-        ? SAINT_ETIENNE_STADIUM_BBOX
-        : SAINT_ETIENNE_BBOX;
+      : withTwoPlates
+        ? SAINT_ETIENNE_TWO_PLATE_BBOX
+        : withStadium
+          ? SAINT_ETIENNE_STADIUM_BBOX
+          : SAINT_ETIENNE_BBOX;
     store.setSelectedCity({
       name: withRoofs
         ? "Saint-Étienne · Badouillière, toitures mesurées"
-        : withStadium
-          ? "Saint-Étienne · centre, Parc Expo et Geoffroy-Guichard"
-          : "Saint-Étienne · centre et Parc Expo",
+        : withTwoPlates
+          ? "Saint-Étienne · centre, Expo et stade · cadrage 2 plaques"
+          : withStadium
+            ? "Saint-Étienne · centre, Parc Expo et Geoffroy-Guichard"
+            : "Saint-Étienne · centre et Parc Expo",
       lat: (saintEtienneBbox[0] + saintEtienneBbox[2]) / 2,
       lng: (saintEtienneBbox[1] + saintEtienneBbox[3]) / 2,
     });
@@ -96,6 +104,17 @@ function quickZone(
       grid: { cols: 2, rows: 2 },
     });
     scene.updateFeatureSettings("buildings", { roofs: true });
+    if (withTwoPlates) {
+      const layout = salonPrintLayouts(saintEtienneBbox)[0];
+      useSceneStore.setState({
+        tileSize: layout.longSideMm,
+        scale: layout.scale,
+        modelSettings: salonLayoutSettings(
+          useSceneStore.getState().modelSettings,
+          layout,
+        ),
+      });
+    }
     store.setBbox(saintEtienneBbox);
   } else {
     const city = store.selectedCity || {
@@ -141,6 +160,9 @@ export function SidePanel() {
   const isPeyrouSelection =
     selectedCity?.name === "Peyrou · Arc et aqueduc" &&
     bbox?.every((coordinate, index) => coordinate === PEYROU_BBOX[index]);
+  const isTwoPlateCorridor = bbox?.every(
+    (coordinate, index) => coordinate === SAINT_ETIENNE_TWO_PLATE_BBOX[index],
+  );
   const salonLayouts = bbox?.every(
     (coordinate, index) => coordinate === SAINT_ETIENNE_STADIUM_BBOX[index],
   )
@@ -194,6 +216,9 @@ export function SidePanel() {
           <button onClick={() => quickZone("saint-etienne-stadium")}>
             Saint-Étienne · centre, Expo et stade
           </button>
+          <button onClick={() => quickZone("saint-etienne-two-plates")}>
+            Saint-Étienne · cadrage 2 plaques
+          </button>
           <button onClick={() => quickZone("saint-etienne-roofs")}>
             Saint-Étienne · toitures détaillées
           </button>
@@ -244,6 +269,15 @@ export function SidePanel() {
             le château d’eau utilisent le relevé 3D municipal ; les voûtes de
             l’aqueduc sont reconstituées d’après un plan historique, avec des
             dimensions et un placement approchés indiqués dans le rapport.
+          </p>
+        ) : null}
+        {isTwoPlateCorridor ? (
+          <p className="field-hint selection-context">
+            Centre, cathédrale Saint-Charles, Cité du Design, Parc Expo et
+            Geoffroy-Guichard. Ce cadrage retire Couriot et les quartiers à
+            l’ouest pour garder, sur deux plaques, la même échelle que la
+            sélection complète sur quatre plaques. Maquette assemblée d’environ
+            145 × 290 mm, deux pièces d’environ 145 × 145 mm.
           </p>
         ) : null}
         <GenerateButton />
@@ -331,6 +365,18 @@ export function SidePanel() {
               détails. 4 plaques agrandissent la même zone de 48 % et conservent
               davantage de petites empreintes imprimables. Relief et bâtiments
               conservent leurs proportions, avec les toits activés.
+            </p>
+            <button
+              className="button button-secondary"
+              disabled={status === "fetching" || status === "processing"}
+              onClick={() => quickZone("saint-etienne-two-plates")}
+            >
+              Mieux cadrer pour 2 plaques
+            </button>
+            <p className="field-hint">
+              Garde le centre, le Parc Expo et le stade avec des bâtiments 48 %
+              plus grands. Couriot et les quartiers à l’ouest sont exclus de ce
+              cadrage.
             </p>
             <details className="advanced-settings">
               <summary>Formats plus grands : 6 ou 9 plaques</summary>

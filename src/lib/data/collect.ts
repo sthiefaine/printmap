@@ -9,6 +9,7 @@ import { selectComplementaryWater } from "./water-coverage";
 import { parseLengthMeters } from "@/lib/osm/building-height";
 import { summarizePointLandmarks } from "./point-landmarks";
 import { enrichIGNRoofs, fetchIGNRoofGrid } from "./ign-roofs";
+import { saintEtienneRoofAcquisitionBbox } from "./saint-etienne-areas";
 import {
   enrichIGNLandmarkRoofs,
   fetchIGNLandmarkRoofGrids,
@@ -35,6 +36,7 @@ export async function collectMapData(
   signal: AbortSignal,
 ): Promise<MapDataResponse> {
   const startedAt = Date.now();
+  const roofBbox = saintEtienneRoofAcquisitionBbox(bbox);
   const osmPending = fetchOverpass(bbox, signal);
   const landmarkSignal = AbortSignal.any([signal, AbortSignal.timeout(79000)]);
   const landmarkGridsPending = osmPending.then((osm) =>
@@ -51,7 +53,7 @@ export async function collectMapData(
     fetchMontpellierStructures(bbox, signal),
     fetchCRAIGBuildings(bbox, signal),
     isMetropolitanFrance(bbox)
-      ? fetchIGNRoofGrid(bbox, signal)
+      ? fetchIGNRoofGrid(roofBbox, signal)
       : Promise.resolve(null),
     landmarkGridsPending,
   ]);

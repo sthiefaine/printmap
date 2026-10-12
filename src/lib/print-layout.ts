@@ -2,9 +2,10 @@ import type { BBox } from "@/types/osm";
 import type { ModelSettings } from "@/store/use-scene-store";
 import { getBboxDimensions } from "./mesh/base-plate-mesh";
 
-export const SAINT_ETIENNE_STADIUM_BBOX: BBox = [
-  45.4288, 4.3702, 45.4628, 4.406,
-];
+export {
+  SAINT_ETIENNE_STADIUM_BBOX,
+  SAINT_ETIENNE_TWO_PLATE_BBOX,
+} from "./data/saint-etienne-areas";
 
 export interface SalonPrintLayout {
   count: 2 | 4 | 6 | 9;

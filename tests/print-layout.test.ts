@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   SAINT_ETIENNE_STADIUM_BBOX,
+  SAINT_ETIENNE_TWO_PLATE_BBOX,
   salonPrintLayouts,
   salonLayoutSettings,
   salonLayoutDimensions,
@@ -13,6 +14,7 @@ import type { BBox } from "../src/types/osm";
 import type { OverpassElement } from "../src/types/osm";
 import { buildPrintModel } from "../src/lib/mesh/build-print-model";
 import { assertClosedSolid } from "./helpers/solid";
+import { saintEtienneRoofAcquisitionBbox } from "../src/lib/data/saint-etienne-areas";
 
 test("Saint-Étienne salon layouts preserve geography and fit 150 mm beds with 5 mm margin", () => {
   const bbox = [...SAINT_ETIENNE_STADIUM_BBOX] as BBox;
@@ -66,6 +68,60 @@ test("Saint-Étienne salon layouts preserve geography and fit 150 mm beds with 5
     /4 plaques : taille réelle assemblée 214,2 × 290 mm ; chaque plaque 107,1 × 145 mm/,
   );
   assert.deepEqual(bbox, SAINT_ETIENNE_STADIUM_BBOX);
+});
+
+test("the two-plate corridor retains the four-plate architecture scale and real church and Expo footprints", () => {
+  const narrow = salonPrintLayouts(SAINT_ETIENNE_TWO_PLATE_BBOX)[0];
+  const wide = salonPrintLayouts(SAINT_ETIENNE_STADIUM_BBOX)[1];
+  assert.deepEqual(narrow.grid, { cols: 1, rows: 2 });
+  assert.ok(Math.abs(narrow.scale - wide.scale) < 1e-8);
+  assert.ok(Math.abs(narrow.heightMm - 290) < 1e-8);
+  assert.ok(narrow.tileWidthMm > 144 && narrow.tileWidthMm <= 145);
+  assert.ok(Math.abs(narrow.tileHeightMm - 145) < 1e-8);
+  assert.deepEqual(
+    saintEtienneRoofAcquisitionBbox(SAINT_ETIENNE_TWO_PLATE_BBOX),
+    SAINT_ETIENNE_STADIUM_BBOX,
+    "the Expo hall keeps the same raster sample positions in both formats",
+  );
+  assert.deepEqual(
+    saintEtienneRoofAcquisitionBbox(SAINT_ETIENNE_STADIUM_BBOX),
+    SAINT_ETIENNE_STADIUM_BBOX,
+  );
+  const anotherZone: BBox = [43.608, 3.872, 43.616, 3.884];
+  assert.deepEqual(saintEtienneRoofAcquisitionBbox(anotherZone), anotherZone);
+  const contains = (point: { lat: number; lon: number }) =>
+    point.lat >= SAINT_ETIENNE_TWO_PLATE_BBOX[0] &&
+    point.lat <= SAINT_ETIENNE_TWO_PLATE_BBOX[2] &&
+    point.lon >= SAINT_ETIENNE_TWO_PLATE_BBOX[1] &&
+    point.lon <= SAINT_ETIENNE_TWO_PLATE_BBOX[3];
+  for (const file of [
+    "saint-etienne-landmark-roofs.json",
+    "saint-etienne-ign-roofs.json",
+  ]) {
+    const fixture = JSON.parse(
+      readFileSync(new URL(`./fixtures/${file}`, import.meta.url), "utf8"),
+    );
+    const elements: OverpassElement[] =
+      fixture.elements ??
+      fixture.buildings?.map(
+        (entry: { element: OverpassElement }) => entry.element,
+      );
+    assert.ok(
+      elements?.length,
+      "real church and Expo fixture provides footprints",
+    );
+    for (const element of elements as OverpassElement[]) {
+      const points =
+        element.geometry ??
+        element.members?.flatMap((member) => member.geometry ?? []) ??
+        [];
+      assert.ok(points.length > 0);
+      assert.ok(
+        points.every(contains),
+        `${element.id} remains inside the corridor`,
+      );
+    }
+  }
 });
 
 test("selecting a salon layout restores equal physical scales without changing printing thresholds or colours", () => {

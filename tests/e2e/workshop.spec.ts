@@ -12,6 +12,7 @@ import { assertClosedSolid } from "../helpers/solid";
 import {
   salonPrintLayouts,
   SAINT_ETIENNE_STADIUM_BBOX,
+  SAINT_ETIENNE_TWO_PLATE_BBOX,
 } from "../../src/lib/print-layout";
 import {
   IGN_ROOF_SOURCE,
@@ -437,17 +438,25 @@ for (const preset of [
   {
     name: "Saint-Étienne · centre et Parc Expo",
     bbox: [45.4288, 4.3702, 45.454, 4.406],
+    plates: 4,
   },
   {
     name: "Saint-Étienne · centre, Expo et stade",
     bbox: [45.4288, 4.3702, 45.4628, 4.406],
+    plates: 4,
+  },
+  {
+    name: "Saint-Étienne · cadrage 2 plaques",
+    bbox: SAINT_ETIENNE_TWO_PLATE_BBOX,
+    plates: 2,
   },
   {
     name: "Saint-Étienne · toitures détaillées",
     bbox: [45.43085, 4.38145, 45.4379, 4.3945],
+    plates: 4,
   },
 ])
-  test(`${preset.name} selects its zone and exports four plates below 150 mm`, async ({
+  test(`${preset.name} selects its zone and exports ${preset.plates} plates below 150 mm`, async ({
     page,
   }) => {
     let request: { bbox: BBox; relief: boolean } | undefined;
@@ -470,7 +479,7 @@ for (const preset of [
     ).toHaveValue("290");
     await expect(
       page.getByRole("spinbutton", { name: "Colonnes de tuiles", exact: true }),
-    ).toHaveValue("2");
+    ).toHaveValue(preset.plates === 2 ? "1" : "2");
     await expect(
       page.getByRole("spinbutton", { name: "Lignes de tuiles", exact: true }),
     ).toHaveValue("2");
@@ -494,7 +503,7 @@ for (const preset of [
     const pieces = Object.values(zip.files).filter((file) =>
       file.name.endsWith(".stl"),
     );
-    expect(pieces).toHaveLength(4);
+    expect(pieces).toHaveLength(preset.plates);
     for (const piece of pieces) {
       const bounds = stlBounds(await piece.async("nodebuffer"));
       expect(bounds.min[2]).toBe(0);
