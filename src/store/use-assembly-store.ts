@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { MapDataResponse } from "@/types/osm";
+import type { PrintModel } from "@/types/print";
 import {
   createAssemblyProject,
   assemblyCellBbox,
@@ -31,10 +32,12 @@ const ACTIVE = "printmap-assembly-active-v1";
 const LAST = "printmap-assembly-last-v1";
 let sequence = 0;
 let pending: AbortController | null = null;
+let refreshPreview: PrintModel | null = null;
 function stop() {
   sequence++;
   pending?.abort();
   pending = null;
+  refreshPreview = null;
   useMapStore.getState().cancel();
 }
 function persist(project: AssemblyProject) {
@@ -93,7 +96,7 @@ interface AssemblyState {
   close: () => void;
   select: (cell: AssemblyCell) => Promise<void>;
   add: (direction: "north" | "south" | "east" | "west") => Promise<void>;
-  load: () => Promise<void>;
+  load: (options?: { refresh?: boolean }) => Promise<void>;
   cancel: () => void;
   importCell: (input: unknown) => Promise<void>;
   cellBackup: () => Promise<string>;
@@ -262,10 +265,13 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       });
     }
   },
-  load: async () => {
+  load: async (options) => {
     const original = get().project;
     if (!original) return;
+    const refresh = options?.refresh === true;
+    const previousModel = useMapStore.getState().model;
     stop();
+    refreshPreview = refresh ? previousModel : null;
     const id = sequence;
     const cell = original.activeCell ?? original.cells[0];
     const currentController = new AbortController();
@@ -274,7 +280,9 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
     set({
       busy: true,
       error: null,
-      notice: "Chargement de cette plaque uniquement…",
+      notice: refresh
+        ? "Actualisation des sources de cette plaque uniquement…"
+        : "Chargement de cette plaque uniquement…",
     });
     const timeout = setTimeout(
       () =>
@@ -290,11 +298,12 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       let data: MapDataResponse | null = null;
       const transient = get().transient;
       if (
+        !refresh &&
         transient?.projectId === original.id &&
         transient.key === cellKey(cell)
       )
         data = transient.data;
-      else {
+      else if (!refresh) {
         try {
           data = await readAssemblyCell(original.id, cell);
         } catch {
@@ -309,6 +318,7 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
           body: JSON.stringify({
             bbox: assemblyCellBbox(original, cell),
             relief: original.settings.base.topographyEnabled,
+            refresh,
           }),
           signal,
         });
@@ -361,7 +371,7 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
         project = { ...project, elevationDatumM: project.elevationDatumM ?? 0 };
       let stored = false;
       try {
-        await saveAssemblyCell(project.id, cell, data);
+        await saveAssemblyCell(project.id, cell, data, signal);
         stored = true;
       } catch {
         cacheIssue = true;
@@ -402,22 +412,38 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
                 : "Données conservées. Vous pouvez réessayer la construction de cette plaque.",
         });
     } catch (err) {
+      // A failed collection has not replaced the working cached parcel. Keep
+      // its already validated preview/export usable while reporting freshness.
+      if (
+        id === sequence &&
+        refresh &&
+        previousModel &&
+        useMapStore.getState().model === previousModel
+      )
+        useMapStore.setState({ status: "done" });
       if (id === sequence)
         set({
           error:
             err instanceof Error
               ? err.message
               : "Chargement impossible. Réessayez cette plaque.",
-          notice:
-            "La préparation de cette plaque s’est interrompue. Les autres plaques sont conservées.",
+          notice: refresh
+            ? "Actualisation interrompue. Les données précédentes de cette plaque et les autres plaques sont conservées."
+            : "La préparation de cette plaque s’est interrompue. Les autres plaques sont conservées.",
         });
     } finally {
       clearTimeout(timeout);
-      if (id === sequence) set({ busy: false });
+      if (id === sequence) {
+        refreshPreview = null;
+        set({ busy: false });
+      }
     }
   },
   cancel: () => {
+    const previousModel = refreshPreview;
     stop();
+    if (previousModel && useMapStore.getState().model === previousModel)
+      useMapStore.setState({ status: "done" });
     set({
       busy: false,
       notice: "Préparation annulée. Les autres plaques sont conservées.",
@@ -461,9 +487,16 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       throw new Error("Ajoutez d’abord cette plaque au plan du projet.");
     stop();
     const id = sequence;
+    const importController = new AbortController();
+    pending = importController;
     let stored = false;
     try {
-      await saveAssemblyCell(target.id, file.cell, data);
+      await saveAssemblyCell(
+        target.id,
+        file.cell,
+        data,
+        importController.signal,
+      );
       stored = true;
     } catch {
       /* The active parcel can still be reconstructed and backed up. */

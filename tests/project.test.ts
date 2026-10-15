@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   useSceneStore,
   DEFAULT_MODEL_SETTINGS,
+  normalizeSettings,
 } from "../src/store/use-scene-store";
 import { createDemoData, DEMO_BBOX } from "../src/lib/demo";
 import { getBboxDimensions } from "../src/lib/mesh/base-plate-mesh";
@@ -20,6 +21,17 @@ function project() {
     }),
   );
 }
+
+test("existing projects enable the optional balcony interpretation and preserve an explicit opt-out", () => {
+  const old = structuredClone(DEFAULT_MODEL_SETTINGS);
+  delete old.features.buildings.balconies;
+  assert.equal(normalizeSettings(old).features.buildings.balconies, true);
+  old.features.buildings.balconies = false;
+  assert.equal(normalizeSettings(old).features.buildings.balconies, false);
+  (old.features.buildings as unknown as Record<string, unknown>).balconies =
+    "yes";
+  assert.throws(() => normalizeSettings(old), /Options du projet invalides/);
+});
 
 test("project round trip keeps raw geography and custom printing settings", () => {
   const saved = project();

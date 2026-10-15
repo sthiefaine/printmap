@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import type { BBox, OverpassElement, RoofSurface } from "@/types/osm";
 import {
   conformIGNRoofSurfaces,
@@ -16,7 +16,7 @@ import {
   enrichIGNLandmarkRoofs,
   fetchIGNLandmarkRoofGrids,
 } from "@/lib/data/ign-landmark-roofs";
-import { fromLambert93 } from "@/lib/data/lambert93";
+import { fromLambert93, toLambert93 } from "@/lib/data/lambert93";
 import { validateRoofData } from "@/lib/data/validate-roofs";
 
 const directory = new URL("./fixtures/", import.meta.url);
@@ -364,4 +364,393 @@ test("local acquisition preserves geometry and avoids calls for already measured
   );
   assert.equal(result.grids.size, 0);
   assert.deepEqual(result.warnings, []);
+});
+
+function uncatalogued(index: number, id = 91000 + index) {
+  const entry = entries[index];
+  return {
+    ...entry,
+    element: {
+      ...structuredClone(entry.element),
+      id,
+      tags: {
+        building: "church",
+        amenity: "place_of_worship",
+        name: `Église de contrôle hors catalogue ${id}`,
+        height: String(20 + index),
+      },
+    } as OverpassElement,
+  };
+}
+
+/** Real BIL values, translated geometry solely to exercise a different city's
+ * selection. This is a synthetic test location, never published survey data. */
+function translated(index: number, id: number, dx: number, dy: number) {
+  const entry = uncatalogued(index, id);
+  entry.element.geometry = entry.element.geometry!.map((point) => {
+    const [x, y] = toLambert93(point.lon, point.lat);
+    return fromLambert93(x + dx, y + dy);
+  });
+  entry.grid = {
+    ...entry.grid,
+    west: entry.grid.west + dx,
+    east: entry.grid.east + dx,
+    south: entry.grid.south + dy,
+    north: entry.grid.north + dy,
+  };
+  return entry;
+}
+
+function mockRaster(t: TestContext) {
+  const requests: URL[] = [];
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (request: string | URL | Request) => {
+      const url = new URL(String(request));
+      requests.push(url);
+      assert.match(url.hostname, /^data\.geopf\.fr$/);
+      const width = Number(url.searchParams.get("WIDTH")),
+        height = Number(url.searchParams.get("HEIGHT"));
+      assert.ok(width * height <= 250000);
+      return new Response(
+        new Float32Array(width * height).fill(
+          url.searchParams.get("LAYERS")!.includes("MNS") ? 550 : 520,
+        ),
+        { headers: { "Content-Type": "image/x-bil;bits=32" } },
+      );
+    },
+  );
+  return requests;
+}
+
+test("local refinement intersects building material even when no mapped corner is selected", async (t) => {
+  const requests = mockRaster(t);
+  const ring = (south: number, west: number, north: number, east: number) => [
+    { lat: south, lon: west },
+    { lat: south, lon: east },
+    { lat: north, lon: east },
+    { lat: north, lon: west },
+    { lat: south, lon: west },
+  ];
+  // Synthetic Paris location, roughly 110 m × 73 m; no invented source geometry
+  // is published. The native local raster remains under the 250,000 pixel budget.
+  const outer = ring(48.8555, 2.3005, 48.8565, 2.3015);
+  const church: OverpassElement = {
+    type: "way",
+    id: 98001,
+    tags: { building: "church", name: "Église de contrôle" },
+    geometry: outer,
+  };
+  const inside: BBox = [48.856, 2.301, 48.8562, 2.3012];
+  const crossing: BBox = [48.8559, 2.3004, 48.8561, 2.3016];
+  const covering: BBox = [48.8554, 2.3004, 48.8566, 2.3016];
+  for (const selection of [inside, crossing, covering]) {
+    const result = await fetchIGNLandmarkRoofGrids(
+      [church],
+      selection,
+      new AbortController().signal,
+    );
+    assert.deepEqual([...result.grids.keys()], ["way/98001"]);
+  }
+  assert.ok(requests.length >= 2);
+
+  const courtyard: OverpassElement = {
+    type: "relation",
+    id: 98002,
+    tags: { type: "multipolygon", ...church.tags },
+    members: [
+      { type: "way", role: "outer", geometry: outer },
+      {
+        type: "way",
+        role: "inner",
+        geometry: ring(48.8558, 2.3008, 48.8563, 2.3013),
+      },
+    ],
+  };
+  for (const selection of [
+    inside,
+    // A rectangle exactly matching the courtyard is still empty of material.
+    [48.8558, 2.3008, 48.8563, 2.3013] as BBox,
+    [48.8566, 2.3006, 48.8568, 2.3008] as BBox,
+  ]) {
+    const before = requests.length;
+    const result = await fetchIGNLandmarkRoofGrids(
+      [courtyard],
+      selection,
+      new AbortController().signal,
+    );
+    assert.equal(result.grids.size, 0);
+    assert.equal(requests.length, before);
+  }
+  const acrossCourtyard = await fetchIGNLandmarkRoofGrids(
+    [courtyard],
+    crossing,
+    new AbortController().signal,
+  );
+  assert.deepEqual([...acrossCourtyard.grids.keys()], ["relation/98002"]);
+
+  const cShape: OverpassElement = {
+    ...church,
+    id: 98003,
+    geometry: [
+      [0, 0],
+      [1, 0],
+      [1, 0.2],
+      [0.2, 0.2],
+      [0.2, 0.8],
+      [1, 0.8],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ].map(([x, y]) => ({ lat: 48.8555 + y * 0.001, lon: 2.3005 + x * 0.001 })),
+  };
+  const beforeNotch = requests.length;
+  const notch = await fetchIGNLandmarkRoofGrids(
+    [cShape],
+    [48.8559, 2.3009, 48.8561, 2.3011],
+    new AbortController().signal,
+  );
+  assert.equal(notch.grids.size, 0, "a concave notch is not building material");
+  assert.equal(requests.length, beforeNotch);
+  const disconnected = await fetchIGNLandmarkRoofGrids(
+    [cShape],
+    [48.8554, 2.3011, 48.8566, 2.3013],
+    new AbortController().signal,
+  );
+  assert.deepEqual(
+    [...disconnected.grids.keys()],
+    ["way/98003"],
+    "the rectangle crosses two wings, with no building vertex inside",
+  );
+});
+
+test("real roof fixtures with unknown OSM IDs refine named churches without the Saint-Étienne catalogue", async (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  const local = [uncatalogued(0), uncatalogued(1)];
+  const result = await enrichIGNLandmarkRoofs(
+    local.map((e) => e.element),
+    bbox,
+    new AbortController().signal,
+    { grids: new Map(local.map((e) => [keyOf(e.element), e.grid])) },
+  );
+  assert.equal(result.buildingCount, 2);
+  assert.equal(result.triangleCount, 5194);
+  assert.equal(result.surfaceCount, 2478);
+  assert.ok(
+    result.elements.every(
+      (e) => e.tags?.["printmap:roof_refinement"] === "landmark",
+    ),
+  );
+  assert.ok(
+    result.elements.every((e) =>
+      e.tags?.name?.startsWith("Église de contrôle hors catalogue"),
+    ),
+  );
+  validateRoofData(result.elements);
+});
+
+const keyOf = (element: OverpassElement) => `${element.type}/${element.id}`;
+
+test("the same real samples also refine uncatalogued geometry at a synthetic location in another French city", async (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  // Lambert-93 translation to Nantes. Altitudes remain fixture values, not a
+  // claim that these buildings or heights exist at this synthetic location.
+  const local = [
+    translated(0, 92001, -453000, 196000),
+    translated(1, 92002, -453000, 196000),
+  ];
+  const points = local.flatMap((e) => e.element.geometry!);
+  const anotherCity: BBox = [
+    Math.min(...points.map((p) => p.lat)) - 0.001,
+    Math.min(...points.map((p) => p.lon)) - 0.001,
+    Math.max(...points.map((p) => p.lat)) + 0.001,
+    Math.max(...points.map((p) => p.lon)) + 0.001,
+  ];
+  assert.ok(
+    anotherCity[1] < 0,
+    "the regression is outside Saint-Étienne and its catalogue coverage",
+  );
+  const result = await enrichIGNLandmarkRoofs(
+    local.map((e) => e.element),
+    anotherCity,
+    new AbortController().signal,
+    { grids: new Map(local.map((e) => [keyOf(e.element), e.grid])) },
+  );
+  assert.equal(result.buildingCount, 2);
+  assert.ok(result.triangleCount <= 8192);
+  assert.ok(Math.abs(Number(result.elements[0].tags?.height) - 42.41) < 0.05);
+  assert.ok(Math.abs(Number(result.elements[1].tags?.height) - 28.74) < 0.05);
+  validateRoofData(result.elements);
+});
+
+test("prefetched grids outrank changed heights so enrichment never discards already acquired local data", async (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("prefetched grids must not trigger network calls");
+  });
+  const local = [uncatalogued(0), uncatalogued(1)];
+  const taller = [
+    uncatalogued(0, 93001).element,
+    uncatalogued(1, 93002).element,
+  ];
+  taller[0].tags!.height = "250";
+  taller[1].tags!.height = "200";
+  const result = await enrichIGNLandmarkRoofs(
+    [...taller, ...local.map((e) => e.element)],
+    bbox,
+    new AbortController().signal,
+    { grids: new Map(local.map((e) => [keyOf(e.element), e.grid])) },
+  );
+  assert.equal(result.buildingCount, 2);
+  assert.equal(result.triangleCount, 5194);
+  assert.equal(result.elements[0], taller[0]);
+  assert.equal(result.elements[1], taller[1]);
+  assert.ok(result.elements.slice(2).every((e) => e.roofSurfaces?.length));
+});
+
+test("native surveys added after prefetch remain untouched while the other available grid still refines", async (t) => {
+  t.mock.method(Date, "now", () => 1000000);
+  const local = [uncatalogued(0), uncatalogued(1)];
+  const surveyed = {
+    ...local[0].element,
+    roofSurfaces: [
+      {
+        outer: local[0].element.geometry!.map((p) => ({
+          ...p,
+          elevation: 550,
+        })),
+        holes: [],
+      },
+    ],
+    groundElevation: 520,
+  };
+  const taller = [
+    uncatalogued(0, 94001).element,
+    uncatalogued(1, 94002).element,
+  ];
+  taller.forEach((e) => {
+    e.tags!.height = "300";
+  });
+  const result = await enrichIGNLandmarkRoofs(
+    [surveyed, ...taller, local[1].element],
+    bbox,
+    new AbortController().signal,
+    { grids: new Map(local.map((e) => [keyOf(e.element), e.grid])) },
+  );
+  assert.equal(result.buildingCount, 1);
+  assert.equal(result.elements[0], surveyed);
+  assert.ok(result.elements.at(-1)?.roofSurfaces?.length);
+});
+
+test("generic local acquisition stays at two buildings and deduplicates named relation members", async (t) => {
+  const requests = mockRaster(t);
+  const member = uncatalogued(0, 95001).element;
+  const relation: OverpassElement = {
+    type: "relation",
+    id: 95002,
+    tags: { ...member.tags, name: "Cathédrale relation", height: "100" },
+    members: [
+      { type: "way", ref: member.id, role: "outer", geometry: member.geometry },
+    ],
+  };
+  const other = uncatalogued(1, 95003).element;
+  other.tags!.height = "80";
+  const omitted = uncatalogued(0, 95004).element;
+  omitted.tags!.height = "60";
+  const result = await fetchIGNLandmarkRoofGrids(
+    [member, omitted, relation, other],
+    bbox,
+    new AbortController().signal,
+  );
+  assert.equal(result.grids.size, 2);
+  assert.deepEqual([...result.grids.keys()].sort(), [
+    "relation/95002",
+    "way/95003",
+  ]);
+  assert.ok(requests.length <= 4, "two bounded local MNS/MNT pairs");
+});
+
+test("invalid plans, excessive vertices and nonlocal native rasters are skipped without blocking a valid landmark", async (t) => {
+  mockRaster(t);
+  const valid = uncatalogued(1, 96001).element;
+  const malformed = uncatalogued(0, 96002).element;
+  const p = malformed.geometry![0];
+  malformed.geometry = [
+    p,
+    { lat: p.lat, lon: 11 },
+    { lat: p.lat + 0.01, lon: 11 },
+    p,
+  ];
+  const excessive = uncatalogued(0, 96003).element;
+  excessive.geometry = Array.from(
+    { length: 10001 },
+    (_, index) => excessive.geometry![index % excessive.geometry!.length],
+  );
+  excessive.geometry[10000] = excessive.geometry[0];
+  const huge = uncatalogued(0, 96004).element;
+  huge.geometry = [
+    p,
+    { lat: p.lat, lon: p.lon + 0.01 },
+    { lat: p.lat + 0.01, lon: p.lon + 0.01 },
+    { lat: p.lat + 0.01, lon: p.lon },
+    p,
+  ];
+  const excessiveRelation: OverpassElement = {
+    type: "relation",
+    id: 96005,
+    tags: { building: "church", name: "Relation trop détaillée" },
+    members: [
+      {
+        type: "way",
+        ref: excessive.id,
+        role: "outer",
+        geometry: excessive.geometry,
+      },
+    ],
+  };
+  const result = await fetchIGNLandmarkRoofGrids(
+    [malformed, excessive, huge, excessiveRelation, valid],
+    bbox,
+    new AbortController().signal,
+  );
+  assert.deepEqual([...result.grids.keys()], ["way/96001"]);
+});
+
+test("Rio, anonymous buildings, native roofs and members of measured relations never request refinement", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () => {
+    throw new Error("an ineligible source cannot request IGN");
+  });
+  const unknown = uncatalogued(0, 97001).element;
+  const rio: BBox = [-22.94, -43.2, -22.9, -43.16];
+  const foreign = await fetchIGNLandmarkRoofGrids(
+    [unknown],
+    rio,
+    new AbortController().signal,
+  );
+  assert.equal(foreign.grids.size, 0);
+  const anonymous = { ...unknown, id: 97002, tags: { building: "church" } };
+  const member = uncatalogued(1, 97003).element;
+  const roof = {
+    outer: member.geometry!.map((p) => ({ ...p, elevation: 550 })),
+    holes: [],
+  };
+  const relation: OverpassElement = {
+    type: "relation",
+    id: 97004,
+    tags: { building: "church", name: "Église relevée" },
+    roofSurfaces: [roof],
+    groundElevation: 520,
+    members: [
+      { type: "way", ref: member.id, role: "outer", geometry: member.geometry },
+    ],
+  };
+  const measured = { ...unknown, roofSurfaces: [roof], groundElevation: 520 };
+  const result = await fetchIGNLandmarkRoofGrids(
+    [anonymous, member, relation, measured],
+    bbox,
+    new AbortController().signal,
+  );
+  assert.equal(result.grids.size, 0);
+  assert.equal(fetch.mock.callCount(), 0);
 });

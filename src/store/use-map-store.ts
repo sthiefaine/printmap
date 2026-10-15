@@ -151,6 +151,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   generate: async () => {
     const { bbox } = get();
     if (!bbox) return;
+    const refresh = !!get().osmData;
     stopOperation();
     const id = operation;
     controller = new AbortController();
@@ -183,6 +184,7 @@ export const useMapStore = create<MapState>((set, get) => ({
         body: JSON.stringify({
           bbox,
           relief: useSceneStore.getState().modelSettings.base.topographyEnabled,
+          refresh,
         }),
         signal,
       });

@@ -43,10 +43,11 @@ import { simplifyPolyline } from "../polygon/simplify";
 import { pointInPolygon } from "../polygon/point-in-polygon";
 import { makeRoof, makeMeasuredRoof } from "./roof-solid";
 import { makeLidarRoof } from "./lidar-roof";
+import { isArbreBlanc, makeArbreBlanc } from "./arbre-blanc";
 import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
 import { preparePrintLayers } from "./fuse-print-layers";
-import { saintEtienneLandmark } from "../data/saint-etienne-landmarks";
+import { buildingLandmark } from "../data/building-landmarks";
 import { validPrintGrid } from "../plate-layout";
 
 let runtime: Promise<ManifoldToplevel> | undefined;
@@ -96,16 +97,25 @@ function validateInput(input: PrintInput): void {
       !Number.isFinite(frame.elevationDatumM)
     )
       throw new Error("Le repère commun des plaques est invalide.");
-    if (settings.base.topographyEnabled && validElevation(input.elevationGrid)) {
+    if (
+      settings.base.topographyEnabled &&
+      validElevation(input.elevationGrid)
+    ) {
       const grid = input.elevationGrid;
-      const minimum = grid.points.reduce((lowest, elevation) => Math.min(lowest, elevation), Infinity);
+      const minimum = grid.points.reduce(
+        (lowest, elevation) => Math.min(lowest, elevation),
+        Infinity,
+      );
       const ocean = input.osmData.elements.some(
         (element) =>
           element.tags?.natural === "sea" || element.tags?.water === "ocean",
       );
       // Do not silently flatten terrain below a previously fixed assembly datum.
       // Expanding towards lower ground needs a deliberately lower common datum.
-      if (frame.elevationDatumM > Math.min(minimum, ocean ? 0 : Infinity) + 1e-8)
+      if (
+        frame.elevationDatumM >
+        Math.min(minimum, ocean ? 0 : Infinity) + 1e-8
+      )
         throw new Error(
           "Le terrain descend sous le datum commun des plaques. Choisissez un datum commun inférieur avant de construire cet assemblage.",
         );
@@ -189,7 +199,8 @@ function makeTerrain(
   const project = createProjectionForBbox(bbox, input.assemblyFrame?.originLat);
   const sf = 1000 / scale;
   const exaggeration = settings.base.elevationExaggeration;
-  const elevationDatumM = input.assemblyFrame?.elevationDatumM ?? grid?.minElev ?? 0;
+  const elevationDatumM =
+    input.assemblyFrame?.elevationDatumM ?? grid?.minElev ?? 0;
   const sample = (x: number, y: number) => {
     if (!grid) return base;
     const [lng, lat] = project.unproject(x / sf, y / sf);
@@ -759,7 +770,10 @@ export async function buildPrintModel(
   try {
     const { bbox, scale, settings } = input;
     const sf = 1000 / scale;
-    const projection = createProjectionForBbox(bbox, input.assemblyFrame?.originLat);
+    const projection = createProjectionForBbox(
+      bbox,
+      input.assemblyFrame?.originLat,
+    );
     const elevationDatumM =
       input.assemblyFrame?.elevationDatumM ?? input.elevationGrid?.minElev ?? 0;
     const [west, south] = projection.project(bbox[1], bbox[0]);
@@ -792,6 +806,7 @@ export async function buildPrintModel(
       estimatedHeights: 0,
       realRoofCount: 0,
       lidarRoofCount: 0,
+      reconstructedBalconyBuildingCount: 0,
       taggedRoofCount: 0,
       staircaseCount: 0,
       measuredStructureCount: 0,
@@ -802,7 +817,9 @@ export async function buildPrintModel(
     };
     const warnings: string[] = [...(terrain.terraceWarnings ?? [])];
     if (input.assemblyFrame)
-      warnings.push("Projet par plaques : échelle et repère vertical communs. Les bords du terrain sont harmonisés lors du chargement. Les bâtiments coupés, fragments sous le seuil d’impression et assises ou terrasses estimées séparément peuvent nécessiter une vérification du raccord avant impression.");
+      warnings.push(
+        "Projet par plaques : échelle et repère vertical communs. Les bords du terrain sont harmonisés lors du chargement. Les bâtiments coupés, fragments sous le seuil d’impression et assises ou terrasses estimées séparément peuvent nécessiter une vérification du raccord avant impression.",
+      );
     const derivedSources: string[] = [...(terrain.terraceSources ?? [])];
     if (settings.base.topographyEnabled && !validElevation(input.elevationGrid))
       warnings.push("Relief indisponible : la maquette utilise un socle plat.");
@@ -1065,7 +1082,7 @@ export async function buildPrintModel(
     if (settings.features.buildings.enabled)
       for (let i = 0; i < parsed.buildings.length; i++) {
         const building = parsed.buildings[i];
-        const landmark = saintEtienneLandmark(building.sourceId);
+        const landmark = buildingLandmark(building);
         let partialSurvey = false;
         let section = footprint(
           building.polygon,
@@ -1452,7 +1469,9 @@ export async function buildPrintModel(
         const grid = terrain.gridVertices.length ? input.elevationGrid : null;
         const deckZ = grid
           ? settings.base.basePlateThicknessMm +
-            (57.774 - elevationDatumM) * sf * settings.base.elevationExaggeration
+            (57.774 - elevationDatumM) *
+              sf *
+              settings.base.elevationExaggeration
           : settings.base.basePlateThicknessMm + 21.68 * sf;
         const aqueduct = makeAqueduct(cad, arena, {
           axisPolylineMm: axis,
@@ -1704,7 +1723,8 @@ export async function buildPrintModel(
       let replacedRoofFoundations = 0;
       const measuredRoofGroundCuts: Manifold[] = [];
       for (let i = 0; i < preparedBuildings.length; i++) {
-        const { building, section, height, partialSurvey } = preparedBuildings[i];
+        const { building, section, height, partialSurvey } =
+          preparedBuildings[i];
         const polygons = section.toPolygons();
         const surfaceZ = measuredGroundZ(building, section);
         const startZ = Math.max(0.2, settings.base.basePlateThicknessMm - 0.3);
@@ -1995,15 +2015,87 @@ export async function buildPrintModel(
             )
           : 0;
         const wallTop = surfaceZ + height - roofHeight;
+        // A 2.5D roof envelope fills every balcony down to the foundation.
+        // This documented landmark instead uses observed LiDAR levels and
+        // an interpreted vertical OSM core, inferred thickness/connections.
+        // Cached source data
+        // benefits from the same constructor as freshly collected plates.
+        let balconies =
+          settings.features.buildings.roofs &&
+          settings.features.buildings.balconies !== false &&
+          isArbreBlanc(building.sourceId) &&
+          building.groundElevation != null &&
+          building.roofSurfaces?.length
+            ? makeArbreBlanc(cad, arena, {
+                surfaces: building.roofSurfaces,
+                groundElevation: building.groundElevation,
+                project: projection.project,
+                scaleFactor: sf,
+                buildingScale: settings.features.buildings.buildingScale,
+                surfaceZ,
+                foundationZ: startZ,
+                footprint: section,
+                clip,
+                minimumHeight: minBuildingHeightMm,
+                minFeatureMm,
+              })
+            : null;
+        if (balconies) {
+          try {
+            validatePrintMesh(extractMesh(balconies.solid, new Map()));
+            const pieces = balconies.solid
+              .decompose()
+              .map((part) => arena.keep(part));
+            if (
+              !pieces.length ||
+              pieces.some(
+                (part) =>
+                  part.volume() <= 0 ||
+                  part.boundingBox().min[2] > startZ + 0.0001,
+              )
+            )
+              balconies = null;
+          } catch {
+            balconies = null;
+          }
+        }
+        if (
+          !balconies &&
+          isArbreBlanc(building.sourceId) &&
+          settings.features.buildings.balconies !== false &&
+          settings.features.buildings.roofs
+        )
+          warnings.push(
+            "Arbre Blanc : la reconstruction des balcons n’a pas pu être conservée sur cette plaque ; l’enveloppe de toiture simplifiée est utilisée.",
+          );
         // Full foundation through the underlying terrain supports every building.
         let solid =
+          balconies?.solid ??
           measuredSolid ??
           arena.keep(
             arena
               .keep(section.extrude(wallTop - startZ))
               .translate([0, 0, startZ]),
           );
-        if (measuredSolid) {
+        if (balconies) {
+          stats.reconstructedBalconyBuildingCount =
+            (stats.reconstructedBalconyBuildingCount ?? 0) + 1;
+          derivedSources.push(
+            "Arbre Blanc · IGN LiDAR HD du 28/05/2021 · Licence Ouverte 2.0 · https://geoservices.ign.fr/lidarhd",
+            "Arbre Blanc · enveloppe de toiture Montpellier Méditerranée Métropole 2020 et noyau OpenStreetMap · ODbL · volume du noyau, raccords et épaisseurs reconstitués",
+          );
+          warnings.push(
+            `Arbre Blanc : ${balconies.retainedLevelCount} niveaux LiDAR visibles conservés sur ${balconies.observedLevelCount}. Le volume du noyau est reconstitué jusqu’au dernier plateau visible, avec le couronnement municipal au-dessus ; ${balconies.inferredConnectionCount} raccord(s) estimé(s), épaisseur de dalle adaptée à ${balconies.slabThicknessMm.toFixed(2)} mm. Les parties masquées et les sous-faces ne sont pas mesurées. Vérifiez les supports sous les balcons dans votre logiciel d’impression.`,
+          );
+          if (balconies.omittedFragmentCount)
+            warnings.push(
+              `Arbre Blanc : ${balconies.omittedFragmentCount} fragment(s) sans appui ou trop petits à cette échelle ont été omis.`,
+            );
+          if (balconies.repairedContactCount)
+            warnings.push(
+              `Arbre Blanc : ${balconies.repairedContactCount} jonction(s) de précision corrigée(s) localement sur 0,005 mm, en trois passages au maximum. L’écart de volume de la conversion est de ${Math.abs(balconies.repairVolumeDeltaMm3).toFixed(6)} mm³, limité à 0,01 % du volume du bâtiment.`,
+            );
+        } else if (measuredSolid) {
           if (building.tags["printmap:roof_reconstruction"] === "lidar")
             stats.lidarRoofCount = (stats.lidarRoofCount ?? 0) + 1;
           else stats.realRoofCount++;
@@ -2148,6 +2240,7 @@ export async function buildPrintModel(
         } else if (explicitRoof && explicitRoof !== "flat") flattenedRoofs++;
         if (
           measuredSolid &&
+          !balconies &&
           !isMeasuredStructure &&
           preparedBuildings.length > 1
         ) {
@@ -2185,7 +2278,7 @@ export async function buildPrintModel(
         // as a detached roof at the selection boundary. Architectural shells
         // and envelopes containing negative cavity boundaries stay together.
         const roofParts =
-          measuredSolid && !isMeasuredStructure
+          measuredSolid && !balconies && !isMeasuredStructure
             ? solid.decompose().map((part) => arena.keep(part))
             : [];
         if (
@@ -2225,28 +2318,49 @@ export async function buildPrintModel(
             for (const part of roofParts) solids.push(tag(part, "buildings"));
           else solids.push(tag(solid, "buildings"));
         } else solids.push(tag(solid, "buildings"));
-        const landmark = saintEtienneLandmark(building.sourceId);
+        const landmark = buildingLandmark(building);
         if (landmark) {
           const bounds = solid.boundingBox();
-          landmarks.push({
+          const entry: NonNullable<PrintModel["landmarks"]>[number] = {
             ...landmark,
             min: bounds.min as [number, number, number],
             max: bounds.max as [number, number, number],
-            representation: measuredSolid
-              ? isMeasuredStructure
-                ? "surveyed-solid"
-                : building.tags["printmap:roof_reconstruction"] === "lidar"
-                  ? "lidar-roof"
-                  : "surveyed-roof"
-              : canRoof
-                ? "osm-roof"
-                : "footprint",
-            source: measuredSolid
-              ? (building.measuredSolid?.source ??
-                building.roofSource ??
-                "Relevé 3D")
-              : (building.heightSource ?? "OpenStreetMap · empreinte"),
-          });
+            representation: balconies
+              ? "reconstructed-balconies"
+              : measuredSolid
+                ? isMeasuredStructure
+                  ? "surveyed-solid"
+                  : building.tags["printmap:roof_reconstruction"] === "lidar"
+                    ? "lidar-roof"
+                    : "surveyed-roof"
+                : canRoof
+                  ? "osm-roof"
+                  : "footprint",
+            source: balconies
+              ? "IGN LiDAR HD 2021 + Montpellier 2020 + OpenStreetMap · noyau, raccords et épaisseur estimés"
+              : measuredSolid
+                ? (building.measuredSolid?.source ??
+                  building.roofSource ??
+                  "Relevé 3D")
+                : (building.heightSource ?? "OpenStreetMap · empreinte"),
+          };
+          const previous = landmarks.find((item) => item.id === entry.id);
+          if (previous) {
+            previous.min = previous.min.map((value, axis) =>
+              Math.min(value, entry.min[axis]),
+            ) as [number, number, number];
+            previous.max = previous.max.map((value, axis) =>
+              Math.max(value, entry.max[axis]),
+            ) as [number, number, number];
+            // A multipart civic site can mix surveyed and basic wings. Avoid
+            // attributing the richest source to the whole merged landmark.
+            if (previous.representation !== entry.representation) {
+              previous.representation = "mixed";
+              previous.source = [
+                ...new Set([...previous.source.split(" ; "), entry.source]),
+              ].join(" ; ");
+            }
+          } else if (landmarks.length < 100) landmarks.push(entry);
         }
         stats.buildingCount++;
         if (

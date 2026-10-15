@@ -429,7 +429,10 @@ export function SidePanel() {
             </button>
           ))}
         </div>
-        <p className="profile-hint">{PRINT_PROFILES[profile].hint}</p>
+        <p className="profile-hint">
+          {PRINT_PROFILES[profile].hint}. Le profil conserve les détails
+          disponibles ; il n’ajoute pas de relevé architectural.
+        </p>
         <details className="advanced-settings">
           <summary>
             Résolution et nettoyage{" "}

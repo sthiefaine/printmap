@@ -21,6 +21,16 @@ export function QualityReport() {
             {model.stats.buildingCount.toLocaleString("fr-FR")} bâtiments ·{" "}
             {warnings.length} remarque{warnings.length > 1 ? "s" : ""}
           </span>
+          <span>
+            {model.stats.realRoofCount.toLocaleString("fr-FR")} toiture
+            {model.stats.realRoofCount === 1 ? " mesurée" : "s mesurées"}
+            {model.stats.lidarRoofCount
+              ? ` · ${model.stats.lidarRoofCount.toLocaleString("fr-FR")} LiDAR`
+              : ""}
+            {model.stats.reconstructedBalconyBuildingCount
+              ? " · balcons reconstitués"
+              : ""}
+          </span>
         </div>
         <span>Détails ⌄</span>
       </summary>
@@ -71,6 +81,16 @@ export function QualityReport() {
             {model.stats.measuredStructureCount > 1 ? "s" : ""}.
           </p>
         ) : null}
+        {model.stats.reconstructedBalconyBuildingCount ? (
+          <p>
+            <strong>Arbre Blanc · balcons reconstitués</strong> · plateaux
+            visibles dans le LiDAR IGN, toiture du noyau issue du relevé
+            municipal. Le volume du noyau, les raccords et les épaisseurs sont
+            estimés. Le relevé aérien reste incomplet ; les 193 balcons ne sont
+            pas tous relevés. Vérifiez les surplombs et les supports dans votre
+            logiciel d’impression.
+          </p>
+        ) : null}
         {model.stats.reconstructedBridgeCount > 0 ? (
           <p>
             <strong>Ponts reconstruits depuis des dimensions</strong> ·{" "}
@@ -118,6 +138,7 @@ export function QualityReport() {
             model.stats.buildingCount -
               model.stats.realRoofCount -
               (model.stats.lidarRoofCount ?? 0) -
+              (model.stats.reconstructedBalconyBuildingCount ?? 0) -
               model.stats.taggedRoofCount,
           )}{" "}
           volumes sans toiture 3D reconstruite.

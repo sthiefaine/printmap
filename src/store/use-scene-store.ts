@@ -45,6 +45,8 @@ export interface BuildingSettings {
   roofColor: string;
   osmColors: boolean;
   roofs: boolean;
+  /** Visible LiDAR terraces, with explicitly inferred connections and thickness. */
+  balconies?: boolean;
   buildingScale: number;
   minHeightM: number;
   minAreaM2: number;
@@ -176,6 +178,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
       roofColor: "#e4dccb",
       osmColors: false,
       roofs: true,
+      balconies: true,
       buildingScale: 1,
       minHeightM: 0,
       minAreaM2: 0,
@@ -302,7 +305,8 @@ export function normalizeSettings(value: unknown): ModelSettings {
   if (
     typeof normalized.base.topographyEnabled !== "boolean" ||
     typeof normalized.base.frame.enabled !== "boolean" ||
-    typeof normalized.features.buildings.roofs !== "boolean"
+    typeof normalized.features.buildings.roofs !== "boolean" ||
+    typeof normalized.features.buildings.balconies !== "boolean"
   )
     throw new Error("Options du projet invalides.");
   if (

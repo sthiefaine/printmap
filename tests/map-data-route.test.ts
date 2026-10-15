@@ -33,10 +33,10 @@ test("a missing requested DEM is retried instead of caching a flat city; the com
       return new Response(png);
     return new Response("unavailable", { status: 503 });
   });
-  const request = () =>
+  const request = (refresh = false) =>
     new Request("http://localhost/api/map-data", {
       method: "POST",
-      body: JSON.stringify({ bbox: RIO_BBOX, relief: true }),
+      body: JSON.stringify({ bbox: RIO_BBOX, relief: true, refresh }),
     });
   const first = await POST(request());
   assert.equal(first.status, 200);
@@ -53,4 +53,19 @@ test("a missing requested DEM is retried instead of caching a flat city; the com
   const third = await POST(request());
   assert.deepEqual(await third.json(), value);
   assert.equal(calls, completedCalls);
+  const refreshed = await POST(request(true));
+  assert.equal(refreshed.status, 200);
+  assert.ok((await refreshed.json()).elevationGrid);
+  assert.equal(osmCalls, 3, "manual refresh bypasses the response cache");
+  const refreshedCalls = calls;
+  await POST(request());
+  assert.equal(calls, refreshedCalls, "the updated data is cached normally");
+  const invalid = await POST(
+    new Request("http://localhost/api/map-data", {
+      method: "POST",
+      body: JSON.stringify({ bbox: RIO_BBOX, refresh: "yes" }),
+    }),
+  );
+  assert.equal(invalid.status, 400);
+  assert.equal(calls, refreshedCalls);
 });

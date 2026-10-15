@@ -370,6 +370,180 @@ const bucketKeys = (bbox: BBox) => {
   return keys;
 };
 
+const SEMANTIC_TAGS = new Set([
+  "name",
+  "official_name",
+  "short_name",
+  "alt_name",
+  "loc_name",
+  "old_name",
+  "amenity",
+  "shop",
+  "leisure",
+  "historic",
+  "tourism",
+  "religion",
+  "denomination",
+  "heritage",
+  "wikidata",
+  "wikipedia",
+]);
+
+/** Geometry/height provenance stays municipal; only OSM identity is transferred. */
+function identityTags(element: OverpassElement): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(element.tags ?? {}).filter(
+      ([key, value]) =>
+        SEMANTIC_TAGS.has(key) ||
+        key.startsWith("name:") ||
+        key.startsWith("addr:") ||
+        (key === "building" && !["yes", "no"].includes(value)),
+    ),
+  );
+}
+
+function hasIdentityName(tags: Record<string, string>): boolean {
+  return !!(tags.name?.trim() || tags.official_name?.trim());
+}
+
+function interiorSamples(polygons: GeographicPolygon[]) {
+  return polygons.flatMap((polygon) => {
+    const bounds = boundsOf(polygon),
+      points: { lat: number; lon: number }[] = [];
+    for (let row = 0; row < 7; row++)
+      for (let col = 0; col < 7; col++) {
+        const lat = bounds[0] + ((row + 0.5) / 7) * (bounds[2] - bounds[0]);
+        const lon = bounds[1] + ((col + 0.5) / 7) * (bounds[3] - bounds[1]);
+        if (contains(polygon, lat, lon)) points.push({ lat, lon });
+      }
+    return points;
+  });
+}
+
+/**
+ * A name is not evidence of geometry. Require an unambiguous spatial match in
+ * both directions, including true holes, before assigning it to a surveyed ID.
+ * The reciprocal threshold allows a surveyed balcony envelope around an OSM
+ * core (Arbre Blanc: 818 m² versus 1392 m²) without naming an entire city block
+ * after a tiny building inside it. Splits/merges with no unique owner remain
+ * unnamed rather than silently transferring the wrong monument identity.
+ */
+function municipalIdentity(
+  elements: OverpassElement[],
+  ways: Map<number, OverpassElement>,
+  replaced: Set<string>,
+  buckets: Map<string, Lod2Building[]>,
+): Map<Lod2Building, Record<string, string>> {
+  const redundantMembers = new Set<number>();
+  for (const element of elements)
+    if (
+      element.type === "relation" &&
+      replaced.has(`relation/${element.id}`) &&
+      hasIdentityName(identityTags(element))
+    )
+      for (const member of element.members ?? [])
+        if (member.type === "way" && member.ref != null)
+          redundantMembers.add(member.ref);
+  const reverseSamples = new Map<
+    Lod2Building,
+    ReturnType<typeof interiorSamples>
+  >();
+  const owners = new Map<
+    Lod2Building,
+    { element: OverpassElement; tags: Record<string, string> }[]
+  >();
+  for (const element of elements) {
+    if (
+      !replaced.has(`${element.type}/${element.id}`) ||
+      (element.type === "way" && redundantMembers.has(element.id))
+    )
+      continue;
+    const tags = identityTags(element);
+    if (!Object.keys(tags).length) continue;
+    const polygons = elementPolygons(element, ways),
+      samples = interiorSamples(polygons);
+    if (samples.length < 4) continue;
+    const candidates = [
+      ...new Set(
+        polygons.flatMap((polygon) =>
+          bucketKeys(boundsOf(polygon)).flatMap(
+            (key) => buckets.get(key) ?? [],
+          ),
+        ),
+      ),
+    ];
+    const matches = candidates.filter((building) => {
+      const surfaces = [
+        ...building.footprints,
+        ...(building.measuredSolid?.surfaces ?? []),
+      ];
+      const forward =
+        samples.filter((point) =>
+          surfaces.some((p) => contains(p, point.lat, point.lon)),
+        ).length / samples.length;
+      if (forward < 0.75) return false;
+      let reverse = reverseSamples.get(building);
+      if (!reverse) {
+        reverse = interiorSamples(building.footprints);
+        reverseSamples.set(building, reverse);
+      }
+      return (
+        reverse.length >= 4 &&
+        reverse.filter((point) =>
+          polygons.some((p) => contains(p, point.lat, point.lon)),
+        ).length /
+          reverse.length >=
+          0.35
+      );
+    });
+    if (matches.length !== 1) continue;
+    const building = matches[0];
+    owners.set(building, [...(owners.get(building) ?? []), { element, tags }]);
+  }
+  const identities = new Map<Lod2Building, Record<string, string>>();
+  for (const [building, matches] of owners) {
+    const outlines = matches.filter(
+      (match) => !match.element.tags?.["building:part"],
+    );
+    let eligible = outlines.length ? outlines : matches;
+    let relationTags: Record<string, string> = {};
+    if (eligible.length > 1) {
+      const named = eligible.filter((match) => hasIdentityName(match.tags));
+      if (named.length !== 1 || named[0].element.type !== "way") continue;
+      const member = named[0].element;
+      const parents = eligible.filter((match) => match !== named[0]);
+      // An unnamed typed relation may supply usage, while its unique named
+      // outer way owns the label/OSM ID. Unrelated overlapping outlines remain
+      // ambiguous, even when only one of them happens to have a name.
+      if (
+        parents.length !== 1 ||
+        !parents.every(
+          (match) =>
+            match.element.type === "relation" &&
+            !hasIdentityName(match.tags) &&
+            match.element.members?.some(
+              (part) =>
+                part.type === "way" &&
+                part.ref === member.id &&
+                (!part.role || part.role === "outer"),
+            ),
+        )
+      )
+        continue;
+      relationTags = parents[0].tags;
+      eligible = named;
+    }
+    if (eligible.length !== 1) continue;
+    const { element, tags } = eligible[0];
+    identities.set(building, {
+      ...relationTags,
+      ...tags,
+      "printmap:osm_id": `${element.type}/${element.id}`,
+    });
+  }
+  return identities;
+}
+
 /** Replace covered old envelopes and their 3D parts; retain unmatched newer OSM buildings. */
 export function enrichWithMunicipalRoofs(
   elements: OverpassElement[],
@@ -436,8 +610,9 @@ export function enrichWithMunicipalRoofs(
             replaced.add(`way/${member.ref}`);
     }
   }
+  const identities = municipalIdentity(elements, ways, replaced, buckets);
   let id = -3000000000000;
-  const added = buildings.flatMap((building) =>
+  const added: OverpassElement[] = buildings.flatMap((building) =>
     (building.measuredSolid && building.envelope
       ? [building.envelope]
       : building.footprints
@@ -450,6 +625,7 @@ export function enrichWithMunicipalRoofs(
       measuredSolid: building.measuredSolid,
       tags: {
         building: "yes",
+        ...identities.get(building),
         height: String(building.height),
         "printmap:source": provenance.source,
         "printmap:source_id": `${provenance.prefix}/${building.id}`,

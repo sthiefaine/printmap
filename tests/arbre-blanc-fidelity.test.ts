@@ -136,6 +136,9 @@ test("Arbre Blanc's 69 terrace panels retain the volume of their measured upper 
 
 test("Arbre Blanc retains six source terrace levels and its narrow summit in the actual 200 mm city projection", async () => {
   const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
+  // The measured-envelope option remains available alongside the separately
+  // labelled LiDAR balcony interpretation, whose volume is intentionally lower.
+  settings.features.buildings.balconies = false;
   settings.base.topographyEnabled = true;
   settings.base.grid = { rows: 2, cols: 2 };
   const model = await buildPrintModel({ ...fixture, settings });

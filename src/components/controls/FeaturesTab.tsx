@@ -1,5 +1,6 @@
 "use client";
 import { useSceneStore, type RoadFilter } from "@/store/use-scene-store";
+import { useMapStore } from "@/store/use-map-store";
 import { FeatureSection } from "./FeatureSection";
 import { SliderInput } from "./SliderInput";
 import { ToggleSwitch } from "./ToggleSwitch";
@@ -40,6 +41,11 @@ function SurfaceLevelControl({
 export function FeaturesTab() {
   const f = useSceneStore((s) => s.modelSettings.features);
   const update = useSceneStore((s) => s.updateFeatureSettings);
+  const hasArbreBlanc = useMapStore((s) =>
+    s.osmData?.elements.some(
+      (element) => element.tags?.["printmap:source_id"] === "MMM/B102558",
+    ),
+  );
   return (
     <div className="layers-stack">
       <FeatureSection
@@ -66,11 +72,25 @@ export function FeaturesTab() {
           onChange={(roofs) => update("buildings", { roofs })}
           label="Toitures 3D disponibles"
         />
+        {hasArbreBlanc && f.buildings.roofs ? (
+          <>
+            <ToggleSwitch
+              checked={f.buildings.balconies !== false}
+              onChange={(balconies) => update("buildings", { balconies })}
+              label="Balcons reconstitués de l’Arbre Blanc"
+            />
+            <p className="field-hint">
+              Plateaux visibles dans le LiDAR IGN. Le volume du noyau, les
+              raccords au bâtiment et l’épaisseur sont estimés pour l’impression
+              ; les parties masquées du relevé restent incomplètes. Vérifiez les
+              surplombs dans votre logiciel d’impression.
+            </p>
+          </>
+        ) : null}
         <p className="field-hint">
           Empreintes, cours et hauteurs décrivent les volumes. Elles ne
-          décrivent pas les façades : fenêtres, balcons et ornements absents des
-          données ne sont pas inventés. Les hauteurs manquantes sont estimées et
-          signalées.
+          décrivent pas toutes les façades. Les reconstructions et les hauteurs
+          estimées sont signalées dans le rapport du modèle.
         </p>
       </FeatureSection>
       <FeatureSection

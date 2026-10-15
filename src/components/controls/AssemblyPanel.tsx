@@ -355,6 +355,23 @@ export function AssemblyPanel() {
               ? "Construire cette plaque"
               : "Charger et construire cette plaque"}
         </button>
+        {hasData ? (
+          <>
+            <button
+              className="button button-secondary button-full"
+              disabled={busy || exporting}
+              onClick={() =>
+                void useAssemblyStore.getState().load({ refresh: true })
+              }
+            >
+              Actualiser les données de cette plaque
+            </button>
+            <p className="field-hint">
+              Recherche les sources disponibles aujourd’hui pour cette plaque.
+              Le plan, l’échelle et les raccords du terrain restent fixes.
+            </p>
+          </>
+        ) : null}
         {busy && status !== "processing" ? (
           <button
             className="button button-quiet button-full"

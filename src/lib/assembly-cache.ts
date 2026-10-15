@@ -80,24 +80,43 @@ function transact<T>(
   db: IDBDatabase,
   mode: IDBTransactionMode,
   operation: (store: IDBObjectStore, result: (value: T) => void) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
     const transaction = db.transaction(STORE, mode);
     let result: T;
-    transaction.oncomplete = () => resolve(result);
-    transaction.onerror = transaction.onabort = () =>
+    const abort = () => {
+      try {
+        transaction.abort();
+      } catch {
+        /* The transaction has already settled. */
+      }
+    };
+    const cleanup = () => signal?.removeEventListener("abort", abort);
+    signal?.addEventListener("abort", abort, { once: true });
+    transaction.oncomplete = () => {
+      cleanup();
+      resolve(result);
+    };
+    transaction.onerror = transaction.onabort = () => {
+      cleanup();
       reject(
-        new Error(
-          "Lecture ou sauvegarde de plaque impossible (stockage local indisponible ou plein).",
-          { cause: transaction.error },
-        ),
+        signal?.aborted
+          ? signal.reason
+          : new Error(
+              "Lecture ou sauvegarde de plaque impossible (stockage local indisponible ou plein).",
+              { cause: transaction.error },
+            ),
       );
+    };
     try {
       operation(transaction.objectStore(STORE), (value) => {
         result = value;
       });
     } catch (error) {
-      transaction.abort();
+      cleanup();
+      abort();
       reject(error);
     }
   });
@@ -129,13 +148,19 @@ export async function saveAssemblyCell(
   projectId: string,
   cell: AssemblyCell,
   data: MapDataResponse,
+  signal?: AbortSignal,
 ): Promise<void> {
   const [id, col, row] = key(projectId, cell),
     validated = validateAssemblyData(data),
     db = await database();
-  await transact<void>(db, "readwrite", (store) => {
-    store.put({ projectId: id, col, row, data: validated });
-  });
+  await transact<void>(
+    db,
+    "readwrite",
+    (store) => {
+      store.put({ projectId: id, col, row, data: validated });
+    },
+    signal,
+  );
 }
 
 /** Query keys only: listing a project never materializes its large parcel data. */

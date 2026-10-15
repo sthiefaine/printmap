@@ -15,6 +15,9 @@ const LANDMARK_REPRESENTATIONS: Record<
   "surveyed-solid": "Volume 3D mesuré",
   "surveyed-roof": "Toiture 3D mesurée · façades simplifiées",
   "lidar-roof": "Toiture LiDAR reconstruite · façades simplifiées",
+  "reconstructed-balconies":
+    "Plateaux LiDAR · noyau, raccords et épaisseur reconstitués",
+  mixed: "Plusieurs parties · niveaux de détail différents",
   "osm-roof": "Forme de toiture renseignée · dimensions estimées",
   footprint: "Volume simplifié · empreinte et hauteur",
 };
@@ -250,9 +253,9 @@ export function Scene3D() {
         {landmarks?.length ? (
           <div className="landmark-view">
             <label>
-              Repères de Saint-Étienne
+              Explorer les bâtiments remarquables
               <select
-                aria-label="Voir un monument de Saint-Étienne"
+                aria-label="Voir un monument"
                 value={selectedLandmark ? landmarkId : ""}
                 onChange={(event) => setLandmarkId(event.target.value)}
               >

@@ -32,10 +32,16 @@ export async function POST(request: Request) {
       { error: "Le choix relief doit être un booléen." },
       { status: 400 },
     );
+  if (body.refresh != null && typeof body.refresh !== "boolean")
+    return NextResponse.json(
+      { error: "Le choix d’actualisation doit être un booléen." },
+      { status: 400 },
+    );
   const relief = body.relief === true;
   const key = `${bbox.map((v) => v.toFixed(7)).join(",")}/${relief}`;
   const cached = cache.get(key);
   if (
+    body.refresh !== true &&
     cached &&
     cached.expires > Date.now() &&
     (!relief || cached.value.elevationGrid)

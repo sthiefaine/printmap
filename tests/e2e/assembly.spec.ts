@@ -257,6 +257,165 @@ async function loadPlate(page: Page, cached = false) {
     .click();
   await ready(page);
 }
+
+test("refreshing one cached plate preserves the last data on network failure, then updates sources without moving the assembly", async ({
+  page,
+}) => {
+  let calls = 0;
+  let phase: "initial" | "pending" | "storage" | "failure" | "fresh" =
+    "initial";
+  let release: (() => void) | undefined;
+  await page.route("**/api/map-data", async (route) => {
+    calls++;
+    const bbox = bboxFrom(route);
+    if (phase === "pending") {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await route
+        .fulfill({ json: plateData(bbox, "Résultat annulé") })
+        .catch(() => undefined);
+      return;
+    }
+    if (phase === "failure") {
+      await route.fulfill({
+        status: 503,
+        json: { error: "Source temporairement indisponible" },
+      });
+      return;
+    }
+    const data = plateData(
+      bbox,
+      phase === "fresh" ? "Église actualisée" : "Anciennes données",
+    );
+    if (phase === "fresh") {
+      data.osmData.elements[0].tags!.building = "church";
+      data.osmData.elements[0].tags!.height = "24";
+      data.report.fetchedAt = "2026-10-16T12:00:00.000Z";
+    }
+    if (phase === "storage") data.report.fetchedAt = "2026-10-16T13:00:00.000Z";
+    await route.fulfill({ json: data });
+  });
+  await createAssembly(page);
+  await loadPlate(page);
+  const before = (await manifest(page)).content.project;
+  const oldBackup = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  );
+  phase = "pending";
+  await page
+    .getByRole("button", {
+      name: "Actualiser les données de cette plaque",
+      exact: true,
+    })
+    .click();
+  await expect.poll(() => calls).toBe(2);
+  await page.getByRole("button", { name: "Annuler", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  release!();
+  // Keep a genuine write transaction active until the visible Cancel action
+  // aborts it. A late promise guard alone cannot roll an IndexedDB write back.
+  await page.evaluate(() => {
+    const put = IDBObjectStore.prototype.put;
+    const get = IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.put = function (value, key) {
+      const request =
+        key === undefined ? put.call(this, value) : put.call(this, value, key);
+      if (value?.data?.report?.fetchedAt === "2026-10-16T13:00:00.000Z") {
+        document.documentElement.dataset.plateSavePending = "true";
+        let holding = true;
+        setTimeout(() => {
+          holding = false;
+        }, 5000);
+        const keepAlive = () => {
+          if (!holding) return;
+          try {
+            get.call(this, [value.projectId, value.col, value.row]).onsuccess =
+              keepAlive;
+          } catch {
+            /* aborted */
+          }
+        };
+        keepAlive();
+      }
+      return request;
+    };
+  });
+  phase = "storage";
+  await page
+    .getByRole("button", {
+      name: "Actualiser les données de cette plaque",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-plate-save-pending",
+    "true",
+  );
+  await page.getByRole("button", { name: "Annuler", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  const cancelledWriteBackup = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  );
+  expect(cancelledWriteBackup.data).toEqual(oldBackup.data);
+  phase = "failure";
+  await page
+    .getByRole("button", {
+      name: "Actualiser les données de cette plaque",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Source temporairement indisponible" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  const failedBackup = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  );
+  expect(failedBackup.data).toEqual(oldBackup.data);
+  phase = "fresh";
+  await page
+    .getByRole("button", {
+      name: "Actualiser les données de cette plaque",
+      exact: true,
+    })
+    .click();
+  await ready(page);
+  expect(calls).toBe(5);
+  const after = (await manifest(page)).content.project;
+  expect(after.origin).toEqual(before.origin);
+  expect(after.scale).toBe(before.scale);
+  expect(after.elevationDatumM).toBe(before.elevationDatumM);
+  expect(after.boundaryElevations).toEqual(before.boundaryElevations);
+  const freshBackup = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  );
+  expect(freshBackup.data.osmData.elements[0].tags.name).toBe(
+    "Église actualisée",
+  );
+  await expect(
+    page.getByRole("combobox", { name: "Voir un monument", exact: true }),
+  ).toContainText("Église actualisée");
+  assert145mm(stlMesh((await download(page, "Télécharger le STL")).bytes));
+  await loadPlate(page, true);
+  expect(calls).toBe(5);
+});
 function borderHeight(
   mesh: PrintMesh,
   side: "west" | "east",

@@ -49,6 +49,8 @@ export interface PrintedLandmark {
     | "surveyed-solid"
     | "surveyed-roof"
     | "lidar-roof"
+    | "reconstructed-balconies"
+    | "mixed"
     | "osm-roof"
     | "footprint";
   source: string;
@@ -77,6 +79,8 @@ export interface PrintModel extends PrintMesh {
     realRoofCount: number;
     /** Reconstructed from IGN MNS/MNT; not a measured LoD2 building geometry. */
     lidarRoofCount?: number;
+    /** Derived terrace geometry, never counted as a complete measured building. */
+    reconstructedBalconyBuildingCount?: number;
     taggedRoofCount: number;
     staircaseCount: number;
     measuredStructureCount: number;
