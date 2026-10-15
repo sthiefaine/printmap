@@ -84,6 +84,7 @@ export function salonLayoutSettings(
     base: {
       ...settings.base,
       grid: { ...layout.grid },
+      plateSizeMm: 150,
       topographyEnabled: true,
       elevationExaggeration: 1,
     },

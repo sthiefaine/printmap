@@ -44,6 +44,7 @@ export interface PrintedLandmark {
 }
 
 export interface PrintModel extends PrintMesh {
+  plateSizeMm?: 100 | 150;
   /** Only landmarks actually retained by the printable geometry pipeline. */
   landmarks?: PrintedLandmark[];
   colors: Record<PrintLayer, string>;

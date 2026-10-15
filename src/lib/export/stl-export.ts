@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import type { PrintMesh, PrintModel } from "@/types/print";
 import type { GridSettings } from "@/store/use-scene-store";
 import { downloadBlob } from "./download";
+import { validateExportLayout, assemblyPlanSVG } from "./validate-layout";
 
 /** Binary STL in millimetres, with vertical Z and the socle resting at Z=0. */
 export function createSTLBuffer(mesh: PrintMesh): ArrayBuffer {
@@ -56,16 +57,7 @@ export async function exportToSTL(
   filename = "printmap.stl",
   grid?: GridSettings,
 ): Promise<void> {
-  if (
-    grid &&
-    (grid.cols * grid.rows !== (model.tiles.length || 1) ||
-      model.tiles.some(
-        (tile) => tile.col >= grid.cols || tile.row >= grid.rows,
-      ))
-  )
-    throw new Error(
-      "La grille a changé. Régénérez la maquette avant l’export.",
-    );
+  validateExportLayout(model, grid);
   if (!model.tiles.length) {
     downloadBlob(
       new Blob([createSTLBuffer(model)], { type: "application/octet-stream" }),
@@ -74,6 +66,7 @@ export async function exportToSTL(
     return;
   }
   const zip = new JSZip();
+  zip.file("plan-assemblage.svg", assemblyPlanSVG(model));
   for (const tile of model.tiles)
     zip.file(
       `tuile_${tile.row + 1}_${tile.col + 1}.stl`,

@@ -9,6 +9,7 @@ import {
   MONTPELLIER_LOD2_SOURCE,
 } from "../../src/lib/data/montpellier-lod2";
 import { assertClosedSolid } from "../helpers/solid";
+import { fitPlateCount } from "../../src/lib/plate-layout";
 import {
   salonPrintLayouts,
   SAINT_ETIENNE_STADIUM_BBOX,
@@ -590,7 +591,7 @@ test("Saint-Étienne switches between two and four 150 mm plates using the same 
   }
 });
 
-test("real Expo raster roofs survive the browser worker and four 3MF exports", async ({
+test("real Expo raster roofs survive 10 cm cutting without changing source scale or geometry", async ({
   page,
 }) => {
   const fixture = JSON.parse(
@@ -690,6 +691,127 @@ test("real Expo raster roofs survive the browser worker and four 3MF exports", a
     ).length;
   }
   expect(buildingFaces).toBeGreaterThan(50);
+  const before = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  await page.getByRole("button", { name: "10 × 10 cm", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: /Découper sans changer la taille/ })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const after = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(after.scale).toBe(before.scale);
+  expect(after.snapshot).toEqual(before.snapshot);
+  expect(after.settings.features).toEqual(before.settings.features);
+  expect(after.settings.print).toEqual(before.settings.print);
+  expect(after.settings.base.plateSizeMm).toBe(100);
+  const cut = await JSZip.loadAsync(
+    (await download(page, "Télécharger le 3MF")).bytes,
+  );
+  expect(cut.file("plan-assemblage.svg")).toBeTruthy();
+  const cutPieces = Object.values(cut.files).filter((file) =>
+    file.name.endsWith(".3mf"),
+  );
+  expect(cutPieces).toHaveLength(12);
+  let cutVolume = 0;
+  for (const piece of cutPieces) {
+    const child = await JSZip.loadAsync(await piece.async("nodebuffer"));
+    const mesh = meshFrom3MF(
+      await child.file("3D/3dmodel.model")!.async("string"),
+    );
+    cutVolume += assertClosedSolid(mesh);
+    const axes = [0, 1].map((axis) =>
+      Array.from(mesh.positions).filter((_, index) => index % 3 === axis),
+    );
+    for (const coordinates of axes)
+      expect(
+        Math.max(...coordinates) - Math.min(...coordinates),
+      ).toBeLessThanOrEqual(95.0001);
+  }
+  let originalVolume = 0;
+  for (const piece of pieces) {
+    const child = await JSZip.loadAsync(await piece.async("nodebuffer"));
+    originalVolume += assertClosedSolid(
+      meshFrom3MF(await child.file("3D/3dmodel.model")!.async("string")),
+    );
+  }
+  expect(Math.abs(cutVolume - originalVolume) / originalVolume).toBeLessThan(
+    1e-4,
+  );
+});
+
+test("six 15 cm plates enlarge the same selection and preserve the detailed profile in saved projects and both exports", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Essayer une démo sans réseau", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Détaillé", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const before = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  await page
+    .getByRole("spinbutton", { name: "Nombre de plaques", exact: true })
+    .fill("6");
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Adapter sur 6 plaques", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  const after = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  const layout = fitPlateCount(before.snapshot.bbox, 6, 150);
+  expect(after.snapshot).toEqual(before.snapshot);
+  expect(after.scale).toBeCloseTo(layout.scale, 6);
+  expect(after.scale).toBeLessThan(before.scale);
+  expect(after.profile).toBe("detail");
+  expect(after.settings.print).toEqual(before.settings.print);
+  expect(after.settings.features).toEqual(before.settings.features);
+  expect(after.settings.base.grid).toEqual(layout.grid);
+  expect(after.settings.base.plateSizeMm).toBe(150);
+  for (const format of ["STL", "3MF"]) {
+    const zip = await JSZip.loadAsync(
+      (await download(page, `Télécharger le ${format}`)).bytes,
+    );
+    expect(zip.file("plan-assemblage.svg")).toBeTruthy();
+    const files = Object.values(zip.files).filter((file) =>
+      file.name.endsWith(`.${format.toLowerCase()}`),
+    );
+    expect(files).toHaveLength(6);
+    for (const file of files) {
+      const bytes = await file.async("nodebuffer");
+      if (format === "STL") {
+        const bounds = stlBounds(bytes);
+        expect(bounds.min[2]).toBe(0);
+        expect(Math.max(...bounds.size.slice(0, 2))).toBeLessThanOrEqual(
+          145.0001,
+        );
+      } else {
+        const child = await JSZip.loadAsync(bytes);
+        assertClosedSolid(
+          meshFrom3MF(await child.file("3D/3dmodel.model")!.async("string")),
+        );
+      }
+    }
+  }
 });
 
 test("terrain can be recovered after a flat collection without replacing the stairs or source date", async ({

@@ -11,6 +11,7 @@ import { validateBbox } from "@/lib/data/bbox";
 import { validateRoofData } from "@/lib/data/validate-roofs";
 import { validateImportedElements } from "@/lib/data/validate-imported-elements";
 import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
+import { validPrintGrid, type PlateSizeMm } from "@/lib/plate-layout";
 
 export interface FrameSettings {
   enabled: boolean;
@@ -36,6 +37,7 @@ export interface BaseSettings {
   dataSource: "osm" | "overture" | "osmbuildings";
   frame: FrameSettings;
   grid: GridSettings;
+  plateSizeMm?: PlateSizeMm | null;
 }
 export interface BuildingSettings {
   enabled: boolean;
@@ -278,8 +280,8 @@ export function normalizeSettings(value: unknown): ModelSettings {
     [normalized.print.minBuildingAreaMm2, 0, 30],
     [normalized.print.minBuildingHeightMm, 0.15, 5],
     [normalized.print.simplifyMm, 0, 1],
-    [normalized.base.grid.cols, 1, 5],
-    [normalized.base.grid.rows, 1, 5],
+    [normalized.base.grid.cols, 1, 25],
+    [normalized.base.grid.rows, 1, 25],
     [normalized.features.buildings.buildingScale, 0.5, 3],
     [normalized.features.buildings.minHeightM, 0, 1000],
     [normalized.features.buildings.minAreaM2, 0, 1e6],
@@ -290,11 +292,13 @@ export function normalizeSettings(value: unknown): ModelSettings {
   ];
   if (ranges.some(([v, min, max]) => !Number.isFinite(v) || v < min || v > max))
     throw new Error("Le projet contient des dimensions invalides.");
-  if (
-    !Number.isInteger(normalized.base.grid.cols) ||
-    !Number.isInteger(normalized.base.grid.rows)
-  )
+  if (!validPrintGrid(normalized.base.grid))
     throw new Error("La grille doit contenir un nombre entier de tuiles.");
+  if (
+    normalized.base.plateSizeMm != null &&
+    ![100, 150].includes(normalized.base.plateSizeMm)
+  )
+    throw new Error("Le format des plaques est invalide.");
   if (
     typeof normalized.base.topographyEnabled !== "boolean" ||
     typeof normalized.base.frame.enabled !== "boolean" ||

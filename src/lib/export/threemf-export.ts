@@ -3,6 +3,7 @@ import type { PrintMesh, PrintModel } from "@/types/print";
 import { PRINT_LAYERS } from "@/types/print";
 import type { GridSettings } from "@/store/use-scene-store";
 import { downloadBlob } from "./download";
+import { validateExportLayout, assemblyPlanSVG } from "./validate-layout";
 
 const CONTENT_TYPES =
   '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>';
@@ -84,16 +85,7 @@ export async function exportTo3MF(
   filename = "printmap.3mf",
   grid?: GridSettings,
 ): Promise<void> {
-  if (
-    grid &&
-    (grid.cols * grid.rows !== (model.tiles.length || 1) ||
-      model.tiles.some(
-        (tile) => tile.col >= grid.cols || tile.row >= grid.rows,
-      ))
-  )
-    throw new Error(
-      "La grille a changé. Régénérez la maquette avant l’export.",
-    );
+  validateExportLayout(model, grid);
   if (!model.tiles.length) {
     downloadBlob(
       new Blob([await create3MFBuffer(model, model.colors)], {
@@ -104,6 +96,7 @@ export async function exportTo3MF(
     return;
   }
   const zip = new JSZip();
+  zip.file("plan-assemblage.svg", assemblyPlanSVG(model));
   for (const tile of model.tiles)
     zip.file(
       `tuile_${tile.row + 1}_${tile.col + 1}.3mf`,

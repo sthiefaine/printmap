@@ -102,6 +102,7 @@ function quickZone(
     scene.updateBaseSettings({
       topographyEnabled: true,
       grid: { cols: 2, rows: 2 },
+      plateSizeMm: 150,
     });
     scene.updateFeatureSettings("buildings", { roofs: true });
     if (withTwoPlates) {

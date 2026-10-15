@@ -46,6 +46,7 @@ import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
 import { preparePrintLayers } from "./fuse-print-layers";
 import { saintEtienneLandmark } from "../data/saint-etienne-landmarks";
+import { validPrintGrid } from "../plate-layout";
 
 let runtime: Promise<ManifoldToplevel> | undefined;
 async function getRuntime(): Promise<ManifoldToplevel> {
@@ -109,16 +110,13 @@ function validateInput(input: PrintInput): void {
   ) {
     throw new Error("Le socle doit mesurer entre 1 et 20 mm.");
   }
-  const { cols, rows } = settings.base.grid;
-  if (
-    !Number.isInteger(cols) ||
-    !Number.isInteger(rows) ||
-    cols < 1 ||
-    rows < 1 ||
-    cols > 5 ||
-    rows > 5
-  )
+  if (!validPrintGrid(settings.base.grid))
     throw new Error("La grille est invalide.");
+  if (
+    settings.base.plateSizeMm != null &&
+    ![100, 150].includes(settings.base.plateSizeMm)
+  )
+    throw new Error("Le format des plaques est invalide.");
 }
 
 interface Terrain {
@@ -2484,6 +2482,7 @@ export async function buildPrintModel(
     onProgress(100, "Maquette prête à imprimer");
     return {
       ...mesh,
+      plateSizeMm: settings.base.plateSizeMm ?? undefined,
       landmarks,
       tiles,
       dimensions: { widthMm, depthMm, heightMm: bounds.max[2] },
