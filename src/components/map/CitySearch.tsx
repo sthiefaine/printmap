@@ -34,7 +34,7 @@ export function CitySearch() {
         );
         if (!res.ok)
           throw new Error(
-            "Recherche indisponible. Utilisez la carte ou Montpellier.",
+            "Recherche indisponible. Utilisez la carte ou un raccourci de ville.",
           );
         const data = await res.json();
         if (!abort.signal.aborted) {
@@ -77,7 +77,7 @@ export function CitySearch() {
           aria-activedescendant={
             visibleResults.length ? `city-result-${active}` : undefined
           }
-          placeholder="Montpellier, Palavas-les-Flots…"
+          placeholder="Montpellier, Saint-Étienne, Rio…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);

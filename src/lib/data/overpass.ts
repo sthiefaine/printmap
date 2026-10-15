@@ -2,9 +2,9 @@ import type { BBox, OverpassResponse } from "@/types/osm";
 import { fetchWithTimeout } from "./request";
 import { LANDMARK_SELECTORS } from "./point-landmarks";
 
-export function buildOverpassQuery(bbox: BBox) {
+export function buildOverpassQuery(bbox: BBox, timeoutSeconds = 35) {
   const bb = bbox.join(",");
-  return `[out:json][timeout:35][maxsize:134217728];
+  return `[out:json][timeout:${timeoutSeconds}][maxsize:134217728];
     (
       wr["building"]["building"!="no"](${bb});
       wr["building:part"]["building:part"!="no"](${bb});
@@ -33,26 +33,49 @@ export async function fetchOverpass(
 ): Promise<OverpassResponse> {
   const configured = process.env.OVERPASS_URL;
   const endpoints = configured
-    ? [configured]
+    ? [{ url: configured, method: "POST", timeoutMs: 38000 }]
     : [
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.private.coffee/api/interpreter",
+        {
+          url: "https://overpass-api.de/api/interpreter",
+          method: "POST",
+          timeoutMs: 24000,
+        },
+        {
+          url: "https://overpass.private.coffee/api/interpreter",
+          method: "POST",
+          timeoutMs: 24000,
+        },
+        // Independent global mirror. GET is supported by Overpass and avoids
+        // the POST gateway failure observed here on the full Expo selection.
+        {
+          url: "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+          method: "GET",
+          timeoutMs: 32000,
+        },
       ];
   for (const endpoint of endpoints) {
     signal.throwIfAborted();
     try {
+      // All three attempts fit inside the route's 85 s acquisition deadline.
+      // Stop remote execution before its corresponding client timeout, too.
+      const query = new URLSearchParams({
+        data: buildOverpassQuery(bbox, endpoint.timeoutMs / 1000 - 3),
+      });
+      const url = new URL(endpoint.url);
+      if (endpoint.method === "GET")
+        url.searchParams.set("data", query.get("data")!);
       const res = await fetchWithTimeout(
-        endpoint,
+        url.toString(),
         {
-          method: "POST",
+          method: endpoint.method,
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             "User-Agent": "PrintMap/3.0",
           },
-          body: new URLSearchParams({ data: buildOverpassQuery(bbox) }),
+          ...(endpoint.method === "POST" ? { body: query } : {}),
         },
         signal,
-        38000,
+        endpoint.timeoutMs,
       );
       if (!res.ok) continue;
       const data: OverpassResponse = await res.json();
@@ -80,6 +103,6 @@ export async function fetchOverpass(
     }
   }
   throw new Error(
-    "Les données OpenStreetMap sont momentanément indisponibles. Réessayez ou sélectionnez une zone plus petite.",
+    "Les serveurs OpenStreetMap ne répondent pas pour le moment. Votre sélection est conservée : réessayez dans quelques instants.",
   );
 }

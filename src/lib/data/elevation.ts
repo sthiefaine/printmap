@@ -1,6 +1,7 @@
 import type { BBox, ElevationGrid } from "@/types/osm";
 import { bboxDimensions, isMetropolitanFrance } from "./bbox";
 import { abortableDelay, fetchWithTimeout } from "./request";
+import { fetchTerrainTiles } from "./terrain-tiles";
 
 const IGN_ELEVATION_URL =
   "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json";
@@ -170,6 +171,19 @@ export async function fetchElevation(
     }
   }
 
+  // Outside France use a complete DEM mosaic instead of depending on a long
+  // series of point-API requests. Keep an operator's configured API primary.
+  if (
+    !isMetropolitanFrance(bbox) &&
+    !process.env.OPEN_METEO_ELEVATION_URL &&
+    !process.env.OPEN_METEO_API_KEY
+  ) {
+    try {
+      return await fetchTerrainTiles(bbox, signal);
+    } catch {
+      signal.throwIfAborted();
+    }
+  }
   const grid = makeGrid(bbox, 90, 32);
   const points = await fetchGlobalPoints(grid.lat, grid.lon, signal);
   const result = finishGrid(
@@ -182,6 +196,13 @@ export async function fetchElevation(
   if (isMetropolitanFrance(bbox))
     result.warnings = [
       "Le MNT LiDAR HD IGN et RGE ALTI sont indisponibles ou incomplets sur cette zone ; le relief utilise le DEM Copernicus à 90 m.",
+    ];
+  else if (
+    !process.env.OPEN_METEO_ELEVATION_URL &&
+    !process.env.OPEN_METEO_API_KEY
+  )
+    result.warnings = [
+      "Les tuiles de relief mondial sont indisponibles ; le relief utilise le DEM Copernicus à 90 m.",
     ];
   return result;
 }

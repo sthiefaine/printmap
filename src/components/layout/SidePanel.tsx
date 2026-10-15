@@ -24,99 +24,56 @@ import {
   salonLayoutDimensions,
   type SalonPrintLayout,
 } from "@/lib/print-layout";
-import type { BBox } from "@/types/osm";
+import {
+  CITY_PRESETS,
+  CITY_SHORTCUTS,
+  PEYROU_BBOX,
+  type CityPresetId,
+} from "@/lib/city-presets";
 
-const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
-const SAINT_ETIENNE_BBOX: BBox = [45.4288, 4.3702, 45.454, 4.406];
-const SAINT_ETIENNE_ROOFS_BBOX: BBox = [45.43085, 4.38145, 45.4379, 4.3945];
-
-function quickZone(
-  type:
-    | "city"
-    | "coast"
-    | "peyrou"
-    | "saint-etienne"
-    | "saint-etienne-stadium"
-    | "saint-etienne-two-plates"
-    | "saint-etienne-roofs"
-    | "nearby"
-    | "architecture",
-) {
+function quickZone(type: CityPresetId | "nearby" | "architecture") {
   const store = useMapStore.getState();
-  if (type === "city") {
+  const preset = CITY_PRESETS.find((preset) => preset.id === type);
+  if (preset) {
     store.setSelectedCity({
-      name: "Montpellier, centre",
-      lat: 43.6119,
-      lng: 3.8767,
-    });
-    store.setBbox([43.6074, 3.8705, 43.6164, 3.8829]);
-  } else if (type === "coast") {
-    store.setSelectedCity({
-      name: "Palavas-les-Flots, littoral",
-      lat: 43.5285,
-      lng: 3.9315,
-    });
-    store.setBbox([43.5205, 3.9205, 43.5365, 3.9425]);
-  } else if (type === "peyrou") {
-    store.setSelectedCity({
-      name: "Peyrou · Arc et aqueduc",
-      lat: 43.6115,
-      lng: 3.8711,
-    });
-    useSceneStore.getState().updateBaseSettings({ topographyEnabled: true });
-    useSceneStore.getState().updateFeatureSettings("roads", {
-      filter: "all",
-      footpathsEnabled: true,
-    });
-    store.setBbox(PEYROU_BBOX);
-  } else if (
-    type === "saint-etienne" ||
-    type === "saint-etienne-stadium" ||
-    type === "saint-etienne-two-plates" ||
-    type === "saint-etienne-roofs"
-  ) {
-    const withStadium = type === "saint-etienne-stadium";
-    const withTwoPlates = type === "saint-etienne-two-plates";
-    const withRoofs = type === "saint-etienne-roofs";
-    const saintEtienneBbox = withRoofs
-      ? SAINT_ETIENNE_ROOFS_BBOX
-      : withTwoPlates
-        ? SAINT_ETIENNE_TWO_PLATE_BBOX
-        : withStadium
-          ? SAINT_ETIENNE_STADIUM_BBOX
-          : SAINT_ETIENNE_BBOX;
-    store.setSelectedCity({
-      name: withRoofs
-        ? "Saint-Étienne · Badouillière, toitures mesurées"
-        : withTwoPlates
-          ? "Saint-Étienne · centre, Expo et stade · cadrage 2 plaques"
-          : withStadium
-            ? "Saint-Étienne · centre, Parc Expo et Geoffroy-Guichard"
-            : "Saint-Étienne · centre et Parc Expo",
-      lat: (saintEtienneBbox[0] + saintEtienneBbox[2]) / 2,
-      lng: (saintEtienneBbox[1] + saintEtienneBbox[3]) / 2,
+      name: preset.name,
+      lat: (preset.bbox[0] + preset.bbox[2]) / 2,
+      lng: (preset.bbox[1] + preset.bbox[3]) / 2,
     });
     const scene = useSceneStore.getState();
-    scene.setProfile(withRoofs ? "detail" : "balanced");
-    scene.setTileSize(290);
-    scene.updateBaseSettings({
-      topographyEnabled: true,
-      grid: { cols: 2, rows: 2 },
-      plateSizeMm: 150,
-    });
-    scene.updateFeatureSettings("buildings", { roofs: true });
-    if (withTwoPlates) {
-      const layout = salonPrintLayouts(saintEtienneBbox)[0];
-      useSceneStore.setState({
-        tileSize: layout.longSideMm,
-        scale: layout.scale,
-        modelSettings: salonLayoutSettings(
-          useSceneStore.getState().modelSettings,
-          layout,
-        ),
+    if (preset.id === "peyrou") {
+      scene.updateBaseSettings({ topographyEnabled: true });
+      scene.updateFeatureSettings("roads", {
+        filter: "all",
+        footpathsEnabled: true,
       });
     }
-    store.setBbox(saintEtienneBbox);
+    if (preset.city === "saint-etienne" || preset.city === "rio") {
+      scene.setProfile(type === "saint-etienne-roofs" ? "detail" : "balanced");
+      scene.setTileSize(290);
+      scene.updateBaseSettings({
+        topographyEnabled: true,
+        elevationExaggeration: 1,
+        grid: { cols: 2, rows: 2 },
+        plateSizeMm: 150,
+      });
+      scene.updateFeatureSettings("buildings", {
+        roofs: true,
+        buildingScale: 1,
+      });
+      if (type === "saint-etienne-two-plates") {
+        const layout = salonPrintLayouts(preset.bbox)[0];
+        useSceneStore.setState({
+          tileSize: layout.longSideMm,
+          scale: layout.scale,
+          modelSettings: salonLayoutSettings(
+            useSceneStore.getState().modelSettings,
+            layout,
+          ),
+        });
+      }
+    }
+    store.setBbox([...preset.bbox]);
   } else {
     const city = store.selectedCity || {
       name: "Montpellier",
@@ -158,6 +115,18 @@ export function SidePanel() {
   const updatePrint = useSceneStore((s) => s.updatePrintSettings);
   const [tab, setTab] = useState<"layers" | "base">("layers");
   const dimensions = bbox ? getBboxDimensions(bbox, scale) : null;
+  const shortcutCity = selectedCity?.name.startsWith("Saint-Étienne")
+    ? "saint-etienne"
+    : selectedCity?.name.startsWith("Rio de Janeiro")
+      ? "rio"
+      : selectedCity?.name.startsWith("Montpellier") ||
+          selectedCity?.name.startsWith("Peyrou")
+        ? "montpellier"
+        : null;
+  const presets = CITY_PRESETS.filter((preset) => preset.city === shortcutCity);
+  const currentPreset = presets.find((preset) =>
+    bbox?.every((coordinate, index) => coordinate === preset.bbox[index]),
+  );
   const isPeyrouSelection =
     selectedCity?.name === "Peyrou · Arc et aqueduc" &&
     bbox?.every((coordinate, index) => coordinate === PEYROU_BBOX[index]);
@@ -205,25 +174,42 @@ export function SidePanel() {
           </div>
         </div>
         <CitySearch />
-        <div className="quick-zones">
-          <button onClick={() => quickZone("city")}>Montpellier</button>
-          <button onClick={() => quickZone("coast")}>Palavas · littoral</button>
-          <button onClick={() => quickZone("peyrou")}>
-            Peyrou · Arc et aqueduc
-          </button>
-          <button onClick={() => quickZone("saint-etienne")}>
-            Saint-Étienne · centre et Parc Expo
-          </button>
-          <button onClick={() => quickZone("saint-etienne-stadium")}>
-            Saint-Étienne · centre, Expo et stade
-          </button>
-          <button onClick={() => quickZone("saint-etienne-two-plates")}>
-            Saint-Étienne · cadrage 2 plaques
-          </button>
-          <button onClick={() => quickZone("saint-etienne-roofs")}>
-            Saint-Étienne · toitures détaillées
-          </button>
+        <div
+          className="quick-zones"
+          role="group"
+          aria-label="Raccourcis de villes"
+        >
+          {CITY_SHORTCUTS.map((shortcut) => (
+            <button
+              key={shortcut.city}
+              aria-pressed={shortcutCity === shortcut.city}
+              onClick={() => quickZone(shortcut.preset)}
+            >
+              {shortcut.label}
+            </button>
+          ))}
         </div>
+        {presets.length > 1 ? (
+          <label className="select-field city-framing">
+            <span>Cadrage</span>
+            <select
+              aria-label={`Cadrage de ${CITY_SHORTCUTS.find((city) => city.city === shortcutCity)?.label}`}
+              value={currentPreset?.id ?? ""}
+              onChange={(event) =>
+                quickZone(event.target.value as CityPresetId)
+              }
+            >
+              <option value="" disabled>
+                Zone personnalisée
+              </option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <div className="selection-actions">
           <SelectionTools />
           <button
@@ -270,6 +256,13 @@ export function SidePanel() {
             le château d’eau utilisent le relevé 3D municipal ; les voûtes de
             l’aqueduc sont reconstituées d’après un plan historique, avec des
             dimensions et un placement approchés indiqués dans le rapport.
+          </p>
+        ) : null}
+        {currentPreset?.id === "rio" ? (
+          <p className="field-hint selection-context">
+            Corcovado, baie de Botafogo, Pain de Sucre et nord de Copacabana.
+            Relief activé, sans exagération, et quatre plaques de 15 cm par
+            défaut.
           </p>
         ) : null}
         {isTwoPlateCorridor ? (

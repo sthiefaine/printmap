@@ -170,7 +170,7 @@ test("Corsican LiDAR provenance uses its legal IGN78C vertical datum", async (t)
   assert.ok(!result.source!.includes("IGN69"));
 });
 
-test("outside metropolitan France keeps the global elevation path", async (t) => {
+test("outside metropolitan France falls back to Copernicus when the complete terrain mosaic is unavailable", async (t) => {
   const global: BBox = [40.7, -74.01, 40.7005, -74.0095];
   t.mock.method(
     globalThis,
@@ -178,6 +178,8 @@ test("outside metropolitan France keeps the global elevation path", async (t) =>
     async (input: string, options: RequestInit) => {
       assert.equal(options.body, undefined);
       const url = new URL(input);
+      if (url.hostname === "s3.amazonaws.com")
+        return new Response("unavailable", { status: 503 });
       return Response.json({
         elevation: url.searchParams
           .get("latitude")!
@@ -188,5 +190,5 @@ test("outside metropolitan France keeps the global elevation path", async (t) =>
   );
   const result = await fetchElevation(global, new AbortController().signal);
   assert.match(result.source!, /Copernicus DEM GLO-90/);
-  assert.equal(result.warnings, undefined);
+  assert.match(result.warnings![0], /tuiles.*indisponibles.*Copernicus/);
 });

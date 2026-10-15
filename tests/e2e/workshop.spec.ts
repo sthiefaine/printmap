@@ -10,6 +10,7 @@ import {
 } from "../../src/lib/data/montpellier-lod2";
 import { assertClosedSolid } from "../helpers/solid";
 import { fitPlateCount } from "../../src/lib/plate-layout";
+import { RIO_BBOX } from "../../src/lib/city-presets";
 import {
   salonPrintLayouts,
   SAINT_ETIENNE_STADIUM_BBOX,
@@ -144,6 +145,80 @@ test.beforeEach(async ({ page }) => {
     route.abort(),
   );
   await page.goto("/");
+});
+
+test("only three city shortcuts remain; Rio retains its relief, retries the same zone and exports four printable plates", async ({
+  page,
+}) => {
+  const shortcuts = page.getByRole("group", { name: "Raccourcis de villes" });
+  await expect(shortcuts.getByRole("button")).toHaveText([
+    "Montpellier",
+    "Saint-Étienne",
+    "Rio de Janeiro",
+  ]);
+  let collections = 0;
+  await page.route("**/api/map-data", async (route) => {
+    const request = route.request().postDataJSON();
+    expect(request.bbox).toEqual(RIO_BBOX);
+    expect(request.relief).toBe(true);
+    collections++;
+    if (collections === 1) {
+      await route.fulfill({
+        status: 502,
+        json: {
+          error:
+            "Les serveurs OpenStreetMap ne répondent pas pour le moment. Votre sélection est conservée : réessayez dans quelques instants.",
+        },
+      });
+    } else {
+      await route.fulfill({ json: enclosedDemoData(RIO_BBOX) });
+    }
+  });
+  await shortcuts.getByRole("button", { name: "Rio de Janeiro" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Rio de Janeiro · Corcovado, Botafogo et Copacabana",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Récupérer et construire", exact: true })
+    .click();
+  await expect(page.getByText(/Votre sélection est conservée/)).toBeVisible();
+  await page.getByRole("button", { name: "Réessayer", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le 3MF", exact: true }),
+  ).toBeEnabled();
+  expect(collections).toBe(2);
+  const saved = JSON.parse(
+    (await download(page, "Enregistrer")).bytes.toString(),
+  );
+  expect(saved.snapshot.bbox).toEqual(RIO_BBOX);
+  expect(saved.settings.base.topographyEnabled).toBe(true);
+  expect(saved.settings.base.elevationExaggeration).toBe(1);
+  expect(saved.settings.base.plateSizeMm).toBe(150);
+  const zip = await JSZip.loadAsync(
+    (await download(page, "Télécharger le 3MF")).bytes,
+  );
+  const tiles = Object.values(zip.files).filter((file) =>
+    file.name.endsWith(".3mf"),
+  );
+  expect(tiles).toHaveLength(4);
+  for (const tile of tiles) {
+    const child = await JSZip.loadAsync(await tile.async("nodebuffer"));
+    const mesh = meshFrom3MF(
+      await child.file("3D/3dmodel.model")!.async("string"),
+    );
+    assertClosedSolid(mesh);
+    for (const axis of [0, 1]) {
+      const coordinates = Array.from(mesh.positions).filter(
+        (_, index) => index % 3 === axis,
+      );
+      expect(
+        Math.max(...coordinates) - Math.min(...coordinates),
+      ).toBeLessThanOrEqual(145.001);
+    }
+  }
 });
 
 test("offline workshop exports actual dimensions, colours and distinct tiles", async ({
@@ -376,9 +451,10 @@ test("Peyrou preset collects relief and all park access routes, then saves its e
     request = route.request().postDataJSON() as typeof request;
     await route.fulfill({ json: enclosedDemoData(request!.bbox) });
   });
+  await page.getByRole("button", { name: "Montpellier", exact: true }).click();
   await page
-    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
-    .click();
+    .getByRole("combobox", { name: "Cadrage de Montpellier" })
+    .selectOption("peyrou");
   await expect(
     page.getByText(/Relief et allées activés pour cette sélection/),
   ).toBeVisible();
@@ -438,21 +514,25 @@ test("Peyrou preset collects relief and all park access routes, then saves its e
 for (const preset of [
   {
     name: "Saint-Étienne · centre et Parc Expo",
+    id: "saint-etienne",
     bbox: [45.4288, 4.3702, 45.454, 4.406],
     plates: 4,
   },
   {
     name: "Saint-Étienne · centre, Expo et stade",
+    id: "saint-etienne-stadium",
     bbox: [45.4288, 4.3702, 45.4628, 4.406],
     plates: 4,
   },
   {
     name: "Saint-Étienne · cadrage 2 plaques",
+    id: "saint-etienne-two-plates",
     bbox: SAINT_ETIENNE_TWO_PLATE_BBOX,
     plates: 2,
   },
   {
     name: "Saint-Étienne · toitures détaillées",
+    id: "saint-etienne-roofs",
     bbox: [45.43085, 4.38145, 45.4379, 4.3945],
     plates: 4,
   },
@@ -466,11 +546,11 @@ for (const preset of [
       await route.fulfill({ json: enclosedDemoData(request!.bbox) });
     });
     await page
-      .getByRole("button", {
-        name: preset.name,
-        exact: true,
-      })
+      .getByRole("button", { name: "Saint-Étienne", exact: true })
       .click();
+    await page
+      .getByRole("combobox", { name: "Cadrage de Saint-Étienne" })
+      .selectOption(preset.id);
     if (preset.bbox[2] > 45.46)
       await expect(
         page.getByText("Geoffroy-Guichard", { exact: true }),
@@ -524,7 +604,7 @@ test("Saint-Étienne switches between two and four 150 mm plates using the same 
   });
   await page
     .getByRole("button", {
-      name: "Saint-Étienne · centre, Expo et stade",
+      name: "Saint-Étienne",
       exact: true,
     })
     .click();
@@ -659,7 +739,7 @@ test("real Expo raster roofs survive 10 cm cutting without changing source scale
   });
   await page
     .getByRole("button", {
-      name: "Saint-Étienne · centre, Expo et stade",
+      name: "Saint-Étienne",
       exact: true,
     })
     .click();
@@ -991,9 +1071,10 @@ test("aerial reference switching preserves the selected site and rectangle drawi
     });
   });
   await page.reload();
+  await page.getByRole("button", { name: "Montpellier", exact: true }).click();
   await page
-    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
-    .click();
+    .getByRole("combobox", { name: "Cadrage de Montpellier" })
+    .selectOption("peyrou");
   const backgrounds = page.getByRole("group", {
     name: "Fond de carte",
     exact: true,
@@ -1150,9 +1231,10 @@ test("the real municipal Peyrou gate reaches the preview and closed 3MF export a
     };
     await route.fulfill({ json: response });
   });
+  await page.getByRole("button", { name: "Montpellier", exact: true }).click();
   await page
-    .getByRole("button", { name: "Peyrou · Arc et aqueduc", exact: true })
-    .click();
+    .getByRole("combobox", { name: "Cadrage de Montpellier" })
+    .selectOption("peyrou");
   await page
     .getByRole("button", { name: "Récupérer et construire", exact: true })
     .click();

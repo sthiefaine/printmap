@@ -35,7 +35,11 @@ export async function POST(request: Request) {
   const relief = body.relief === true;
   const key = `${bbox.map((v) => v.toFixed(7)).join(",")}/${relief}`;
   const cached = cache.get(key);
-  if (cached && cached.expires > Date.now())
+  if (
+    cached &&
+    cached.expires > Date.now() &&
+    (!relief || cached.value.elevationGrid)
+  )
     return NextResponse.json(cached.value);
   if (activeRequests >= 3)
     return NextResponse.json(
@@ -52,8 +56,12 @@ export async function POST(request: Request) {
       AbortSignal.timeout(85000),
     ]);
     const value = await collectMapData(bbox, relief, signal);
-    if (cache.size >= 6) cache.delete(cache.keys().next().value!);
-    cache.set(key, { value, expires: Date.now() + 30 * 60 * 1000 });
+    // A transient terrain outage must not pin a requested relief to a flat
+    // model for thirty minutes, including after a manual retry.
+    if (!relief || value.elevationGrid) {
+      if (cache.size >= 6) cache.delete(cache.keys().next().value!);
+      cache.set(key, { value, expires: Date.now() + 30 * 60 * 1000 });
+    }
     return NextResponse.json(value);
   } catch (error) {
     return NextResponse.json(
