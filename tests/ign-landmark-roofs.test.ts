@@ -122,7 +122,10 @@ test("real Saint-Charles and Sainte-Marie roofs use clipped source support witho
   }
 });
 
-test("local landmark enrichment publishes truthful 1 m provenance and leaves native roofs untouched", async () => {
+test("local landmark enrichment publishes truthful 1 m provenance and leaves native roofs untouched", async (t) => {
+  // Test geometry independently of runner speed. The real CPU deadline and
+  // cancellation have their own test below; production's 4 s cap is unchanged.
+  t.mock.method(Date, "now", () => 1_000_000);
   const result = await enrichIGNLandmarkRoofs(
     elements,
     bbox,
@@ -165,7 +168,8 @@ test("local landmark enrichment publishes truthful 1 m provenance and leaves nat
   assert.ok(reserved.warnings.some((warning) => warning.includes("réservé")));
 });
 
-test("landmark enrichment shares the import vertex budget with existing primary geometry", async () => {
+test("landmark enrichment shares the import vertex budget with existing primary geometry", async (t) => {
+  t.mock.method(Date, "now", () => 1_000_000);
   const ring = Array.from({ length: 19998 }, (_, index) => {
     const angle = (index / 19998) * Math.PI * 2;
     return {
@@ -228,7 +232,8 @@ test("landmark CPU deadline and cancellation are observed before publishing geom
   }
 });
 
-test("collection reserves refined triangles, reports mixed spacing, and preserves CRAIG measured geometry", async () => {
+test("collection reserves refined triangles, reports mixed spacing, and preserves CRAIG measured geometry", async (t) => {
+  t.mock.method(Date, "now", () => 1_000_000);
   const document = JSON.parse(
     readFileSync(
       new URL("saint-etienne-craig-cityjson.json", directory),
