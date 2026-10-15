@@ -24,6 +24,8 @@ interface EdgeContactOptions {
   coplanarFootprint?:
     "faces" | "bounds" | ((originalId: number) => "faces" | "bounds");
   lineContactSegments?: 4 | 12;
+  /** A later retry can clear a remaining point/line without cutting full faces. */
+  shortContactShape?: "faces" | "line";
 }
 
 /**
@@ -110,7 +112,11 @@ function tryOpeningContacts(
       const delta = subtract(edge.b, edge.a);
       const length = Math.hypot(...delta);
       if (length === 0) continue;
-      if (length <= clearanceMm * 2 && edgeIndex !== lineEdgeIndex) {
+      if (
+        length <= clearanceMm * 2 &&
+        edgeIndex !== lineEdgeIndex &&
+        options.shortContactShape !== "line"
+      ) {
         if (footprint === "faces") shortFaceContacts?.push(edgeIndex);
         // On a sub-clearance edge, a cylindrical cut can stop inside the thin
         // adjacent film and create another four-face edge. Clear those faces'

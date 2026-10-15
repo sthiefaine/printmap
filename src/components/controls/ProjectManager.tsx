@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSceneStore } from "@/store/use-scene-store";
 import { useMapStore } from "@/store/use-map-store";
 import { downloadBlob } from "@/lib/export/download";
+import { useAssemblyStore } from "@/store/use-assembly-store";
 export function ProjectManager() {
   const input = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
@@ -13,6 +14,27 @@ export function ProjectManager() {
     return () => clearTimeout(timer);
   }, [message, isError]);
   const save = () => {
+    const assembly = useAssemblyStore.getState().project;
+    if (assembly) {
+      downloadBlob(
+        new Blob(
+          [
+            JSON.stringify(
+              { kind: "assembly-project", version: 1, project: assembly },
+              null,
+              2,
+            ),
+          ],
+          { type: "application/json" },
+        ),
+        `printmap-${assembly.id}.printmap.json`,
+      );
+      setIsError(false);
+      setMessage(
+        "Plan enregistré. Les données des plaques restent dans ce navigateur ; sauvegardez-les plaque par plaque.",
+      );
+      return;
+    }
     const { bbox, selectedCity, osmData, elevationGrid, report, isDemo } =
       useMapStore.getState();
     const name = selectedCity?.name.split(",")[0] || "printmap-projet";
@@ -35,7 +57,25 @@ export function ProjectManager() {
     try {
       if (file.size > 100 * 1024 * 1024)
         throw new Error("Le fichier dépasse 100 Mo.");
-      const snapshot = useSceneStore.getState().loadProject(await file.text());
+      const text = await file.text();
+      const content = JSON.parse(text);
+      if (content?.kind === "assembly-project") {
+        if (content.version !== 1)
+          throw new Error("Version de plan non prise en charge.");
+        await useAssemblyStore.getState().open(content.project);
+        setMessage(
+          "Plan restauré. Choisissez une plaque pour charger ses données.",
+        );
+        return;
+      }
+      if (content?.kind === "assembly-cell") {
+        await useAssemblyStore.getState().importCell(content);
+        setMessage("Données de cette plaque restaurées sans collecte.");
+        return;
+      }
+      const snapshot = useSceneStore.getState().loadProject(text);
+      if (useAssemblyStore.getState().project)
+        useAssemblyStore.getState().close();
       if (snapshot) {
         await useMapStore.getState().importProject(snapshot);
         setMessage("Projet restauré, données disponibles hors ligne.");

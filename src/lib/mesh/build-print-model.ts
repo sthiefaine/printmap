@@ -87,6 +87,30 @@ function validateInput(input: PrintInput): void {
   }
   if (!Number.isFinite(scale) || scale <= 0 || scale > 500000)
     throw new Error("L’échelle est invalide.");
+  const frame = input.assemblyFrame;
+  if (frame !== undefined) {
+    if (
+      !frame ||
+      !Number.isFinite(frame.originLat) ||
+      Math.abs(frame.originLat) > 85 ||
+      !Number.isFinite(frame.elevationDatumM)
+    )
+      throw new Error("Le repère commun des plaques est invalide.");
+    if (settings.base.topographyEnabled && validElevation(input.elevationGrid)) {
+      const grid = input.elevationGrid;
+      const minimum = grid.points.reduce((lowest, elevation) => Math.min(lowest, elevation), Infinity);
+      const ocean = input.osmData.elements.some(
+        (element) =>
+          element.tags?.natural === "sea" || element.tags?.water === "ocean",
+      );
+      // Do not silently flatten terrain below a previously fixed assembly datum.
+      // Expanding towards lower ground needs a deliberately lower common datum.
+      if (frame.elevationDatumM > Math.min(minimum, ocean ? 0 : Infinity) + 1e-8)
+        throw new Error(
+          "Le terrain descend sous le datum commun des plaques. Choisissez un datum commun inférieur avant de construire cet assemblage.",
+        );
+    }
+  }
   const print = settings.print;
   if (
     !print ||
@@ -162,15 +186,16 @@ function makeTerrain(
     settings.base.topographyEnabled && validElevation(input.elevationGrid)
       ? input.elevationGrid
       : null;
-  const project = createProjectionForBbox(bbox);
+  const project = createProjectionForBbox(bbox, input.assemblyFrame?.originLat);
   const sf = 1000 / scale;
   const exaggeration = settings.base.elevationExaggeration;
+  const elevationDatumM = input.assemblyFrame?.elevationDatumM ?? grid?.minElev ?? 0;
   const sample = (x: number, y: number) => {
     if (!grid) return base;
     const [lng, lat] = project.unproject(x / sf, y / sf);
     return (
       base +
-      Math.max(0, sampleElevation(grid, lat, lng) - grid.minElev) *
+      Math.max(0, sampleElevation(grid, lat, lng) - elevationDatumM) *
         sf *
         exaggeration
     );
@@ -284,7 +309,7 @@ function makeTerrain(
   };
   const selection = arena.keep(cad.CrossSection.square([width, depth], true));
   const elevationZ = (elevation: number) =>
-    base + Math.max(0, elevation - grid.minElev) * sf * exaggeration;
+    base + Math.max(0, elevation - elevationDatumM) * sf * exaggeration;
   const ocean = applyOceanTerrain(cad, arena, {
     elements: input.osmData.elements,
     projectMm: (lon, lat) =>
@@ -734,7 +759,9 @@ export async function buildPrintModel(
   try {
     const { bbox, scale, settings } = input;
     const sf = 1000 / scale;
-    const projection = createProjectionForBbox(bbox);
+    const projection = createProjectionForBbox(bbox, input.assemblyFrame?.originLat);
+    const elevationDatumM =
+      input.assemblyFrame?.elevationDatumM ?? input.elevationGrid?.minElev ?? 0;
     const [west, south] = projection.project(bbox[1], bbox[0]);
     const [east, north] = projection.project(bbox[3], bbox[2]);
     const width = (east - west) * sf,
@@ -774,6 +801,8 @@ export async function buildPrintModel(
       aqueductArchCount: 0,
     };
     const warnings: string[] = [...(terrain.terraceWarnings ?? [])];
+    if (input.assemblyFrame)
+      warnings.push("Projet par plaques : échelle et repère vertical communs. Les bords du terrain sont harmonisés lors du chargement. Les bâtiments coupés, fragments sous le seuil d’impression et assises ou terrasses estimées séparément peuvent nécessiter une vérification du raccord avant impression.");
     const derivedSources: string[] = [...(terrain.terraceSources ?? [])];
     if (settings.base.topographyEnabled && !validElevation(input.elevationGrid))
       warnings.push("Relief indisponible : la maquette utilise un socle plat.");
@@ -989,7 +1018,12 @@ export async function buildPrintModel(
       base = arena.keep(base.subtract(cutter));
       base = arena.keep(base.add(insert));
     };
-    const parsed = parseElements(input.osmData.elements, bbox, scale);
+    const parsed = parseElements(
+      input.osmData.elements,
+      bbox,
+      scale,
+      input.assemblyFrame?.originLat,
+    );
     if (parsed.undergroundBuildingCount)
       warnings.push(
         `${parsed.undergroundBuildingCount} bâtiment(s) ou partie(s) souterrains explicitement cartographiés ne sont pas extrudés au-dessus du terrain.`,
@@ -1136,7 +1170,7 @@ export async function buildPrintModel(
       )
         return (
           settings.base.basePlateThicknessMm +
-          (building.groundElevation - grid.minElev) *
+          (building.groundElevation - elevationDatumM) *
             sf *
             settings.base.elevationExaggeration
         );
@@ -1418,7 +1452,7 @@ export async function buildPrintModel(
         const grid = terrain.gridVertices.length ? input.elevationGrid : null;
         const deckZ = grid
           ? settings.base.basePlateThicknessMm +
-            (57.774 - grid.minElev) * sf * settings.base.elevationExaggeration
+            (57.774 - elevationDatumM) * sf * settings.base.elevationExaggeration
           : settings.base.basePlateThicknessMm + 21.68 * sf;
         const aqueduct = makeAqueduct(cad, arena, {
           axisPolylineMm: axis,
@@ -1518,7 +1552,7 @@ export async function buildPrintModel(
         const deckZ =
           surveyedDeck != null && grid
             ? settings.base.basePlateThicknessMm +
-              (surveyedDeck - grid.minElev) *
+              (surveyedDeck - elevationDatumM) *
                 sf *
                 settings.base.elevationExaggeration
             : footprintSurfaceMaximum(
@@ -2447,6 +2481,11 @@ export async function buildPrintModel(
             : "faces";
         },
         lineContactSegments: 4,
+        // A face-film cut can expose a short terrain/foundation contact. Cutting
+        // whole faces again propagates its Float32 seam onto further triangles.
+        // On a retry, use the smaller line prism within the same five-micron
+        // circle; source-local repairs and tile cuts retain their default.
+        shortContactShape: pass > 0 ? "line" : "faces",
       });
       contactRepairs += contactRepair.repairedCount;
       // Check the actual Float32 export after each local cut. Its new vertices

@@ -2,8 +2,12 @@ import type { BBox } from "@/types/osm";
 
 const EARTH_RADIUS = 6371000; // meters
 
-export function createLocalProjection(originLat: number, originLng: number) {
-  const latRad = originLat * (Math.PI / 180);
+export function createLocalProjection(
+  originLat: number,
+  originLng: number,
+  longitudeScaleLat = originLat,
+) {
+  const latRad = longitudeScaleLat * (Math.PI / 180);
   const metersPerDegreeLat = (Math.PI / 180) * EARTH_RADIUS;
   const metersPerDegreeLng = (Math.PI / 180) * EARTH_RADIUS * Math.cos(latRad);
 
@@ -21,8 +25,9 @@ export function createLocalProjection(originLat: number, originLng: number) {
   };
 }
 
-export function createProjectionForBbox(bbox: BBox) {
+/** Keep the bbox centred while optionally sharing the assembly's X scale. */
+export function createProjectionForBbox(bbox: BBox, originLat?: number) {
   const centerLat = (bbox[0] + bbox[2]) / 2;
   const centerLng = (bbox[1] + bbox[3]) / 2;
-  return createLocalProjection(centerLat, centerLng);
+  return createLocalProjection(centerLat, centerLng, originLat ?? centerLat);
 }

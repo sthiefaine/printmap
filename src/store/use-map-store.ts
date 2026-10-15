@@ -6,7 +6,7 @@ import type {
   DataReport,
   MapDataResponse,
 } from "@/types/osm";
-import type { PrintModel } from "@/types/print";
+import type { PrintInput, PrintModel } from "@/types/print";
 import { generatePrintModel } from "@/lib/mesh/build-client";
 import { validateBbox } from "@/lib/data/bbox";
 import { validateElevationGrid } from "@/lib/elevation/validate-grid";
@@ -20,7 +20,11 @@ interface SelectedCity {
   lng: number;
 }
 export type GenerationStatus =
-  "idle" | "fetching" | "processing" | "done" | "error";
+  | "idle"
+  | "fetching"
+  | "processing"
+  | "done"
+  | "error";
 let operation = 0;
 let controller: AbortController | null = null;
 
@@ -42,6 +46,12 @@ interface MapState {
   progress: number;
   progressLabel: string;
   isDemo: boolean;
+  assemblyFrame: PrintInput["assemblyFrame"] | null;
+  openAssemblyCell: (
+    snapshot: ProjectSnapshot,
+    frame: PrintInput["assemblyFrame"] | null,
+    build?: boolean,
+  ) => Promise<void>;
   setSelectedCity: (city: SelectedCity | null) => void;
   setBbox: (bbox: BBox | null) => void;
   setOsmData: (data: OverpassResponse | null) => void;
@@ -69,10 +79,29 @@ export const useMapStore = create<MapState>((set, get) => ({
   progress: 0,
   progressLabel: "",
   isDemo: false,
+  assemblyFrame: null,
+  openAssemblyCell: async (snapshot, assemblyFrame, build = false) => {
+    stopOperation();
+    set({
+      ...snapshot,
+      assemblyFrame,
+      model: null,
+      buildKey: null,
+      status: "idle",
+      error: null,
+      progress: 0,
+    });
+    useAppStore.getState().setViewMode("map");
+    if (build && snapshot.osmData && assemblyFrame) {
+      useAppStore.getState().setViewMode("preview");
+      await get().rebuild();
+    }
+  },
   setSelectedCity: (selectedCity) => {
     stopOperation();
     set({
       selectedCity,
+      assemblyFrame: null,
       bbox: null,
       osmData: null,
       elevationGrid: null,
@@ -86,6 +115,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   },
   setBbox: (bbox) => {
     stopOperation();
+    set({ assemblyFrame: null });
     if (bbox) {
       try {
         validateBbox(bbox);
@@ -292,7 +322,7 @@ export const useMapStore = create<MapState>((set, get) => ({
     }
   },
   rebuild: async () => {
-    const { bbox, osmData, elevationGrid, report } = get();
+    const { bbox, osmData, elevationGrid, report, assemblyFrame } = get();
     if (!bbox || !osmData) return;
     stopOperation();
     const id = operation;
@@ -308,7 +338,15 @@ export const useMapStore = create<MapState>((set, get) => ({
     });
     try {
       const model = await generatePrintModel(
-        { osmData, bbox, scale, elevationGrid, settings, report },
+        {
+          osmData,
+          bbox,
+          scale,
+          elevationGrid,
+          settings,
+          report,
+          ...(assemblyFrame ? { assemblyFrame } : {}),
+        },
         {
           signal: controller.signal,
           onProgress: (progress, label) => {
@@ -358,6 +396,7 @@ export const useMapStore = create<MapState>((set, get) => ({
     useSceneStore.getState().fitSelection(DEMO_BBOX);
     set({
       ...data,
+      assemblyFrame: null,
       bbox: [...DEMO_BBOX],
       selectedCity: {
         name: "Quartier de démonstration",
@@ -373,7 +412,14 @@ export const useMapStore = create<MapState>((set, get) => ({
   },
   importProject: async (snapshot) => {
     stopOperation();
-    set({ ...snapshot, model: null, status: "idle", error: null, progress: 0 });
+    set({
+      ...snapshot,
+      assemblyFrame: null,
+      model: null,
+      status: "idle",
+      error: null,
+      progress: 0,
+    });
     useAppStore.getState().setViewMode(snapshot.osmData ? "preview" : "map");
     if (snapshot.osmData && snapshot.bbox) await get().rebuild();
   },
@@ -381,6 +427,7 @@ export const useMapStore = create<MapState>((set, get) => ({
     stopOperation();
     set({
       bbox: null,
+      assemblyFrame: null,
       osmData: null,
       elevationGrid: null,
       report: null,

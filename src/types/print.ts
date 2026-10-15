@@ -93,6 +93,14 @@ export interface PrintModel extends PrintMesh {
   tiles: PrintTile[];
 }
 
+/** Fixed for independently built adjacent plates; their XY origins stay local. */
+export interface AssemblyFrame {
+  /** Latitude used for longitude-to-metre conversion on every plate. */
+  originLat: number;
+  /** Common absolute ground reference, in the elevation grid's vertical datum. */
+  elevationDatumM: number;
+}
+
 export interface PrintInput {
   osmData: OverpassResponse;
   bbox: BBox;
@@ -100,6 +108,7 @@ export interface PrintInput {
   elevationGrid: ElevationGrid | null;
   settings: ModelSettings;
   report?: DataReport | null;
+  assemblyFrame?: AssemblyFrame;
 }
 
 export type PrintProgress = (progress: number, label: string) => void;

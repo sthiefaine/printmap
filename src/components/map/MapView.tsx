@@ -6,6 +6,13 @@ import { TerraDraw, TerraDrawRectangleMode } from "terra-draw";
 import { TerraDrawMapLibreGLAdapter } from "terra-draw-maplibre-gl-adapter";
 import { useMapStore } from "@/store/use-map-store";
 import { useAppStore } from "@/store/use-app-store";
+import { useAssemblyStore } from "@/store/use-assembly-store";
+import {
+  assemblyBounds,
+  assemblyCellBbox,
+  cellKey,
+  cellLabel,
+} from "@/lib/assembly-project";
 
 const CARTOGRAPHIC_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const AERIAL_STYLE: maplibregl.StyleSpecification = {
@@ -38,6 +45,8 @@ export function MapView() {
   const drawRef = useRef<TerraDraw | null>(null);
   const selectedCity = useMapStore((s) => s.selectedCity);
   const bbox = useMapStore((s) => s.bbox);
+  const assembly = useAssemblyStore((s) => s.project);
+  const cached = useAssemblyStore((s) => s.cached);
   const drawingRevision = useAppStore((s) => s.drawingRevision);
   const viewMode = useAppStore((s) => s.viewMode);
   const [mapError, setMapError] = useState(false);
@@ -85,7 +94,10 @@ export function MapView() {
       )
         return;
       map.resize();
-      const selected = useMapStore.getState().bbox;
+      const project = useAssemblyStore.getState().project;
+      const selected = project
+        ? assemblyBounds(project)
+        : useMapStore.getState().bbox;
       if (selected) frameSelection(map, selected);
     });
     resizeObserver.observe(containerRef.current);
@@ -120,13 +132,57 @@ export function MapView() {
         source: "print-selection",
         paint: { "line-color": "#d16c39", "line-width": 2 },
       });
+      map.addSource("assembly-cells", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "assembly-cell-fill",
+        type: "fill",
+        source: "assembly-cells",
+        paint: {
+          "fill-color": [
+            "case",
+            ["get", "active"],
+            "#d16c39",
+            ["get", "cached"],
+            "#3e6854",
+            "#93a589",
+          ],
+          "fill-opacity": 0.18,
+        },
+      });
+      map.addLayer({
+        id: "assembly-cell-line",
+        type: "line",
+        source: "assembly-cells",
+        paint: { "line-color": "#3e6854", "line-width": 2 },
+      });
+      map.addLayer({
+        id: "assembly-cell-label",
+        type: "symbol",
+        source: "assembly-cells",
+        layout: { "text-field": ["get", "label"], "text-size": 13 },
+        paint: {
+          "text-color": "#26372b",
+          "text-halo-color": "#fbfaf6",
+          "text-halo-width": 2,
+        },
+      });
+      updateAssembly(map);
       const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
         modes: [new TerraDrawRectangleMode()],
       });
       draw.start();
-      draw.setMode("rectangle");
+      draw.setMode(
+        useAssemblyStore.getState().project ? "static" : "rectangle",
+      );
       draw.on("finish", (id) => {
+        if (useAssemblyStore.getState().project) {
+          draw.clear();
+          return;
+        }
         const feature = draw.getSnapshot().find((f) => f.id === id);
         if (feature?.geometry.type !== "Polygon") return;
         const ring = feature.geometry.coordinates[0];
@@ -143,11 +199,22 @@ export function MapView() {
         draw.clear();
       });
       drawRef.current = draw;
-      const selected = useMapStore.getState().bbox;
-      if (selected) updateSelection(map, selected);
+      const project = useAssemblyStore.getState().project;
+      const selected = project
+        ? assemblyBounds(project)
+        : useMapStore.getState().bbox;
+      const activeBbox = useMapStore.getState().bbox;
+      if (activeBbox) updateSelection(map, activeBbox);
       if (initialStyle && selected) frameSelection(map, selected);
       initialStyle = false;
       setMapReady(true);
+    });
+    map.on("click", "assembly-cell-fill", (event) => {
+      const properties = event.features?.[0]?.properties;
+      if (properties)
+        void useAssemblyStore
+          .getState()
+          .select({ col: Number(properties.col), row: Number(properties.row) });
     });
     return () => {
       resizeObserver.disconnect();
@@ -162,7 +229,8 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     const selection = map?.getSource("print-selection") as
-      maplibregl.GeoJSONSource | undefined;
+      | maplibregl.GeoJSONSource
+      | undefined;
     if (!map || !selection) return;
     // GeoJSON can update while image tiles are still pending; otherwise clearing
     // the drawing would hide the current zone until another selection change.
@@ -171,7 +239,18 @@ export function MapView() {
   }, [bbox]);
   useEffect(() => {
     const map = mapRef.current;
-    const selected = useMapStore.getState().bbox;
+    if (!map || !mapReady) return;
+    updateAssembly(map);
+    drawRef.current?.setMode(assembly ? "static" : "rectangle");
+    if (assembly && viewMode === "map")
+      frameSelection(map, assemblyBounds(assembly));
+  }, [assembly, cached, mapReady, viewMode]);
+  useEffect(() => {
+    const map = mapRef.current;
+    const project = useAssemblyStore.getState().project;
+    const selected = project
+      ? assemblyBounds(project)
+      : useMapStore.getState().bbox;
     if (map && selected) frameSelection(map, selected);
     else if (selectedCity)
       map?.flyTo({
@@ -182,14 +261,18 @@ export function MapView() {
     drawRef.current?.clear();
   }, [selectedCity]);
   useEffect(() => {
-    drawRef.current?.setMode("rectangle");
+    if (!useAssemblyStore.getState().project)
+      drawRef.current?.setMode("rectangle");
   }, [drawingRevision]);
   useEffect(() => {
     if (viewMode === "map")
       requestAnimationFrame(() => {
         const map = mapRef.current;
         map?.resize();
-        const selected = useMapStore.getState().bbox;
+        const project = useAssemblyStore.getState().project;
+        const selected = project
+          ? assemblyBounds(project)
+          : useMapStore.getState().bbox;
         if (map && selected) frameSelection(map, selected);
       });
   }, [viewMode]);
@@ -222,7 +305,9 @@ export function MapView() {
                 ? "Photo IGN indisponible ou hors couverture française. Revenez à Carte pour sélectionner la zone."
                 : "Fond de carte indisponible. La sélection rapide et la démo restent disponibles."
               : mapReady
-                ? "Dessinez un rectangle : cliquez sur deux coins opposés."
+                ? assembly
+                  ? "Sélectionnez une plaque. Chargez ses données séparément depuis le panneau."
+                  : "Dessinez un rectangle : cliquez sur deux coins opposés."
                 : "Chargement du fond de carte…"}
           </span>
           {basemap === "aerial" ? (
@@ -235,6 +320,45 @@ export function MapView() {
       </div>
     </div>
   );
+}
+
+function updateAssembly(map: maplibregl.Map) {
+  const { project, cached } = useAssemblyStore.getState();
+  const source = map.getSource("assembly-cells") as
+    | maplibregl.GeoJSONSource
+    | undefined;
+  source?.setData({
+    type: "FeatureCollection",
+    features: project
+      ? project.cells.map((cell) => {
+          const [s, w, n, e] = assemblyCellBbox(project, cell);
+          return {
+            type: "Feature" as const,
+            properties: {
+              col: cell.col,
+              row: cell.row,
+              label: cellLabel(cell),
+              active:
+                !!project.activeCell &&
+                cellKey(project.activeCell) === cellKey(cell),
+              cached: cached.includes(cellKey(cell)),
+            },
+            geometry: {
+              type: "Polygon" as const,
+              coordinates: [
+                [
+                  [w, s],
+                  [e, s],
+                  [e, n],
+                  [w, n],
+                  [w, s],
+                ],
+              ],
+            },
+          };
+        })
+      : [],
+  });
 }
 
 /** Large presets must show both their northern and southern edges. */

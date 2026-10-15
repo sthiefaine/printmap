@@ -584,8 +584,9 @@ export function parseElements(
   elements: OverpassElement[],
   bbox: BBox,
   scale: number,
+  originLat?: number,
 ): ParsedOSMData {
-  const { project } = createProjectionForBbox(bbox);
+  const { project } = createProjectionForBbox(bbox, originLat);
   const sf = 1000 / scale;
 
   const result: ParsedOSMData = {

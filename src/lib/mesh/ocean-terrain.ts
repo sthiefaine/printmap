@@ -15,7 +15,7 @@ export interface OceanTerrainOptions {
   clip: CrossSection;
   terrainSolid: Manifold;
   surfaceAt: (x: number, y: number) => number;
-  /** The caller converts elevation 0 m using the unchanged DEM origin and scale. */
+  /** The caller converts elevation 0 m using the active common datum and scale. */
   seaLevelMm: number;
 }
 

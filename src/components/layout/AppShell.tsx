@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAppStore } from "@/store/use-app-store";
 import { useMapStore } from "@/store/use-map-store";
 import { useSceneStore } from "@/store/use-scene-store";
+import { useAssemblyStore } from "@/store/use-assembly-store";
 import { ViewToggle } from "./ViewToggle";
 import { SidePanel } from "./SidePanel";
 import { ProjectManager } from "@/components/controls/ProjectManager";
@@ -23,12 +24,17 @@ export function AppShell() {
   const settings = useSceneStore((s) => s.modelSettings);
   const scale = useSceneStore((s) => s.scale);
   const status = useMapStore((s) => s.status);
+  const assemblyBusy = useAssemblyStore((s) => s.busy);
   const selectedCity = useMapStore((s) => s.selectedCity);
   const isDemo = useMapStore((s) => s.isDemo);
   const mobileSettings = useAppStore((s) => s.settingsPanelOpen);
   const setMobileSettings = useAppStore((s) => s.setSettingsPanelOpen);
   useEffect(() => {
+    void useAssemblyStore.getState().restore();
+  }, []);
+  useEffect(() => {
     const store = useMapStore.getState();
+    if (store.assemblyFrame) return;
     const key = JSON.stringify({ scale, settings });
     if (!store.osmData || store.status === "fetching" || store.buildKey === key)
       return;
@@ -100,13 +106,15 @@ export function AppShell() {
               <i
                 className={`footer-status ${status === "done" ? "ready" : ""}`}
               />
-              {status === "done"
-                ? "Prêt à exporter"
-                : status === "processing"
-                  ? "Volumes en construction"
-                  : status === "fetching"
-                    ? "Données en cours de collecte"
-                    : "Délimitez votre zone et préparez votre pièce"}
+              {assemblyBusy && status !== "processing"
+                ? "Préparation de la plaque sélectionnée"
+                : status === "done"
+                  ? "Prêt à exporter"
+                  : status === "processing"
+                    ? "Volumes en construction"
+                    : status === "fetching"
+                      ? "Données en cours de collecte"
+                      : "Délimitez votre zone et préparez votre pièce"}
             </span>
             <span>OpenStreetMap · IGN en France · dimensions en mm</span>
           </footer>

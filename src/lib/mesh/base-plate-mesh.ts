@@ -4,8 +4,9 @@ import { createProjectionForBbox } from "../projection";
 export function getBboxDimensions(
   bbox: BBox,
   scale: number,
+  originLat?: number,
 ): { widthMm: number; heightMm: number } {
-  const { project } = createProjectionForBbox(bbox);
+  const { project } = createProjectionForBbox(bbox, originLat);
   const sf = 1000 / scale;
 
   const [x1, y1] = project(bbox[1], bbox[0]);

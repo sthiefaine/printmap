@@ -13,6 +13,11 @@ import { BaseTab } from "@/components/controls/BaseTab";
 import { FeaturesTab } from "@/components/controls/FeaturesTab";
 import { ExportPanel } from "@/components/controls/ExportPanel";
 import { GenerateButton } from "@/components/controls/GenerateButton";
+import {
+  AssemblyStart,
+  AssemblyPanel,
+} from "@/components/controls/AssemblyPanel";
+import { useAssemblyStore } from "@/store/use-assembly-store";
 import { SliderInput } from "@/components/controls/SliderInput";
 import { getBboxDimensions } from "@/lib/mesh/base-plate-mesh";
 import { bboxDimensions } from "@/lib/data/bbox";
@@ -104,6 +109,7 @@ function quickZone(type: CityPresetId | "nearby" | "architecture") {
   useAppStore.getState().setViewMode("map");
 }
 export function SidePanel() {
+  const assembly = useAssemblyStore((s) => s.project);
   const bbox = useMapStore((s) => s.bbox);
   const selectedCity = useMapStore((s) => s.selectedCity);
   const status = useMapStore((s) => s.status);
@@ -167,6 +173,7 @@ export function SidePanel() {
       </button>
     );
   };
+  if (assembly) return <AssemblyPanel />;
   return (
     <aside className="side-panel" aria-label="Réglages du modèle">
       <section className="workflow-section">
@@ -285,6 +292,7 @@ export function SidePanel() {
             145 × 290 mm, deux pièces d’environ 145 × 145 mm.
           </p>
         ) : null}
+        <AssemblyStart />
         <GenerateButton />
         <button
           className="demo-link"
