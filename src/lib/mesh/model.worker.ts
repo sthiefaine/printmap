@@ -1,10 +1,7 @@
 /// <reference lib="webworker" />
 import { buildPrintModel } from "./build-print-model";
-import type {
-  BuildWorkerRequest,
-  BuildWorkerResponse,
-  PrintMesh,
-} from "@/types/print";
+import { preparePreview, printModelTransferables } from "./prepare-preview";
+import type { BuildWorkerRequest, BuildWorkerResponse } from "@/types/print";
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 scope.onmessage = async (event: MessageEvent<BuildWorkerRequest>) => {
@@ -15,16 +12,14 @@ scope.onmessage = async (event: MessageEvent<BuildWorkerRequest>) => {
     const model = await buildPrintModel(input, (progress, label) =>
       send({ type: "progress", id, progress, label }),
     );
-    const transfer: Transferable[] = [];
-    const add = (mesh: PrintMesh) =>
-      transfer.push(
-        mesh.positions.buffer as ArrayBuffer,
-        mesh.indices.buffer as ArrayBuffer,
-        mesh.faceLayers.buffer as ArrayBuffer,
-      );
-    add(model);
-    for (const tile of model.tiles) add(tile);
-    send({ type: "success", id, model }, transfer);
+    send({
+      type: "progress",
+      id,
+      progress: 100,
+      label: "Préparation de l’aperçu 3D",
+    });
+    model.preview = preparePreview(model);
+    send({ type: "success", id, model }, printModelTransferables(model));
   } catch (error) {
     send({
       type: "error",

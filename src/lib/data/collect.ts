@@ -1,6 +1,7 @@
 import type { BBox, MapDataResponse } from "@/types/osm";
 import { bboxDimensions, isMetropolitanFrance } from "./bbox";
 import { fetchOverpass } from "./overpass";
+import { fetchRioBuildings, RIO_BUILDINGS_SOURCE } from "./rio-buildings";
 import { fetchIGNBuildings, enrichWithIGN } from "./ign-buildings";
 import { fetchElevation } from "./elevation";
 import { fetchWaterPolygons } from "./ocean";
@@ -56,6 +57,7 @@ export async function collectMapData(
       ? fetchIGNRoofGrid(roofBbox, signal)
       : Promise.resolve(null),
     landmarkGridsPending,
+    fetchRioBuildings(bbox, signal),
   ]);
   signal.throwIfAborted();
   const [
@@ -68,6 +70,7 @@ export async function collectMapData(
     craigResult,
     roofGridResult,
     landmarkGridsResult,
+    rioResult,
   ] = results;
   if (osmResult.status === "rejected") throw osmResult.reason;
   const osm = osmResult.value;
@@ -75,6 +78,25 @@ export async function collectMapData(
     sources = ["OpenStreetMap · Overpass"];
   let elements = osm.elements,
     ignBuildingCount = 0;
+  let rioBuildingCount = 0;
+  if (rioResult.status === "fulfilled") {
+    warnings.push(...rioResult.value.warnings);
+    if (rioResult.value.features.length) {
+      const enriched = enrichWithIGN(elements, rioResult.value.features, {
+        source: "Rio de Janeiro · IPP 2019 · contours et hauteurs LoD1",
+        heightSource: "Rio de Janeiro · IPP · hauteur publiée 2019",
+        idStart: -4000000000000,
+        eaveHeight: false,
+        preserveDistinctVolumes: true,
+      });
+      elements = enriched.elements;
+      rioBuildingCount = enriched.added + enriched.enriched;
+      sources.push(RIO_BUILDINGS_SOURCE);
+      warnings.push(
+        "Le cadastre municipal de Rio (2019) décrit les contours et hauteurs des volumes, mais ne fournit pas les pans de toiture ni les façades en 3D.",
+      );
+    }
+  }
   if (ignResult.status === "fulfilled") {
     warnings.push(...ignResult.value.warnings);
     if (ignResult.value.features.length) {
@@ -306,6 +328,7 @@ export async function collectMapData(
       buildingCount: buildings.length,
       measuredBuildingCount,
       ignBuildingCount,
+      rioBuildingCount,
       elevationSource: elevationGrid?.source ?? null,
       elevationResolutionM: elevationGrid?.resolutionM ?? null,
       osmTimestamp: osm.osm3s?.timestamp_osm_base,

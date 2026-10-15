@@ -49,7 +49,11 @@ function quickZone(type: CityPresetId | "nearby" | "architecture") {
       });
     }
     if (preset.city === "saint-etienne" || preset.city === "rio") {
-      scene.setProfile(type === "saint-etienne-roofs" ? "detail" : "balanced");
+      scene.setProfile(
+        type === "saint-etienne-roofs" || type === "rio-architecture"
+          ? "detail"
+          : "balanced",
+      );
       scene.setTileSize(290);
       scene.updateBaseSettings({
         topographyEnabled: true,
@@ -263,6 +267,13 @@ export function SidePanel() {
             Corcovado, baie de Botafogo, Pain de Sucre et nord de Copacabana.
             Relief activé, sans exagération, et quatre plaques de 15 cm par
             défaut.
+          </p>
+        ) : null}
+        {currentPreset?.id === "rio-architecture" ? (
+          <p className="field-hint selection-context">
+            Un quartier de Copacabana sur quatre plaques, avec le profil
+            Détaillé et les contours municipaux disponibles. Pour voir la baie
+            et les montagnes, choisissez le cadrage Corcovado–Pain de Sucre.
           </p>
         ) : null}
         {isTwoPlateCorridor ? (

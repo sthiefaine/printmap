@@ -39,8 +39,13 @@ export interface MeasuredSolidOptions {
 export function makeMeasuredRoofFallbackFootprint(
   cad: ManifoldToplevel,
   owner: Handles,
-  data: MeasuredBuildingSolid,
-  options: Pick<MeasuredSolidOptions, "project" | "scaleFactor" | "clip">,
+  data: Pick<MeasuredBuildingSolid, "surfaces"> &
+    Partial<Omit<MeasuredBuildingSolid, "surfaces">>,
+  options: Pick<MeasuredSolidOptions, "project" | "scaleFactor" | "clip"> & {
+    /** Explicit partial survey: retain available roof projections, never
+     * replace uncovered source ground with a full-height building block. */
+    roofOnly?: boolean;
+  },
 ): CrossSection | null {
   if (
     !Array.isArray(data?.surfaces) ||
@@ -62,7 +67,11 @@ export function makeMeasuredRoofFallbackFootprint(
       grounds = 0,
       vertices = 0;
     for (const surface of data.surfaces) {
-      if (surface.kind !== "roof" && surface.kind !== "ground") continue;
+      if (
+        surface.kind !== "roof" &&
+        (options.roofOnly || surface.kind !== "ground")
+      )
+        continue;
       if (
         !Array.isArray(surface.outer) ||
         !Array.isArray(surface.holes) ||
@@ -97,11 +106,13 @@ export function makeMeasuredRoofFallbackFootprint(
       if (surface.kind === "roof") roofs++;
       else grounds++;
     }
-    if (!roofs || !grounds) return null;
+    if (!roofs || (!options.roofOnly && !grounds)) return null;
     const bounded = keep(
       keep(cad.CrossSection.union(sections)).intersect(options.clip),
     );
-    if (bounded.isEmpty()) return null;
+    // An empty clipped partial survey is valid: this selection contains no
+    // measured roof. Keep it distinct from invalid input, which returns null.
+    if (bounded.isEmpty() && !options.roofOnly) return null;
     output = owner.keep(bounded);
     return output;
   } catch {

@@ -10,7 +10,7 @@ import {
 } from "../../src/lib/data/montpellier-lod2";
 import { assertClosedSolid } from "../helpers/solid";
 import { fitPlateCount } from "../../src/lib/plate-layout";
-import { RIO_BBOX } from "../../src/lib/city-presets";
+import { RIO_ARCHITECTURE_BBOX } from "../../src/lib/city-presets";
 import {
   salonPrintLayouts,
   SAINT_ETIENNE_STADIUM_BBOX,
@@ -159,7 +159,7 @@ test("only three city shortcuts remain; Rio retains its relief, retries the same
   let collections = 0;
   await page.route("**/api/map-data", async (route) => {
     const request = route.request().postDataJSON();
-    expect(request.bbox).toEqual(RIO_BBOX);
+    expect(request.bbox).toEqual(RIO_ARCHITECTURE_BBOX);
     expect(request.relief).toBe(true);
     collections++;
     if (collections === 1) {
@@ -171,13 +171,22 @@ test("only three city shortcuts remain; Rio retains its relief, retries the same
         },
       });
     } else {
-      await route.fulfill({ json: enclosedDemoData(RIO_BBOX) });
+      await route.fulfill({ json: enclosedDemoData(RIO_ARCHITECTURE_BBOX) });
     }
   });
   await shortcuts.getByRole("button", { name: "Rio de Janeiro" }).click();
+  const framing = page.getByRole("combobox", {
+    name: "Cadrage de Rio de Janeiro",
+  });
+  await framing.selectOption("rio");
+  await expect(framing).toHaveValue("rio");
+  await framing.selectOption("rio-architecture");
+  await expect(
+    page.getByRole("button", { name: "Détaillé", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("heading", {
-      name: "Rio de Janeiro · Corcovado, Botafogo et Copacabana",
+      name: "Rio de Janeiro · Copacabana, architecture",
       exact: true,
     }),
   ).toBeVisible();
@@ -193,7 +202,7 @@ test("only three city shortcuts remain; Rio retains its relief, retries the same
   const saved = JSON.parse(
     (await download(page, "Enregistrer")).bytes.toString(),
   );
-  expect(saved.snapshot.bbox).toEqual(RIO_BBOX);
+  expect(saved.snapshot.bbox).toEqual(RIO_ARCHITECTURE_BBOX);
   expect(saved.settings.base.topographyEnabled).toBe(true);
   expect(saved.settings.base.elevationExaggeration).toBe(1);
   expect(saved.settings.base.plateSizeMm).toBe(150);

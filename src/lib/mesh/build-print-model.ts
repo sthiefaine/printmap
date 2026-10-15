@@ -30,6 +30,7 @@ import { buildMeasuredStairReference } from "./measured-stair-reference";
 import { makeAqueduct } from "./aqueduct-solid";
 import { buildMeasuredTerraces } from "./measured-terraces";
 import { makeMappedRetainingWall } from "./mapped-retaining-wall";
+import { applyOceanTerrain } from "./ocean-terrain";
 import { repairNumericalTriangles } from "./repair-numerical-triangles";
 import { contractShortEdges } from "./contract-short-edges";
 import { parseLengthMeters } from "../osm/building-height";
@@ -281,6 +282,25 @@ function makeTerrain(
       ? z00 + u * (z10 - z00) + v * (z01 - z00)
       : z11 + (1 - v) * (z10 - z11) + (1 - u) * (z01 - z11);
   };
+  const selection = arena.keep(cad.CrossSection.square([width, depth], true));
+  const elevationZ = (elevation: number) =>
+    base + Math.max(0, elevation - grid.minElev) * sf * exaggeration;
+  const ocean = applyOceanTerrain(cad, arena, {
+    elements: input.osmData.elements,
+    projectMm: (lon, lat) =>
+      project.project(lon, lat).map((value) => value * sf) as Point2D,
+    clip: selection,
+    terrainSolid: solid,
+    surfaceAt: originalSurfaceAt,
+    seaLevelMm: elevationZ(0),
+  });
+  if (ocean) {
+    solid = ocean.solid;
+    maxZ = Math.max(maxZ, ocean.seaLevelMm);
+    gridVertices.push(...ocean.gridVertices);
+    gridEdges.push(...ocean.gridEdges);
+  }
+  const baseSurfaceAt = ocean?.surfaceAt ?? originalSurfaceAt;
   const terraces = buildMeasuredTerraces(
     input.osmData.elements,
     grid,
@@ -290,9 +310,10 @@ function makeTerrain(
   );
   const terraceWarnings: string[] = [];
   const terraceSources: string[] = [];
-  const selection = arena.keep(cad.CrossSection.square([width, depth], true));
-  const elevationZ = (elevation: number) =>
-    base + Math.max(0, elevation - grid.minElev) * sf * exaggeration;
+  if (ocean)
+    terraceWarnings.push(
+      "La surface marine cartographiée est horizontale au niveau marin de référence 0 m (hors marée). Les îles, le terrain extérieur et les eaux intérieures gardent leur relief ; les ondulations du raster en mer ne sont pas imprimées.",
+    );
   for (const terrace of terraces) {
     const toSection = (polygon: Polygon2D) =>
       arena.keep(
@@ -346,7 +367,7 @@ function makeTerrain(
     const terrace = terraces.find((item) => item.contains(x, y));
     return terrace
       ? elevationZ(terrace.elevationAt(x, y))
-      : originalSurfaceAt(x, y);
+      : baseSurfaceAt(x, y);
   };
   if (
     grid.source?.includes("IGN") &&
@@ -1004,11 +1025,14 @@ export async function buildPrintModel(
       building: BuildingData;
       section: CrossSection;
       height: number;
+      partialSurvey: boolean;
     }[] = [];
+    let partialSurveyFootprints = 0;
     if (settings.features.buildings.enabled)
       for (let i = 0; i < parsed.buildings.length; i++) {
         const building = parsed.buildings[i];
         const landmark = saintEtienneLandmark(building.sourceId);
+        let partialSurvey = false;
         let section = footprint(
           building.polygon,
           Math.max(
@@ -1036,6 +1060,47 @@ export async function buildPrintModel(
           if (landmark) omittedLandmarks.add(landmark.name);
           continue;
         }
+        if (
+          settings.features.buildings.roofs &&
+          building.roofSurfaces?.length &&
+          !building.measuredSolid &&
+          building.sourceId?.startsWith("CRAIG/2021/") &&
+          building.tags["printmap:roof_reconstruction"] !== "lidar"
+        ) {
+          const surveyed = makeMeasuredRoofFallbackFootprint(
+            cad,
+            arena,
+            {
+              surfaces: building.roofSurfaces.map((surface) => ({
+                ...surface,
+                kind: "roof" as const,
+              })),
+            },
+            {
+              project: projection.project,
+              scaleFactor: sf,
+              clip,
+              roofOnly: true,
+            },
+          );
+          if (surveyed) {
+            const absent = arena.keep(section.subtract(surveyed)).area();
+            if (
+              surveyed.isEmpty() ||
+              absent > Math.max(0.02, section.area() * 0.02)
+            ) {
+              const available = arena.keep(section.intersect(surveyed));
+              partialSurveyFootprints++;
+              if (available.isEmpty()) {
+                stats.discardedFeatures++;
+                if (landmark) omittedLandmarks.add(landmark.name);
+                continue;
+              }
+              section = available;
+              partialSurvey = true;
+            }
+          }
+        }
         const inset = arena.keep(section.offset(-minFeatureMm / 2, "Miter"));
         if (inset.isEmpty()) {
           stats.discardedFeatures++;
@@ -1052,6 +1117,7 @@ export async function buildPrintModel(
           building,
           section,
           height: Math.max(totalHeight, minBuildingHeightMm),
+          partialSurvey,
         });
       }
     const measuredGroundZ = (
@@ -1604,7 +1670,7 @@ export async function buildPrintModel(
       let replacedRoofFoundations = 0;
       const measuredRoofGroundCuts: Manifold[] = [];
       for (let i = 0; i < preparedBuildings.length; i++) {
-        const { building, section, height } = preparedBuildings[i];
+        const { building, section, height, partialSurvey } = preparedBuildings[i];
         const polygons = section.toPolygons();
         const surfaceZ = measuredGroundZ(building, section);
         const startZ = Math.max(0.2, settings.base.basePlateThicknessMm - 0.3);
@@ -1627,7 +1693,7 @@ export async function buildPrintModel(
                 },
               })
             : null;
-        const isMeasuredStructure = !!measuredSolid;
+        let isMeasuredStructure = !!measuredSolid;
         const measuredRoofFootprint =
           !measuredSolid && hasMeasuredRoof && building.measuredSolid
             ? makeMeasuredRoofFallbackFootprint(
@@ -1675,6 +1741,8 @@ export async function buildPrintModel(
                   startZ,
                   measuredRoofFootprint ?? section,
                   minBuildingHeightMm,
+                  false,
+                  partialSurvey,
                 )
             : null;
         if (measuredSolid) {
@@ -1804,6 +1872,75 @@ export async function buildPrintModel(
             }
           } catch {
             measuredSolid = null;
+          }
+        }
+        if (
+          !measuredSolid &&
+          hasMeasuredRoof &&
+          building.groundElevation != null &&
+          building.tags["printmap:roof_reconstruction"] !== "lidar"
+        ) {
+          // A second construction of the same horizontal measured panels can
+          // avoid repeated vertical seams. Accept it only after the unchanged
+          // Float32 closure checks; do not enlarge any repair budget.
+          const support =
+            measuredRoofFootprint ??
+            (building.measuredSolid
+              ? makeMeasuredRoofFallbackFootprint(
+                  cad,
+                  arena,
+                  building.measuredSolid,
+                  {
+                    project: projection.project,
+                    scaleFactor: sf,
+                    clip,
+                  },
+                )
+              : section);
+          const alternative = support
+            ? makeMeasuredRoof(
+                cad,
+                arena,
+                building.roofSurfaces!,
+                building.groundElevation,
+                projection.project,
+                sf,
+                settings.features.buildings.buildingScale,
+                surfaceZ,
+                startZ,
+                support,
+                minBuildingHeightMm,
+                true,
+                partialSurvey,
+              )
+            : null;
+          if (alternative) {
+            try {
+              const checked = stabilizeSolid(
+                cad,
+                arena,
+                alternative,
+                0.001,
+                true,
+              );
+              validatePrintMesh(extractMesh(checked, new Map()));
+              const pieces = checked
+                .decompose()
+                .map((piece) => arena.keep(piece));
+              if (
+                pieces.length &&
+                pieces.every(
+                  (piece) =>
+                    piece.volume() > 0.000001 &&
+                    piece.boundingBox().min[2] <= startZ + 0.0001,
+                )
+              ) {
+                measuredSolid = checked;
+                isMeasuredStructure = false;
+              }
+            } catch {
+              /* Keep the declared fallback if the source still cannot close. */
+            }
           }
         }
         if (building.measuredSolid && (!measuredSolid || !isMeasuredStructure))
@@ -2100,6 +2237,10 @@ export async function buildPrintModel(
       if (unavailableStructures)
         warnings.push(
           `${unavailableStructures} coque(s) 3D mesurée(s) n’ont pas pu être fermées. Le repli conserve les toitures mesurées lorsqu’elles sont utilisables et leurs fondations ; les ouvertures et dessous ne sont pas reproduits par ce repli.`,
+        );
+      if (partialSurveyFootprints)
+        warnings.push(
+          `${partialSurveyFootprints} bâtiment(s) à relevé incomplet conservent les seules parties couvertes par une toiture mesurée. Les emprises sans toiture disponible restent au sol ; elles ne sont pas extrudées à la hauteur maximale du bâtiment.`,
         );
       if (repairedStructureSeams)
         warnings.push(

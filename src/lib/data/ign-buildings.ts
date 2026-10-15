@@ -7,7 +7,7 @@ import {
 import { fetchWithTimeout } from "./request";
 import { parseLengthMeters } from "@/lib/osm/building-height";
 
-interface IGNFeature {
+export interface IGNFeature {
   id: string;
   geometry: {
     type: "Polygon" | "MultiPolygon";
@@ -24,6 +24,16 @@ interface IGNFeature {
 export interface IGNBuildings {
   features: IGNFeature[];
   warnings: string[];
+}
+
+export interface BuildingEnrichmentProvenance {
+  source: string;
+  heightSource: string;
+  idStart: number;
+  eaveHeight: boolean;
+  /** Municipal LoD1 surveys can contain overlapping volumes at different heights.
+   * Keep distinct source IDs and require a close OSM match before deduplicating. */
+  preserveDistinctVolumes?: boolean;
 }
 
 export async function fetchIGNBuildings(
@@ -252,6 +262,12 @@ function bucketKeys(bounds: BBox) {
 export function enrichWithIGN(
   elements: OverpassElement[],
   features: IGNFeature[],
+  provenance: BuildingEnrichmentProvenance = {
+    source: "IGN BD TOPO",
+    heightSource: "IGN · hauteur à la gouttière",
+    idStart: -1000000000000,
+    eaveHeight: true,
+  },
 ) {
   const output: OverpassElement[] = elements.map((el) => ({
     ...el,
@@ -275,18 +291,18 @@ export function enrichWithIGN(
   }
   let added = 0,
     enriched = 0,
-    id = -1000000000000;
+    id = provenance.idStart;
   for (const feature of features) {
     const height = feature.properties.hauteur;
     const tags: Record<string, string> = {
       building: "yes",
       "roof:shape": "flat",
-      "printmap:source": "IGN BD TOPO",
+      "printmap:source": provenance.source,
       "printmap:source_id": feature.properties.cleabs ?? feature.id,
     };
     if (typeof height === "number" && height > 0 && height < 1000) {
       tags.height = String(height);
-      tags["printmap:height_source"] = "IGN · hauteur à la gouttière";
+      tags["printmap:height_source"] = provenance.heightSource;
     } else if (
       feature.properties.nombre_d_etages &&
       feature.properties.nombre_d_etages > 0
@@ -314,7 +330,18 @@ export function enrichWithIGN(
       ];
       const matches = candidates
         .map((candidate) => ({ candidate, score: overlap(item, candidate) }))
-        .filter((match) => match.score > 0);
+        .filter(({ candidate, score }) => {
+          if (!provenance.preserveDistinctVolumes) return score > 0;
+          if (score < 0.6) return false;
+          const candidateTags = candidate.element.tags!;
+          // A new municipal volume must not erase the next one merely because
+          // their projected contours overlap. An actual repeated source ID can
+          // still be deduplicated when its footprint closely agrees.
+          return (
+            candidateTags["printmap:source"] !== provenance.source ||
+            candidateTags["printmap:source_id"] === tags["printmap:source_id"]
+          );
+        });
       const best = matches.sort((a, b) => b.score - a.score)[0];
       if (best) {
         // Do not duplicate buildings from a different source. Replace only uncertain heights,
@@ -326,9 +353,12 @@ export function enrichWithIGN(
           parseLengthMeters(osmTags["building:height"]) == null &&
           tags.height
         ) {
-          const roofHeight = parseLengthMeters(osmTags["roof:height"]) ?? 0;
+          const roofHeight = provenance.eaveHeight
+            ? (parseLengthMeters(osmTags["roof:height"]) ?? 0)
+            : 0;
           osmTags.height = String(Number(tags.height) + roofHeight);
-          osmTags["printmap:eave_height"] = tags.height;
+          if (provenance.eaveHeight)
+            osmTags["printmap:eave_height"] = tags.height;
           osmTags["printmap:height_source"] = tags["printmap:height_source"];
           enriched++;
         }

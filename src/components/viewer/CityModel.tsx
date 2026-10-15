@@ -2,40 +2,40 @@
 import { useMemo, useEffect } from "react";
 import * as THREE from "three";
 import { useMapStore } from "@/store/use-map-store";
-import { PRINT_LAYERS } from "@/types/print";
+import { PRINT_LAYERS, type PrintPreview } from "@/types/print";
+
+/** Attach worker-owned buffers without copying vertices or traversing faces. */
+export function createPreviewGeometry(preview: PrintPreview) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(preview.positions, 3),
+  );
+  geometry.setAttribute(
+    "normal",
+    new THREE.BufferAttribute(preview.normals, 3),
+  );
+  geometry.setIndex(new THREE.BufferAttribute(preview.indices, 1));
+  for (const group of preview.groups)
+    geometry.addGroup(group.start, group.count, group.materialIndex);
+  geometry.boundingBox = new THREE.Box3(
+    new THREE.Vector3(...preview.bounds.min),
+    new THREE.Vector3(...preview.bounds.max),
+  );
+  geometry.boundingSphere = new THREE.Sphere(
+    new THREE.Vector3(...preview.sphere.center),
+    preview.sphere.radius,
+  );
+  return geometry;
+}
+
 export function CityModel() {
   const model = useMapStore((s) => s.model);
-  const geometry = useMemo(() => {
-    if (!model) return null;
-    const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array(model.positions.length);
-    for (let i = 0; i < positions.length; i += 3) {
-      positions[i] = model.positions[i];
-      positions[i + 1] = model.positions[i + 2];
-      positions[i + 2] = -model.positions[i + 1];
-    }
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const grouped = PRINT_LAYERS.map(() => [] as number[]);
-    for (let t = 0; t < model.faceLayers.length; t++) {
-      const group = grouped[model.faceLayers[t]] || grouped[0];
-      group.push(
-        model.indices[t * 3],
-        model.indices[t * 3 + 1],
-        model.indices[t * 3 + 2],
-      );
-    }
-    const indices = new Uint32Array(model.indices.length);
-    let offset = 0;
-    grouped.forEach((group, material) => {
-      indices.set(group, offset);
-      geo.addGroup(offset, group.length, material);
-      offset += group.length;
-    });
-    geo.setIndex(new THREE.BufferAttribute(indices, 1));
-    geo.computeVertexNormals();
-    geo.computeBoundingSphere();
-    return geo;
-  }, [model]);
+  const preview = model?.preview;
+  const geometry = useMemo(
+    () => (preview ? createPreviewGeometry(preview) : null),
+    [preview],
+  );
   const materials = useMemo(
     () =>
       model
@@ -51,12 +51,10 @@ export function CityModel() {
         : [],
     [model],
   );
+  useEffect(() => () => geometry?.dispose(), [geometry]);
   useEffect(
-    () => () => {
-      geometry?.dispose();
-      materials.forEach((material) => material.dispose());
-    },
-    [geometry, materials],
+    () => () => materials.forEach((material) => material.dispose()),
+    [materials],
   );
   return geometry ? (
     <mesh geometry={geometry} material={materials} castShadow receiveShadow />

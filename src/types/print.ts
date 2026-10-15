@@ -21,6 +21,17 @@ export interface PrintMesh {
   faceLayers: Uint8Array;
 }
 
+/** Derived render buffers, in east/up/south order (X, Z, -Y).
+ * These own their memory; printable millimetre/Z buffers remain untouched. */
+export interface PrintPreview {
+  positions: Float32Array;
+  indices: Uint32Array;
+  normals: Float32Array;
+  groups: { start: number; count: number; materialIndex: number }[];
+  bounds: { min: [number, number, number]; max: [number, number, number] };
+  sphere: { center: [number, number, number]; radius: number };
+}
+
 export interface PrintTile extends PrintMesh {
   col: number;
   row: number;
@@ -44,6 +55,8 @@ export interface PrintedLandmark {
 }
 
 export interface PrintModel extends PrintMesh {
+  /** Prepared by the build worker for direct attachment to the 3D viewer. */
+  preview?: PrintPreview;
   plateSizeMm?: 100 | 150;
   /** Only landmarks actually retained by the printable geometry pipeline. */
   landmarks?: PrintedLandmark[];

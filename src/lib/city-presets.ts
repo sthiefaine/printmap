@@ -12,6 +12,7 @@ export type CityPresetId =
   | "saint-etienne-stadium"
   | "saint-etienne-two-plates"
   | "saint-etienne-roofs"
+  | "rio-architecture"
   | "rio";
 
 export interface CityPreset {
@@ -26,6 +27,7 @@ export const PEYROU_BBOX: BBox = [43.6099, 3.8677, 43.6131, 3.8745];
 // 23.1 km²: the Corcovado summit, Botafogo cove, Sugarloaf and the northern
 // Copacabana waterfront fit within the same selection, below the 25 km² cap.
 export const RIO_BBOX: BBox = [-22.974, -43.212, -22.939, -43.154];
+export const RIO_ARCHITECTURE_BBOX: BBox = [-22.973, -43.187, -22.963, -43.174];
 
 export const CITY_PRESETS: CityPreset[] = [
   {
@@ -71,6 +73,13 @@ export const CITY_PRESETS: CityPreset[] = [
     bbox: [45.43085, 4.38145, 45.4379, 4.3945],
   },
   {
+    id: "rio-architecture",
+    city: "rio",
+    label: "Copacabana · architecture",
+    name: "Rio de Janeiro · Copacabana, architecture",
+    bbox: RIO_ARCHITECTURE_BBOX,
+  },
+  {
     id: "rio",
     city: "rio",
     label: "Corcovado, Botafogo et Pain de Sucre",
@@ -86,5 +95,5 @@ export const CITY_SHORTCUTS = [
     label: "Saint-Étienne",
     preset: "saint-etienne-stadium",
   },
-  { city: "rio", label: "Rio de Janeiro", preset: "rio" },
+  { city: "rio", label: "Rio de Janeiro", preset: "rio-architecture" },
 ] as const;

@@ -176,6 +176,12 @@ export function QualityReport() {
                   : ""}
               </p>
             ) : null}
+            {report.rioBuildingCount ? (
+              <p>
+                {report.rioBuildingCount} volumes ajoutés ou enrichis par les
+                contours et hauteurs municipaux de Rio (2019).
+              </p>
+            ) : null}
             <p>
               Collecte :{" "}
               {new Date(report.fetchedAt).toLocaleString("fr-FR", {

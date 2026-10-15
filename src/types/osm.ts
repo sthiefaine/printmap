@@ -81,6 +81,7 @@ export interface DataReport {
   buildingCount: number;
   measuredBuildingCount: number;
   ignBuildingCount: number;
+  rioBuildingCount?: number;
   elevationSource: string | null;
   elevationResolutionM: number | null;
   osmTimestamp?: string;

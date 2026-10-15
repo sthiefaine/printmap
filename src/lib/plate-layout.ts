@@ -1,6 +1,7 @@
 import type { BBox } from "@/types/osm";
 import type { GridSettings } from "@/store/use-scene-store";
 import { getBboxDimensions } from "./mesh/base-plate-mesh";
+import { physicalPlateDimensions, plateFitFactor } from "./plate-math";
 
 export const MAX_PRINT_TILES = 25;
 export const PLATE_MARGIN_MM = 5;
@@ -16,10 +17,10 @@ export interface PlateLayout {
   longSideMm: number;
   scale: number;
 }
-export function usablePlateSize(plate: PlateSizeMm) {
+export function usablePlateSize(plate: PlateSizeMm): 95 | 145 {
   if (plate !== 100 && plate !== 150)
     throw new Error("Choisissez des plaques de 10 ou 15 cm.");
-  return plate - PLATE_MARGIN_MM;
+  return plate === 100 ? 95 : 145;
 }
 export function validPrintGrid(grid: GridSettings) {
   return (
@@ -55,10 +56,12 @@ export function fitPlateCount(
   for (let cols = 1; cols <= count; cols++) {
     if (count % cols) continue;
     const rows = count / cols;
-    const factor = Math.min(
-      (cols * usable) / geographic.widthMm,
-      (rows * usable) / geographic.heightMm,
-      1000 / Math.max(geographic.widthMm, geographic.heightMm),
+    const factor = plateFitFactor(
+      geographic.widthMm,
+      geographic.heightMm,
+      cols,
+      rows,
+      usable,
     );
     const widthMm = geographic.widthMm * factor,
       depthMm = geographic.heightMm * factor;
@@ -87,10 +90,12 @@ export function splitAtCurrentScale(
   if (!Number.isFinite(scale) || scale <= 0)
     throw new Error("Échelle invalide.");
   const geographic = dimensions(bbox);
-  const widthMm = (geographic.widthMm * 1000) / scale,
-    depthMm = (geographic.heightMm * 1000) / scale;
-  const cols = Math.max(1, Math.ceil(widthMm / usable - 1e-9));
-  const rows = Math.max(1, Math.ceil(depthMm / usable - 1e-9));
+  const { widthMm, depthMm, cols, rows } = physicalPlateDimensions(
+    geographic.widthMm,
+    geographic.heightMm,
+    scale,
+    usable,
+  );
   if (!validPrintGrid({ cols, rows }))
     throw new Error(
       `Plus de ${MAX_PRINT_TILES} plaques nécessaires. Réduisez la taille assemblée ou choisissez des plaques de 15 cm.`,

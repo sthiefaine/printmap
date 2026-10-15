@@ -29,6 +29,8 @@ export function makeMeasuredRoof(
   foundationZ: number,
   footprint: CrossSection,
   minimumHeight: number,
+  useTerraceStrata = false,
+  useLocalFrame = false,
 ): Manifold | null {
   if (
     !Array.isArray(surfaces) ||
@@ -69,6 +71,37 @@ export function makeMeasuredRoof(
       minimumHeight / (maximumRelative * scaleFactor * buildingScale),
     );
   if (!Number.isFinite(factor) || factor <= 0) return null;
+  if (useLocalFrame) {
+    if (footprint.isEmpty()) return null;
+    const bounds = footprint.bounds();
+    const originX = (bounds.min[0] + bounds.max[0]) / 2;
+    const originY = (bounds.min[1] + bounds.max[1]) / 2;
+    const originZ = foundationZ;
+    // Partial roof coverage leaves more exposed internal corners. Constructing
+    // its Float32 panels far from their origin can weld a low wall to a higher
+    // roof plane. A local frame improves conditioning without moving any source
+    // coordinate, changing its datum or filling the unsurveyed footprint.
+    const local = makeMeasuredRoof(
+      cad,
+      owner,
+      surfaces,
+      groundElevation,
+      (lon, lat) => {
+        const [x, y] = project(lon, lat);
+        return [x - originX / scaleFactor, y - originY / scaleFactor];
+      },
+      scaleFactor,
+      buildingScale,
+      surfaceZ - originZ,
+      foundationZ - originZ,
+      owner.keep(footprint.translate([-originX, -originY])),
+      minimumHeight,
+      useTerraceStrata,
+    );
+    return local
+      ? owner.keep(local.translate([originX, originY, originZ]))
+      : null;
+  }
   const temporary: { delete(): void }[] = [];
   const arena: Handles = {
     keep<T extends { delete(): void }>(handle: T): T {
@@ -80,6 +113,14 @@ export function makeMeasuredRoof(
   try {
     const solids: Manifold[] = [],
       coverages: CrossSection[] = [];
+    const terraces = new Map<number, CrossSection[]>();
+    const allHorizontal = surfaces.every(
+      ({ outer, holes }) =>
+        outer.length > 0 &&
+        [outer, ...holes].every((ring) =>
+          ring.every((point) => point.elevation === outer[0].elevation),
+        ),
+    );
     for (const surface of surfaces) {
       const rings: Vec3[][] = [];
       for (const [ringIndex, rawRing] of [
@@ -159,7 +200,12 @@ export function makeMeasuredRoof(
       );
       if (solid.status() !== "NoError" || solid.isEmpty()) return null;
       solids.push(solid);
-      coverages.push(arena.keep(new cad.CrossSection(polygons, "NonZero")));
+      const coverage = arena.keep(new cad.CrossSection(polygons, "NonZero"));
+      coverages.push(coverage);
+      if (allHorizontal) {
+        const z = top[0][2];
+        terraces.set(z, [...(terraces.get(z) ?? []), coverage]);
+      }
     }
     if (!solids.length) return null;
     const coverage = arena.keep(cad.CrossSection.union(coverages));
@@ -168,18 +214,31 @@ export function makeMeasuredRoof(
     // must not silently create a partly empty building.
     if (missing.area() > Math.max(0.02, footprint.area() * 0.02)) return null;
     let unionOperands = solids;
-    const allHorizontal = surfaces.every(
-      ({ outer, holes }) =>
-        outer.length > 0 &&
-        [outer, ...holes].every((ring) =>
-          ring.every((point) => point.elevation === outer[0].elevation),
-        ),
-    );
-    if (allHorizontal && solids.length > 8) {
-      // Many terrace prisms share the same foundation plane. One large native
-      // union can retain a four-face seam there after Float32 conversion.
-      // Materialise small unions first without moving any source coordinates
-      // or heights. Inclined surveys retain their existing construction.
+    if (useTerraceStrata && allHorizontal && terraces.size <= 128) {
+      // Build the same measured height field in horizontal strata. Extruding
+      // every small rooftop panel down to the foundation repeats coplanar
+      // walls and can reject the whole survey in Float32, leaving a huge block.
+      // Nested level masks have no such internal vertical seams. No rooftop
+      // height, courtyard or projected contour is inferred or moved here.
+      unionOperands = [];
+      const levels = [...terraces.keys()].sort((a, b) => b - a);
+      let mask: CrossSection | undefined;
+      for (let i = 0; i < levels.length; i++) {
+        const z = levels[i];
+        const group = terraces.get(z)!;
+        mask = arena.keep(
+          cad.CrossSection.union(mask ? [mask, ...group] : group),
+        );
+        const bounded = arena.keep(mask.intersect(footprint));
+        const bottom = levels[i + 1] ?? foundationZ;
+        if (bounded.isEmpty() || z <= bottom) continue;
+        unionOperands.push(
+          arena.keep(
+            arena.keep(bounded.extrude(z - bottom)).translate([0, 0, bottom]),
+          ),
+        );
+      }
+    } else if (allHorizontal && solids.length > 8) {
       unionOperands = [];
       for (let first = 0; first < solids.length; first += 8)
         unionOperands.push(
