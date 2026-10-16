@@ -50,6 +50,7 @@ export interface PrintedLandmark {
     | "surveyed-roof"
     | "lidar-roof"
     | "reconstructed-balconies"
+    | "documented-facade"
     | "reconstructed-bridge"
     | "mixed"
     | "osm-roof"
@@ -82,6 +83,8 @@ export interface PrintModel extends PrintMesh {
     lidarRoofCount?: number;
     /** Derived terrace geometry, never counted as a complete measured building. */
     reconstructedBalconyBuildingCount?: number;
+    /** Facade relief based on documentary dimensions, not a surveyed shell. */
+    documentedFacadeBuildingCount?: number;
     taggedRoofCount: number;
     staircaseCount: number;
     measuredStructureCount: number;

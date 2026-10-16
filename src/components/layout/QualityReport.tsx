@@ -30,6 +30,9 @@ export function QualityReport() {
             {model.stats.reconstructedBalconyBuildingCount
               ? " · balcons reconstitués"
               : ""}
+            {model.stats.documentedFacadeBuildingCount
+              ? " · façade reconstituée"
+              : ""}
           </span>
         </div>
         <span>Détails ⌄</span>
@@ -89,6 +92,16 @@ export function QualityReport() {
             et les épaisseurs sont estimés. Le relevé aérien reste incomplet ;
             les 193 balcons ne sont pas tous relevés. Vérifiez les surplombs et
             les supports dans votre logiciel d’impression.
+          </p>
+        ) : null}
+        {model.stats.documentedFacadeBuildingCount ? (
+          <p>
+            <strong>Hôtel de Région · façade reconstituée</strong> · deux
+            verrières de 21 × 8 m documentées par l’Inventaire régional. La
+            position verticale et la profondeur des renfoncements sont estimées
+            ; leur relief est adapté à l’impression. Un volume plein reste
+            derrière le verre. Cette restitution ne constitue pas un relevé de
+            façade.
           </p>
         ) : null}
         {model.stats.reconstructedBridgeCount > 0 ? (

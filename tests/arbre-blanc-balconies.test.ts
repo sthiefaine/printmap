@@ -476,6 +476,86 @@ test("the exact browser scale and phase retain a nearly tangent municipal terrac
   assert.equal(JSON.stringify(original.osmData), sourceSnapshot);
 });
 
+test("the user's C3 L1 assembly frame retains the balconies without a detached scrap from a clipped connector", async () => {
+  // Exact saved assembly-cell frame from the reported 365-building model.
+  // Its municipal input is bit-for-bit identical to this native fixture.
+  // A connector at 59.469m used to acquire a separate 0.0002677631mm² scrap
+  // after clipping against a concave envelope. That inferred scrap overlaps
+  // neither source terrace nor core, and must not invalidate the whole tower.
+  const assemblyBbox: BBox = [
+    43.601407977642914, 3.893206659524327, 43.607928059285825,
+    3.9022093950324357,
+  ];
+  const originLat = 43.594887896;
+  const assemblyInput = input(true);
+  assemblyInput.bbox = assemblyBbox;
+  assemblyInput.assemblyFrame = { originLat, elevationDatumM: 0 };
+  assemblyInput.settings.print = { ...PRINT_PROFILES.detail.print };
+  // Declared synthetic IGN69 zero terrain isolates the true source and exact
+  // assembly projection. The source footprint, all 69 pans and Z stay native.
+  assemblyInput.elevationGrid = {
+    ...assemblyInput.elevationGrid!,
+    south: assemblyBbox[0],
+    west: assemblyBbox[1],
+    north: assemblyBbox[2],
+    east: assemblyBbox[3],
+  };
+  const retained = await buildPrintModel(assemblyInput);
+  assert.equal(retained.stats.reconstructedBalconyBuildingCount, 1);
+  assert.equal(retained.stats.buildingCount, 1);
+  assert.equal(retained.stats.components, 1);
+  assert.ok(
+    retained.landmarks?.some(
+      (landmark) => landmark.representation === "reconstructed-balconies",
+    ),
+  );
+  assert.ok(
+    !retained.warnings.some((w) =>
+      /balcons.*n’a pas pu être conservée/.test(w),
+    ),
+  );
+  const volume = assertClosedSolid(retained);
+  const tileVolume = retained.tiles.reduce(
+    (sum, tile) => sum + assertClosedSolid(tile),
+    0,
+  );
+  assert.equal(retained.tiles.length, 4);
+  assert.ok(Math.abs(tileVolume - volume) / volume < 0.0001);
+  const assemblyProjection = createProjectionForBbox(assemblyBbox, originLat);
+  let checked = 0;
+  for (const { elevationM, point } of allSurfaceProbes()) {
+    const [px, py] = assemblyProjection.project(point.lon, point.lat);
+    const x = px * sf,
+      y = py * sf;
+    const expectedTop = toZ(elevationM);
+    const z = expectedTop - 0.06;
+    const values = intervals(retained, x, y);
+    const slab = values.find((v) => z > v.bottom && z < v.top);
+    assert.ok(slab, `C3 L1 source witness ${elevationM}m retains material`);
+    assert.ok(slab.top - slab.bottom < 0.5);
+    assert.ok(slab.top >= expectedTop - 0.005);
+    if ("surface" in point) assert.ok(Math.abs(slab.top - expectedTop) < 0.005);
+    assert.equal(includes(values, slab.bottom - 0.03), false);
+    let containing = 0;
+    for (const tile of retained.tiles) {
+      const [tx, ty] = localPoint(tile, x, y, retained);
+      if (Math.abs(tx) > tile.widthMm / 2 || Math.abs(ty) > tile.depthMm / 2)
+        continue;
+      const cut = intervals(tile, tx, ty);
+      const tileSlab = cut.find((v) => z > v.bottom && z < v.top);
+      assert.ok(tileSlab);
+      assert.ok(Math.abs(tileSlab.bottom - slab.bottom) < 0.00001);
+      assert.ok(Math.abs(tileSlab.top - slab.top) < 0.00001);
+      assert.equal(includes(cut, slab.bottom - 0.03), false);
+      containing++;
+    }
+    assert.ok(containing > 0);
+    checked++;
+  }
+  assert.equal(checked, 29);
+  assert.equal(JSON.stringify(original.osmData), sourceSnapshot);
+});
+
 test("whole and all four STL/3MF exports preserve physical balcony air and exact millimetre geometry", async () => {
   for (const mesh of [model, ...model.tiles]) {
     const stl = readSTL(createSTLBuffer(mesh));

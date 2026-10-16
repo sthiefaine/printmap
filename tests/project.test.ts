@@ -33,6 +33,24 @@ test("existing projects enable the optional balcony interpretation and preserve 
   assert.throws(() => normalizeSettings(old), /Options du projet invalides/);
 });
 
+test("old settings retain optional documented facade relief and respect an explicit opt-out", () => {
+  const old = structuredClone(DEFAULT_MODEL_SETTINGS);
+  delete old.features.buildings.documentedFacades;
+  assert.equal(
+    normalizeSettings(old).features.buildings.documentedFacades,
+    true,
+  );
+  old.features.buildings.documentedFacades = false;
+  assert.equal(
+    normalizeSettings(old).features.buildings.documentedFacades,
+    false,
+  );
+  (
+    old.features.buildings as unknown as Record<string, unknown>
+  ).documentedFacades = "yes";
+  assert.throws(() => normalizeSettings(old), /Options du projet invalides/);
+});
+
 test("project round trip keeps raw geography and custom printing settings", () => {
   const saved = project();
   saved.settings.features.water.color = "#123abc";

@@ -158,6 +158,8 @@ function validateSettings(value: unknown): ModelSettings {
   if (
     typeof base.topographyEnabled !== "boolean" ||
     typeof features.buildings.roofs !== "boolean" ||
+    (features.buildings.documentedFacades !== undefined &&
+      typeof features.buildings.documentedFacades !== "boolean") ||
     typeof features.roads.footpathsEnabled !== "boolean" ||
     !record(features.roads.roadTypeEnabled) ||
     Object.values(features.roads.roadTypeEnabled).some(

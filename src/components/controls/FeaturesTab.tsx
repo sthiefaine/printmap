@@ -46,6 +46,11 @@ export function FeaturesTab() {
       (element) => element.tags?.["printmap:source_id"] === "MMM/B102558",
     ),
   );
+  const hasDocumentedFacade = useMapStore((s) =>
+    s.osmData?.elements.some(
+      (element) => element.tags?.["printmap:source_id"] === "MMM/B102810",
+    ),
+  );
   return (
     <div className="layers-stack">
       <FeatureSection
@@ -84,6 +89,22 @@ export function FeaturesTab() {
               raccords au bâtiment et l’épaisseur sont estimés pour l’impression
               ; les parties masquées du relevé restent incomplètes. Vérifiez les
               surplombs dans votre logiciel d’impression.
+            </p>
+          </>
+        ) : null}
+        {hasDocumentedFacade && f.buildings.roofs ? (
+          <>
+            <ToggleSwitch
+              checked={f.buildings.documentedFacades !== false}
+              onChange={(documentedFacades) =>
+                update("buildings", { documentedFacades })
+              }
+              label="Façades documentées disponibles"
+            />
+            <p className="field-hint">
+              Hôtel de Région : dimensions des grandes verrières documentées.
+              Leur position verticale et la profondeur des renfoncements sont
+              estimées pour une lecture en maquette. Le bâtiment reste fermé.
             </p>
           </>
         ) : null}

@@ -46,6 +46,7 @@ import { pointInPolygon } from "../polygon/point-in-polygon";
 import { makeRoof, makeMeasuredRoof } from "./roof-solid";
 import { makeLidarRoof } from "./lidar-roof";
 import { isArbreBlanc, makeArbreBlanc } from "./arbre-blanc";
+import { applyHotelRegionFacade, isHotelRegion } from "./hotel-region";
 import { repairCoincident, removeCoincidentSheets } from "./repair-coincident";
 import { repairCollinear } from "./repair-collinear";
 import { preparePrintLayers } from "./fuse-print-layers";
@@ -809,6 +810,7 @@ export async function buildPrintModel(
       realRoofCount: 0,
       lidarRoofCount: 0,
       reconstructedBalconyBuildingCount: 0,
+      documentedFacadeBuildingCount: 0,
       taggedRoofCount: 0,
       staircaseCount: 0,
       measuredStructureCount: 0,
@@ -2468,6 +2470,45 @@ export async function buildPrintModel(
             solid = sourceEnvelope;
           }
         }
+        // Preserve the measured roof envelope while giving documented closed
+        // glazing a readable facade relief. The window dimensions are sourced;
+        // its depth and vertical placement are explicitly interpreted.
+        let facade =
+          settings.features.buildings.roofs &&
+          settings.features.buildings.documentedFacades !== false &&
+          isHotelRegion(building.sourceId, building.tags["printmap:osm_id"]) &&
+          measuredSolid &&
+          building.groundElevation != null &&
+          building.roofSurfaces?.length
+            ? applyHotelRegionFacade(cad, arena, solid, {
+                sourceId: building.sourceId,
+                osmId: building.tags["printmap:osm_id"],
+                surfaces: building.roofSurfaces,
+                groundElevation: building.groundElevation,
+                project: projection.project,
+                scaleFactor: sf,
+                buildingScale: settings.features.buildings.buildingScale,
+                surfaceZ,
+                minFeatureMm,
+                clip,
+              })
+            : null;
+        if (facade) {
+          try {
+            validatePrintMesh(extractMesh(facade.solid, new Map()));
+          } catch {
+            facade = null;
+          }
+        }
+        if (facade) {
+          solid = facade.solid;
+          stats.documentedFacadeBuildingCount =
+            (stats.documentedFacadeBuildingCount ?? 0) + 1;
+          derivedSources.push(...facade.sources);
+          warnings.push(
+            ...facade.warnings.map((warning) => `Hôtel de Région : ${warning}`),
+          );
+        }
         // A clipped survey may have several separate roof envelopes, each
         // supported by the common socle. Submit those as independent operands:
         // a compound native operand can otherwise retain a closed terrain seam
@@ -2523,22 +2564,26 @@ export async function buildPrintModel(
             max: bounds.max as [number, number, number],
             representation: balconies
               ? "reconstructed-balconies"
-              : measuredSolid
-                ? isMeasuredStructure
-                  ? "surveyed-solid"
-                  : building.tags["printmap:roof_reconstruction"] === "lidar"
-                    ? "lidar-roof"
-                    : "surveyed-roof"
-                : canRoof
-                  ? "osm-roof"
-                  : "footprint",
+              : facade
+                ? "documented-facade"
+                : measuredSolid
+                  ? isMeasuredStructure
+                    ? "surveyed-solid"
+                    : building.tags["printmap:roof_reconstruction"] === "lidar"
+                      ? "lidar-roof"
+                      : "surveyed-roof"
+                  : canRoof
+                    ? "osm-roof"
+                    : "footprint",
             source: balconies
               ? "IGN LiDAR HD 2021 + Montpellier 2020 + OpenStreetMap · noyau, raccords et épaisseur estimés"
-              : measuredSolid
-                ? (building.measuredSolid?.source ??
-                  building.roofSource ??
-                  "Relevé 3D")
-                : (building.heightSource ?? "OpenStreetMap · empreinte"),
+              : facade
+                ? "Montpellier 2020 + Inventaire régional 2016 · dimensions des verrières documentées, position et profondeur estimées"
+                : measuredSolid
+                  ? (building.measuredSolid?.source ??
+                    building.roofSource ??
+                    "Relevé 3D")
+                  : (building.heightSource ?? "OpenStreetMap · empreinte"),
           };
           const previous = landmarks.find((item) => item.id === entry.id);
           if (previous) {

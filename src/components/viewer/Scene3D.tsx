@@ -17,6 +17,8 @@ const LANDMARK_REPRESENTATIONS: Record<
   "lidar-roof": "Toiture LiDAR reconstruite · façades simplifiées",
   "reconstructed-balconies":
     "Terrasses LiDAR et municipales · noyau, raccords et épaisseur reconstitués",
+  "documented-facade":
+    "Verrières documentées · position et profondeur des renfoncements estimées",
   "reconstructed-bridge":
     "Tablier reconstitué · profil supérieur mesuré ou estimé, épaisseur estimée",
   mixed: "Plusieurs parties · niveaux de détail différents",

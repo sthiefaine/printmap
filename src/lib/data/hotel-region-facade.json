@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "name": "Hôtel de région · Montpellier",
+  "sourceId": "MMM/B102810",
+  "osmId": "way/283339491",
+  "bounds": [43.6073135, 3.89746329, 43.60770932, 3.89786285],
+  "documented": {
+    "glazingCount": 2,
+    "glazingHeightM": 21,
+    "glazingWidthM": 8,
+    "closedGlazing": true,
+    "year": 1989,
+    "reference": "Dominique Ganibenc, L’Hôtel de Région en Languedoc-Roussillon (1986-1989), Patrimoines du Sud 3, 2016, p. 125–126, figures 13–14",
+    "url": "https://journals.openedition.org/pds/1222",
+    "doi": "10.4000/pds.1222"
+  },
+  "interpreted": {
+    "bottomAboveGroundM": 8,
+    "recessDepthM": 1.5,
+    "reference": "Position centrale, niveau bas et profondeur interprétés depuis les photographies des façades réalisées, figures 13–14 ; aucune coupe finale cotée disponible.",
+    "measured": false
+  },
+  "printing": {
+    "minimumReliefDepthMm": 0.24,
+    "maximumReliefDepthMm": 0.4,
+    "minimumCentralWallMm": 0.8
+  },
+  "limits": [
+    "Relief de façade documentaire interprété, pas un relevé architectural des verrières.",
+    "Largeur et hauteur des verrières documentées ; position verticale et profondeur estimées, puis profondeur adaptée à l’impression.",
+    "Les deux verrières ferment l’arche : aucun tunnel traversant n’est créé.",
+    "Les quatre pans municipaux, le sol et l’emprise restent ceux du CityGML 2020 ; petites fenêtres et moulures non reconstruites."
+  ]
+}

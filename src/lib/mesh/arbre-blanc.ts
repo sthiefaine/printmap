@@ -414,7 +414,20 @@ export function makeArbreBlanc(
               )
               .intersect(footprint),
           );
-          connected = arena.keep(part.add(connector));
+          // Clipping this inferred rectangle to a concave source envelope can
+          // leave a separate scrap on the other side of an indentation. Such
+          // a scrap is neither an observed terrace nor a connection to this
+          // terrace. Keep only connector components with finite overlap with
+          // the original part, before extruding or testing the core support.
+          const joins = connector
+            .decompose()
+            .map((piece) => arena.keep(piece))
+            .filter(
+              (piece) => arena.keep(piece.intersect(part)).area() > 0.000001,
+            );
+          connected = arena.keep(
+            part.add(arena.keep(cad.CrossSection.union(joins))),
+          );
           if (arena.keep(connected.intersect(core)).area() <= 0.000001) {
             omittedFragmentCount++;
             continue;
