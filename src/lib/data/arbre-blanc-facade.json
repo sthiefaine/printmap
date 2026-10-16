@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "sourceId": "MMM/B102558",
+  "source": "Nicolas Laisné Architectes · plans publiés R+9/R+16 · façade interprétée et géoréférencée sur le contour OpenStreetMap",
+  "sourceUrl": "https://nicolaslaisne.com/portfolio_page/arbre-blanc/",
+  "sourcePlans": [
+    {
+      "level": "R+9",
+      "url": "https://nicolaslaisne.com/wp-content/uploads/2021/04/arbre-blanc-plan-2.png",
+      "sizePx": [1700, 1000]
+    },
+    {
+      "level": "R+16",
+      "url": "https://nicolaslaisne.com/wp-content/uploads/2021/04/arbre-blanc-plan-3.png",
+      "sizePx": [1700, 1000]
+    }
+  ],
+  "rights": "Les plans originaux ne sont pas redistribués. Site de l’architecte : tous droits réservés. Ce fichier décrit un relevé documentaire de contour, pas un modèle fourni ou certifié par les architectes.",
+  "crs": "EPSG:4326",
+  "referenceCrs": "EPSG:2154",
+  "facadeFootprint": {
+    "outer": [
+      {
+        "lat": 43.60586,
+        "lon": 3.8979453
+      },
+      {
+        "lat": 43.605945,
+        "lon": 3.8979675
+      },
+      {
+        "lat": 43.6060718,
+        "lon": 3.898133
+      },
+      {
+        "lat": 43.6060681,
+        "lon": 3.8982022
+      },
+      {
+        "lat": 43.6060358,
+        "lon": 3.8982644
+      },
+      {
+        "lat": 43.605982,
+        "lon": 3.8982733
+      },
+      {
+        "lat": 43.6058935,
+        "lon": 3.8982237
+      },
+      {
+        "lat": 43.6058421,
+        "lon": 3.8982107
+      },
+      {
+        "lat": 43.6057463,
+        "lon": 3.8982132
+      },
+      {
+        "lat": 43.6056979,
+        "lon": 3.898178
+      },
+      {
+        "lat": 43.6056834,
+        "lon": 3.8981038
+      },
+      {
+        "lat": 43.6056981,
+        "lon": 3.8980368
+      },
+      {
+        "lon": 3.8979970389966274,
+        "lat": 43.60578506990028
+      },
+      {
+        "lat": 43.60586,
+        "lon": 3.8979453
+      }
+    ],
+    "holes": []
+  },
+  "referenceBoundaryLambert93": {
+    "outer": [
+      [772517.2851399, 6278946.41905913],
+      [772518.9704869781, 6278955.88572168],
+      [772532.175240125, 6278970.129347847],
+      [772537.7681880333, 6278969.781724304],
+      [772542.8320075249, 6278966.249281718],
+      [772543.618749622, 6278960.2785229],
+      [772539.7251617683, 6278950.397718162],
+      [772538.7403191231, 6278944.673558066],
+      [772539.0633195954, 6278934.029347436],
+      [772536.2819004266, 6278928.618191259],
+      [772530.3081430128, 6278926.938609207],
+      [772524.8789174634, 6278928.510719234],
+      [772521.5580609073, 6278938.139396227],
+      [772517.2851399, 6278946.41905913]
+    ],
+    "holes": []
+  },
+  "interpretation": {
+    "baselineSourceId": "way/441634682",
+    "baselineAreaM2": 818.0770185656352,
+    "facadeAreaM2": 759.175380427003,
+    "removedAreaM2": 58.901638138632165,
+    "baselineUnchangedVertexIndices": [0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "removedBaselineVertexIndices": [2, 13, 14],
+    "horizontalUncertaintyM": 1,
+    "registration": {
+      "scalePxPerM": 15.830099721093362,
+      "rotationDeg": 1.1271424467358153,
+      "northLambert93": [772532.175240125, 6278970.129347847],
+      "southLambert93": [772530.3081430128, 6278926.938609207],
+      "northPixel": [878, 91],
+      "southPixel": [835, 774],
+      "southWestFacadeBendPixel": [700, 594]
+    },
+    "crossCheckR16": {
+      "northPixel": [877, 90],
+      "southPixel": [834, 773],
+      "southWestFacadeBendPixel": [698, 594]
+    },
+    "description": "Deux renflements ouest du contour OSM recouvrent des balcons ou ombrières dans les deux plans. Leur contour est remplacé par les lignes de façade publiées. Les autres sommets OSM sont inchangés ; aucune contraction uniforme. Le corps vertical et son extrapolation entre les étages restent reconstitués, pas mesurés.",
+    "arbitraryBalconyCopies": false,
+    "completeFacadeSurvey": false,
+    "undersideMeasured": false
+  },
+  "verificationPoints": {
+    "removedOverhangInteriors": [
+      {
+        "lon": 3.898008088223105,
+        "lat": 43.6059858459701
+      },
+      {
+        "lon": 3.898006546332201,
+        "lat": 43.605744056633434
+      }
+    ],
+    "selection": "Points intérieurs aux deux lobes retirés ET à l’emprise municipale de sol, pour comparer les corps imprimés avant/après."
+  }
+}

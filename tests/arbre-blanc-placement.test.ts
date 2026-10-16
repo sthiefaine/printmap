@@ -156,12 +156,14 @@ test("the derived Arbre Blanc stays closed at three positions in a 145 mm assemb
         faceLayers: new Uint8Array(mesh.triVerts.length / 3),
       });
       assert.equal(result.retainedLevelCount, 17);
-      // Restoring nearly tangent source patches exposes one precision contact
-      // at X=0. Its 5µm opening removes 0.000001012665 mm³; total conversion
-      // deltas at these three fixed poses stay below 0.0003 mm³. The previous
-      // zero-cut assertion described the incomplete terrace reconstruction.
-      assert.ok(result.repairedContactCount <= 1);
+      // The additive observed contours and corrected facade expose two local
+      // precision contacts. At these fixed poses, total conversion deltas are
+      // +0.000010091/-0.000019944/-0.000103570 mm³. Keep the same tighter bound
+      // as well as the unchanged 0.01% source guard below.
+      assert.ok(result.repairedContactCount <= 2);
       assert.ok(Math.abs(result.repairVolumeDeltaMm3) < 0.0003);
+      assert.equal(result.documentedBody, true);
+      assert.ok(result.maximumInferredConnectionM < 3.2);
       const sourceCounts = [
         result.retainedLevelCount,
         result.terraceCount,

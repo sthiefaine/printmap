@@ -46,7 +46,7 @@ export function FeaturesTab() {
       (element) => element.tags?.["printmap:source_id"] === "MMM/B102558",
     ),
   );
-  const hasDocumentedFacade = useMapStore((s) =>
+  const hasHotelRegion = useMapStore((s) =>
     s.osmData?.elements.some(
       (element) => element.tags?.["printmap:source_id"] === "MMM/B102810",
     ),
@@ -85,14 +85,14 @@ export function FeaturesTab() {
               label="Balcons reconstitués de l’Arbre Blanc"
             />
             <p className="field-hint">
-              Plateaux visibles dans le LiDAR IGN. Le volume du noyau, les
-              raccords au bâtiment et l’épaisseur sont estimés pour l’impression
-              ; les parties masquées du relevé restent incomplètes. Vérifiez les
+              Terrasses visibles dans le LiDAR IGN et le relevé municipal. Les
+              raccords et l’épaisseur sont estimés pour l’impression ; les
+              parties masquées du relevé restent incomplètes. Vérifiez les
               surplombs dans votre logiciel d’impression.
             </p>
           </>
         ) : null}
-        {hasDocumentedFacade && f.buildings.roofs ? (
+        {(hasHotelRegion || hasArbreBlanc) && f.buildings.roofs ? (
           <>
             <ToggleSwitch
               checked={f.buildings.documentedFacades !== false}
@@ -101,11 +101,20 @@ export function FeaturesTab() {
               }
               label="Façades documentées disponibles"
             />
-            <p className="field-hint">
-              Hôtel de Région : dimensions des grandes verrières documentées.
-              Leur position verticale et la profondeur des renfoncements sont
-              estimées pour une lecture en maquette. Le bâtiment reste fermé.
-            </p>
+            {hasArbreBlanc ? (
+              <p className="field-hint">
+                Arbre Blanc : deux avancées de terrasses sont retirées du corps
+                de la tour d’après les plans de l’architecte. Le recalage du
+                contour et sa continuité entre les étages sont interprétés.
+              </p>
+            ) : null}
+            {hasHotelRegion ? (
+              <p className="field-hint">
+                Hôtel de Région : dimensions des grandes verrières documentées.
+                Leur position verticale et la profondeur des renfoncements sont
+                estimées pour une lecture en maquette. Le bâtiment reste fermé.
+              </p>
+            ) : null}
           </>
         ) : null}
         <p className="field-hint">

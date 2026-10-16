@@ -26,6 +26,10 @@ import { makeBeamBridge } from "./beam-bridge";
 import { verifiedBridgeDeckProfile } from "../data/bridge-deck-profile";
 import { makeMeasuredBridgeApproach } from "./measured-bridge-approach";
 import { removeNumericalShells } from "./retain-shells";
+import {
+  filterCutFragments,
+  underPrintResolution,
+} from "./filter-cut-fragments";
 import { openEdgeContacts } from "./open-edge-contacts";
 import { makeBasinRim } from "./basin-rim";
 import { buildMeasuredStairReference } from "./measured-stair-reference";
@@ -810,6 +814,9 @@ export async function buildPrintModel(
       realRoofCount: 0,
       lidarRoofCount: 0,
       reconstructedBalconyBuildingCount: 0,
+      documentedArbreBodyCount: 0,
+      tileDiscardedFeatureCount: 0,
+      tileDiscardedFeatureVolumeMm3: 0,
       documentedFacadeBuildingCount: 0,
       taggedRoofCount: 0,
       staircaseCount: 0,
@@ -2236,6 +2243,8 @@ export async function buildPrintModel(
                 clip,
                 minimumHeight: minBuildingHeightMm,
                 minFeatureMm,
+                documentedFacade:
+                  settings.features.buildings.documentedFacades !== false,
               })
             : null;
         if (balconies) {
@@ -2278,6 +2287,17 @@ export async function buildPrintModel(
         if (balconies) {
           stats.reconstructedBalconyBuildingCount =
             (stats.reconstructedBalconyBuildingCount ?? 0) + 1;
+          if (balconies.documentedBody) {
+            stats.documentedArbreBodyCount =
+              (stats.documentedArbreBodyCount ?? 0) + 1;
+            derivedSources.push(
+              "Arbre Blanc · contour de façade interprété des plans R+9 et R+16 publiés par Nicolas Laisné Architectes · https://nicolaslaisne.com/portfolio_page/arbre-blanc/ · recalage et continuité verticale estimés",
+            );
+            warnings.push(
+              "Arbre Blanc : deux avancées de terrasses incluses dans le contour OpenStreetMap sont retirées du corps de la tour d’après les plans R+9 et R+16 de l’architecte. Le contour est recalé sur la carte ; sa continuité entre les étages est interprétée. Ce corps reconstitué ne constitue pas un relevé de façade.",
+              `Arbre Blanc : les raccords horizontaux vers la façade corrigée atteignent ${balconies.maximumInferredConnectionM.toFixed(2)} m dans cette représentation. Leur allongement est limité aux deux avancées retirées et à l’ancienne zone de raccord de 1,5 m autour du contour OSM. Cette distance est estimée, pas mesurée.`,
+            );
+          }
           derivedSources.push(
             "Arbre Blanc · IGN LiDAR HD du 28/05/2021 · Licence Ouverte 2.0 · https://geoservices.ign.fr/lidarhd",
             "Arbre Blanc · enveloppe de toiture Montpellier Méditerranée Métropole 2020 et noyau OpenStreetMap · ODbL · volume du noyau, raccords et épaisseurs reconstitués",
@@ -2779,19 +2799,8 @@ export async function buildPrintModel(
     // They carry no printable material and must not become detached mesh faces.
     // Internal voids have negative oriented boundary shells. They are not
     // detached pieces and must remain in the original solid and export.
-    const underResolution = (component: Manifold): boolean => {
-      const volume = component.volume();
-      if (volume <= 0 || volume >= minFeatureMm ** 3) return false;
-      const bounds = component.boundingBox();
-      return (
-        bounds.min[2] > 0.001 &&
-        Math.min(
-          bounds.max[0] - bounds.min[0],
-          bounds.max[1] - bounds.min[1],
-          bounds.max[2] - bounds.min[2],
-        ) < minFeatureMm
-      );
-    };
+    const underResolution = (component: Manifold): boolean =>
+      underPrintResolution(component, minFeatureMm);
     const retained = (component: Manifold) =>
       hasMaterial(component) && !underResolution(component);
     const omittedFragments = components.filter(
@@ -2919,7 +2928,23 @@ export async function buildPrintModel(
               )
               .translate([minX, minY, 0]),
           );
-          const cut = arena.keep(result.intersect(cube));
+          const rawCut = arena.keep(result.intersect(cube));
+          const filteredCut = filterCutFragments(cad, arena, rawCut, {
+            minimumFeatureMm: minFeatureMm,
+            min: [minX, minY],
+            max: [minX + tileWidth, minY + tileDepth],
+            internalEdges: {
+              west: col > 0,
+              east: col < cols - 1,
+              south: row > 0,
+              north: row < rows - 1,
+            },
+            hasMaterial,
+          });
+          stats.tileDiscardedFeatureCount! += filteredCut.discardedCount;
+          stats.tileDiscardedFeatureVolumeMm3! +=
+            filteredCut.discardedVolumeMm3;
+          const cut = filteredCut.solid;
           // Prefer the tighter cut tolerance to conserve the repaired parent.
           // Complex surveyed intersections can need its one-micron tolerance;
           // either result must pass the same strict exported-mesh validation.
@@ -2997,6 +3022,10 @@ export async function buildPrintModel(
     if (tileContactRepairs)
       warnings.push(
         `${tileContactRepairs} contact(s) de précision ont été ouverts localement dans les tuiles sur 0,005 mm, en trois passages au maximum et avec un retrait cumulé limité à 0,01 % du volume de chaque tuile. Les cavités sont conservées.`,
+      );
+    if (stats.tileDiscardedFeatureCount)
+      warnings.push(
+        `Découpe : ${stats.tileDiscardedFeatureCount} petite(s) pointe(s) de détails séparée(s) par les bords des plaques, sous le seuil du profil (${minFeatureMm} mm), ont été écartées des seules tuiles. Volume total : ${stats.tileDiscardedFeatureVolumeMm3!.toFixed(6)} mm³. Le modèle entier les conserve. Les fragments plus grands restent soumis aux contrôles habituels ; aucun appui artificiel n’est ajouté.`,
       );
     if (stats.estimatedHeights)
       warnings.push(

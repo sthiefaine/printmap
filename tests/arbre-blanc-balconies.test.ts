@@ -44,6 +44,23 @@ const toZ = (elevationM: number) => baseZ + elevationM * sf;
 const sourceSnapshot = JSON.stringify(original.osmData);
 let model: PrintModel;
 let envelope: PrintModel;
+
+function assertCutVolume(
+  subject: PrintModel,
+  wholeVolume: number,
+  tileVolume: number,
+  minimumFeatureMm: number,
+) {
+  const omitted = subject.stats.tileDiscardedFeatureVolumeMm3 ?? 0;
+  const count = subject.stats.tileDiscardedFeatureCount ?? 0;
+  assert.ok(omitted >= 0 && omitted <= count * minimumFeatureMm ** 3);
+  assert.ok(
+    Math.abs(tileVolume + omitted - wholeVolume) / wholeVolume < 0.0001,
+    "tile material plus explicitly filtered cut tips conserves the parent volume",
+  );
+  if (count) assert.ok(subject.warnings.some((w) => w.startsWith("Découpe :")));
+}
+
 function input(balconies: boolean): PrintInput {
   const settings = structuredClone(DEFAULT_MODEL_SETTINGS);
   settings.base.grid = { cols: 2, rows: 2 };
@@ -249,6 +266,13 @@ test("Arbre Blanc keeps a connected physical balcony reconstruction at 1:5000 an
   assert.equal(observed.method.undersidesMeasured, false);
   assert.equal(observed.method.slabThicknessMeasured, false);
   assert.equal(model.stats.reconstructedBalconyBuildingCount, 1);
+  assert.equal(model.stats.documentedArbreBodyCount, 1);
+  assert.ok(
+    model.sources.some((source) =>
+      source.includes("https://nicolaslaisne.com/portfolio_page/arbre-blanc/"),
+    ),
+    "the corrected facade remains explicitly attributed as an interpretation",
+  );
   assert.equal(model.stats.buildingCount, 1);
   assert.equal(model.stats.components, 1);
   assert.equal(model.tiles.length, 4);
@@ -257,7 +281,16 @@ test("Arbre Blanc keeps a connected physical balcony reconstruction at 1:5000 an
     (sum, tile) => sum + assertClosedSolid(tile),
     0,
   );
-  assert.ok(Math.abs(tileVolume - volume) / volume < 0.0001);
+  assert.ok(
+    model.stats.tileDiscardedFeatureCount! > 0,
+    "cutting through the tower exposes real sub-resolution cantilever tips",
+  );
+  assertCutVolume(
+    model,
+    volume,
+    tileVolume,
+    DEFAULT_MODEL_SETTINGS.print.minFeatureMm,
+  );
   assert.ok(
     volume < assertClosedSolid(envelope),
     "keeping air under balconies removes the old filled columns",
@@ -440,7 +473,12 @@ test("the exact browser scale and phase retain a nearly tangent municipal terrac
     (sum, tile) => sum + assertClosedSolid(tile),
     0,
   );
-  assert.ok(Math.abs(tileVolume - volume) / volume < 0.0001);
+  assertCutVolume(
+    browserModel,
+    volume,
+    tileVolume,
+    browserInput.settings.print.minFeatureMm,
+  );
   const browserProjection = createProjectionForBbox(browserBbox);
   let checked = 0;
   for (const { elevationM, point } of allSurfaceProbes()) {
@@ -520,7 +558,12 @@ test("the user's C3 L1 assembly frame retains the balconies without a detached s
     0,
   );
   assert.equal(retained.tiles.length, 4);
-  assert.ok(Math.abs(tileVolume - volume) / volume < 0.0001);
+  assertCutVolume(
+    retained,
+    volume,
+    tileVolume,
+    assemblyInput.settings.print.minFeatureMm,
+  );
   const assemblyProjection = createProjectionForBbox(assemblyBbox, originLat);
   let checked = 0;
   for (const { elevationM, point } of allSurfaceProbes()) {

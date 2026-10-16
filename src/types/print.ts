@@ -83,6 +83,12 @@ export interface PrintModel extends PrintMesh {
     lidarRoofCount?: number;
     /** Derived terrace geometry, never counted as a complete measured building. */
     reconstructedBalconyBuildingCount?: number;
+    /** Arbre Blanc facade contour interpreted from the architect's plans. */
+    documentedArbreBodyCount?: number;
+    /** Real cantilever tips separated by a tile cut and below the print profile. */
+    tileDiscardedFeatureCount?: number;
+    /** Native volume omitted from tiles only; the whole model keeps it. */
+    tileDiscardedFeatureVolumeMm3?: number;
     /** Facade relief based on documentary dimensions, not a surveyed shell. */
     documentedFacadeBuildingCount?: number;
     taggedRoofCount: number;

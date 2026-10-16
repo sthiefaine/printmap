@@ -88,10 +88,13 @@ export function QualityReport() {
           <p>
             <strong>Arbre Blanc · balcons reconstitués</strong> · plateaux
             visibles dans le LiDAR IGN, complétés par les terrasses et le
-            couronnement du relevé municipal. Le volume du noyau, les raccords
-            et les épaisseurs sont estimés. Le relevé aérien reste incomplet ;
-            les 193 balcons ne sont pas tous relevés. Vérifiez les surplombs et
-            les supports dans votre logiciel d’impression.
+            couronnement du relevé municipal.{" "}
+            {model.stats.documentedArbreBodyCount
+              ? "Le corps de la tour suit un contour corrigé d’après les plans R+9 et R+16 de l’architecte ; son recalage et sa continuité verticale sont interprétés. "
+              : "Le corps de la tour est estimé depuis le contour OpenStreetMap. "}
+            Les raccords et les épaisseurs sont estimés. Le relevé aérien reste
+            incomplet ; les 193 balcons ne sont pas tous relevés. Vérifiez les
+            surplombs et les supports dans votre logiciel d’impression.
           </p>
         ) : null}
         {model.stats.documentedFacadeBuildingCount ? (
@@ -102,6 +105,14 @@ export function QualityReport() {
             ; leur relief est adapté à l’impression. Un volume plein reste
             derrière le verre. Cette restitution ne constitue pas un relevé de
             façade.
+          </p>
+        ) : null}
+        {model.stats.tileDiscardedFeatureCount ? (
+          <p>
+            <strong>Découpe</strong> · {model.stats.tileDiscardedFeatureCount}{" "}
+            petites pointes de détails séparées par les bords des plaques, sous
+            le seuil du profil, sont écartées des tuiles. Le modèle entier les
+            conserve ; le volume retiré est indiqué dans les remarques.
           </p>
         ) : null}
         {model.stats.reconstructedBridgeCount > 0 ? (

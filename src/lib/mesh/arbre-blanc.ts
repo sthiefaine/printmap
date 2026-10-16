@@ -7,6 +7,7 @@ import type {
 import type { Point2D } from "@/types/geometry";
 import type { RoofSurface } from "@/types/osm";
 import observed from "../data/arbre-blanc-lidar.json";
+import documented from "../data/arbre-blanc-facade.json";
 import { repairCoincident } from "./repair-coincident";
 import { repairNumericalTriangles } from "./repair-numerical-triangles";
 import { repairCollinear } from "./repair-collinear";
@@ -33,6 +34,8 @@ export interface ArbreBlancOptions {
   clip: CrossSection;
   minimumHeight: number;
   minFeatureMm: number;
+  /** Use the two local facade corrections documented at R+9 and R+16. */
+  documentedFacade?: boolean;
 }
 export interface ArbreBlancModel {
   solid: Manifold;
@@ -49,6 +52,9 @@ export interface ArbreBlancModel {
   /** Proxy facade up to the highest observed terrace, not a measured wall. */
   bodyTopElevationM: number;
   estimatedBody: true;
+  documentedBody?: boolean;
+  /** Longest retained gap to the interpreted facade; not a measured balcony. */
+  maximumInferredConnectionM: number;
 }
 
 /** Source identities remain stable when a cached OSM extract is enriched again. */
@@ -221,9 +227,16 @@ export function makeArbreBlanc(
         Math.min(sourceFootprint.area(), supplied.area()) * 0.95
     )
       return null;
-    const core = arena.keep(
+    const documentedBody = options.documentedFacade !== false;
+    // OSM's overall envelope includes two western overhangs. Published R+9
+    // and R+16 drawings put the occupied facade behind these local lobes. Keep
+    // every other mapped vertex; this is not a uniform shrink of the tower.
+    const mappedCore = arena.keep(
       section(observed.coreFootprint).intersect(footprint),
     );
+    const core = documentedBody
+      ? arena.keep(section(documented.facadeFootprint).intersect(mappedCore))
+      : mappedCore;
     if (core.isEmpty()) return null;
     if (
       surfaces.some(
@@ -341,9 +354,22 @@ export function makeArbreBlanc(
     let retainedLevelCount = 0,
       terraceCount = 0,
       inferredConnectionCount = 0,
+      maximumInferredConnectionM = 0,
       omittedFragmentCount = 0;
     const coreRings = core.toPolygons();
+    const mappedCoreRings = mappedCore.toPolygons();
     const maximumGap = observed.method.coreConnectionMaxM * sf;
+    // The 1.5m observation guard still refers to the unchanged mapped core.
+    // Correcting its two overhang lobes may lengthen a horizontal connection
+    // inside material previously occupied by that proxy body. Bound that extra
+    // inference to the original core's same 1.5m neighbourhood and source plot.
+    const connectionEnvelope = documentedBody
+      ? arena.keep(
+          arena
+            .keep(mappedCore.offset(maximumGap, "Miter"))
+            .intersect(footprint),
+        )
+      : footprint;
     const addPlate = (shape: CrossSection, elevation: number) => {
       const z = roofZ(elevation);
       if (z <= slabThicknessMm || !Number.isFinite(z)) return false;
@@ -355,14 +381,24 @@ export function makeArbreBlanc(
         }
         let connected = part;
         let inferred = false;
+        let connectionGapM = 0;
         const overlap = arena.keep(part.intersect(core));
-        if (overlap.area() <= 0.000001) {
-          let pair = nearestPair(part.toPolygons(), coreRings);
-          if (pair.distance > maximumGap + 0.000001) {
+        // The acceptance guard below checks a 3D attachment volume. A grazing
+        // 2D overlap may exceed 1e-6 mm² yet still provide less than 1e-6 mm³
+        // through this thin slab. Construct its finite link instead of later
+        // discarding the complete, genuinely observed terrace.
+        const grazingOverlap = overlap.area() * slabThicknessMm <= 0.000001;
+        if (grazingOverlap) {
+          const sourceDistance = nearestPair(
+            part.toPolygons(),
+            mappedCoreRings,
+          ).distance;
+          if (sourceDistance > maximumGap + 0.000001) {
             omittedFragmentCount++;
             continue;
           }
-          if (pair.distance === 0) {
+          let pair = nearestPair(part.toPolygons(), coreRings);
+          if (pair.distance === 0 || overlap.area() > 0) {
             // Tangent contours have no direction vector. Aim at a point just
             // inside the already occupied core instead of manufacturing a
             // zero-area tongue. The admissible exterior gap was checked above;
@@ -412,7 +448,7 @@ export function makeArbreBlanc(
                   "EvenOdd",
                 ),
               )
-              .intersect(footprint),
+              .intersect(connectionEnvelope),
           );
           // Clipping this inferred rectangle to a concave source envelope can
           // leave a separate scrap on the other side of an indentation. Such
@@ -433,6 +469,7 @@ export function makeArbreBlanc(
             continue;
           }
           inferred = true;
+          connectionGapM = pair.distance / sf;
         }
         const plate = arena.keep(
           arena
@@ -447,7 +484,13 @@ export function makeArbreBlanc(
           continue;
         }
         solids.push(plate);
-        if (inferred) inferredConnectionCount++;
+        if (inferred) {
+          inferredConnectionCount++;
+          maximumInferredConnectionM = Math.max(
+            maximumInferredConnectionM,
+            connectionGapM,
+          );
+        }
         terraceCount++;
         retained = true;
       }
@@ -552,6 +595,8 @@ export function makeArbreBlanc(
       repairVolumeDeltaMm3: cleaned.volume() - originalVolume,
       bodyTopElevationM,
       estimatedBody: true,
+      documentedBody,
+      maximumInferredConnectionM,
     };
   } catch {
     return null;
