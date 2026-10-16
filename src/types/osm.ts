@@ -97,9 +97,25 @@ export interface DataReport {
   lidarRoofResolutionM?: number | null;
   lidarRoofMinResolutionM?: number | null;
   landmarkRoofBuildingCount?: number;
+  /** Persistent progress of optional local surveys; limits apply to each batch. */
+  landmarkRefinement?: LandmarkRefinementProgress;
   municipalStructureCount?: number;
   /** Located landmarks whose point data does not provide printable 3D geometry. */
   pointLandmarkCount?: number;
+}
+
+export interface LandmarkRefinementProgress {
+  version: 1;
+  updatedAt: string;
+  remaining: number;
+  completed: number;
+  failed: number;
+  limited: number;
+  attempts: Array<{
+    id: string;
+    outcome: "unavailable" | "invalid" | "budget";
+    reason: string;
+  }>;
 }
 
 export interface MapDataResponse {

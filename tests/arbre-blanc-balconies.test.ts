@@ -9,7 +9,10 @@ import { createProjectionForBbox } from "../src/lib/projection";
 import { createSTLBuffer } from "../src/lib/export/stl-export";
 import { create3MFBuffer } from "../src/lib/export/threemf-export";
 import { geographicPointInRing } from "../src/lib/osm/relation-polygons";
-import { DEFAULT_MODEL_SETTINGS } from "../src/store/use-scene-store";
+import {
+  DEFAULT_MODEL_SETTINGS,
+  PRINT_PROFILES,
+} from "../src/store/use-scene-store";
 import type { BBox } from "../src/types/osm";
 import {
   PRINT_LAYERS,
@@ -133,18 +136,54 @@ function witnesses() {
     point: level.verificationPoints[pointIndices[at]],
   }));
 }
+
+// Fixed interior points of the authentic 2020 horizontal RoofSurfaces. These
+// patches were absent from the earlier LiDAR-only reconstruction, despite
+// being present in its unchanged municipal input. Indices refer to the native
+// fixture, not the order of triangles produced by the constructor.
+const municipalProbes = [
+  { surface: 18, elevationM: 59.469, lat: 43.605664531, lon: 3.898074662 },
+  { surface: 21, elevationM: 50.749, lat: 43.605941197, lon: 3.898316667 },
+  { surface: 26, elevationM: 50.809, lat: 43.606057505, lon: 3.898249804 },
+  { surface: 38, elevationM: 50.631, lat: 43.606062165, lon: 3.89806721 },
+  { surface: 42, elevationM: 56.304, lat: 43.605890552, lon: 3.898262053 },
+  { surface: 43, elevationM: 50.824, lat: 43.605904186, lon: 3.898269443 },
+  { surface: 45, elevationM: 45.094, lat: 43.605800802, lon: 3.898228125 },
+  { surface: 49, elevationM: 45.201, lat: 43.605839052, lon: 3.898236193 },
+  { surface: 52, elevationM: 50.749, lat: 43.605686345, lon: 3.898213405 },
+  { surface: 55, elevationM: 42.349, lat: 43.605665161, lon: 3.898136116 },
+  { surface: 57, elevationM: 56.304, lat: 43.605709886, lon: 3.898224403 },
+  { surface: 60, elevationM: 51.411, lat: 43.605827472, lon: 3.897890894 },
+];
+function allSurfaceProbes() {
+  return [
+    ...witnesses().map(({ level, point }) => ({
+      elevationM: level.elevationM,
+      point,
+    })),
+    ...municipalProbes.map((point) => ({
+      elevationM: point.elevationM,
+      point,
+    })),
+  ];
+}
 function printedPoint(point: { lat: number; lon: number }): [number, number] {
   const [x, y] = projection.project(point.lon, point.lat);
   return [x * sf, y * sf];
 }
-function localPoint(tile: PrintTile, x: number, y: number) {
+function localPoint(
+  tile: PrintTile,
+  x: number,
+  y: number,
+  parent: PrintModel = model,
+) {
   return [
     x +
-      model.dimensions.widthMm / 2 -
+      parent.dimensions.widthMm / 2 -
       tile.col * tile.widthMm -
       tile.widthMm / 2,
     y +
-      model.dimensions.depthMm / 2 -
+      parent.dimensions.depthMm / 2 -
       tile.row * tile.depthMm -
       tile.depthMm / 2,
   ];
@@ -318,6 +357,125 @@ test("real LiDAR returns outside the OSM core have thin slabs, downward undersid
   );
 });
 
+test("twelve previously discarded municipal terrace patches keep native tops and open undersides in the model and tiles", () => {
+  const surfaces = original.osmData.elements[0].roofSurfaces!;
+  for (const point of municipalProbes) {
+    const surface = surfaces[point.surface];
+    assert.ok(
+      [surface.outer, ...surface.holes].every((ring) =>
+        ring.every((p) => p.elevation === point.elevationM),
+      ),
+    );
+    assert.ok(geographicPointInRing(point, surface.outer));
+    assert.equal(
+      surface.holes.some((hole) => geographicPointInRing(point, hole)),
+      false,
+    );
+    assert.equal(
+      geographicPointInRing(point, observed.coreFootprint.outer),
+      false,
+    );
+    const [x, y] = printedPoint(point);
+    const z = toZ(point.elevationM) - 0.06;
+    const values = intervals(model, x, y);
+    const slab = values.find((v) => z > v.bottom && z < v.top);
+    assert.ok(slab, `municipal surface ${point.surface} retains material`);
+    assert.ok(Math.abs(slab.top - toZ(point.elevationM)) < 0.005);
+    assert.ok(slab.top - slab.bottom < 0.5);
+    const under = slab.bottom - 0.03;
+    assert.equal(includes(values, under), false);
+    assert.equal(includes(intervals(envelope, x, y), under), true);
+    let containing = 0;
+    for (const tile of model.tiles) {
+      const [tx, ty] = localPoint(tile, x, y);
+      if (Math.abs(tx) > tile.widthMm / 2 || Math.abs(ty) > tile.depthMm / 2)
+        continue;
+      const cut = intervals(tile, tx, ty);
+      assert.equal(includes(cut, z), true);
+      assert.equal(includes(cut, under), false);
+      const localSlab = cut.find((v) => z > v.bottom && z < v.top)!;
+      assert.ok(Math.abs(localSlab.top - toZ(point.elevationM)) < 0.005);
+      containing++;
+    }
+    assert.ok(containing > 0);
+  }
+});
+
+test("the exact browser scale and phase retain a nearly tangent municipal terrace and all 29 fixed source witnesses", async () => {
+  // Real failing browser selection/normalised scale. The deliberate flat IGN69
+  // control retains its exact datum, isolating the XY contact from DEM noise.
+  // Surface 38 is only 4e-9 mm from the core at this phase: clamping the unit
+  // vector's denominator to 1e-6 discarded a genuine, well-supported terrace.
+  const browserBbox: BBox = [43.6025, 3.892, 43.609, 3.901];
+  const browserScale = 4997.5784102273765;
+  const browserSf = 1000 / browserScale;
+  const datum = 6.12;
+  const browserInput = input(true);
+  browserInput.bbox = browserBbox;
+  browserInput.scale = browserScale;
+  browserInput.settings.print = { ...PRINT_PROFILES.detail.print };
+  browserInput.elevationGrid = {
+    rows: 2,
+    cols: 2,
+    points: [datum, datum, datum, datum],
+    minElev: datum,
+    maxElev: datum,
+    south: browserBbox[0],
+    west: browserBbox[1],
+    north: browserBbox[2],
+    east: browserBbox[3],
+    source: "IGN69 datum · declared synthetic browser-phase regression control",
+  };
+  const browserModel = await buildPrintModel(browserInput);
+  assert.equal(browserModel.stats.reconstructedBalconyBuildingCount, 1);
+  assert.equal(browserModel.tiles.length, 4);
+  assert.ok(
+    !browserModel.warnings.some((w) =>
+      /balcons.*n’a pas pu être conservée/.test(w),
+    ),
+    "the source reconstruction must not silently fall back to an extrusion",
+  );
+  const volume = assertClosedSolid(browserModel);
+  const tileVolume = browserModel.tiles.reduce(
+    (sum, tile) => sum + assertClosedSolid(tile),
+    0,
+  );
+  assert.ok(Math.abs(tileVolume - volume) / volume < 0.0001);
+  const browserProjection = createProjectionForBbox(browserBbox);
+  let checked = 0;
+  for (const { elevationM, point } of allSurfaceProbes()) {
+    const [px, py] = browserProjection.project(point.lon, point.lat);
+    const x = px * browserSf,
+      y = py * browserSf;
+    const expectedTop = baseZ + (elevationM - datum) * browserSf;
+    const z = expectedTop - 0.06;
+    const values = intervals(browserModel, x, y);
+    const slab = values.find((v) => z > v.bottom && z < v.top);
+    assert.ok(slab, `source witness ${elevationM}m retains real material`);
+    assert.ok(slab.top - slab.bottom < 0.5);
+    assert.ok(slab.top >= expectedTop - 0.005);
+    if ("surface" in point) assert.ok(Math.abs(slab.top - expectedTop) < 0.005);
+    assert.equal(includes(values, slab.bottom - 0.03), false);
+    let containing = 0;
+    for (const tile of browserModel.tiles) {
+      const [tx, ty] = localPoint(tile, x, y, browserModel);
+      if (Math.abs(tx) > tile.widthMm / 2 || Math.abs(ty) > tile.depthMm / 2)
+        continue;
+      const cut = intervals(tile, tx, ty);
+      const tileSlab = cut.find((v) => z > v.bottom && z < v.top);
+      assert.ok(tileSlab);
+      assert.ok(Math.abs(tileSlab.bottom - slab.bottom) < 0.00001);
+      assert.ok(Math.abs(tileSlab.top - slab.top) < 0.00001);
+      assert.equal(includes(cut, slab.bottom - 0.03), false);
+      containing++;
+    }
+    assert.ok(containing > 0);
+    checked++;
+  }
+  assert.equal(checked, 29);
+  assert.equal(JSON.stringify(original.osmData), sourceSnapshot);
+});
+
 test("whole and all four STL/3MF exports preserve physical balcony air and exact millimetre geometry", async () => {
   for (const mesh of [model, ...model.tiles]) {
     const stl = readSTL(createSTLBuffer(mesh));
@@ -330,7 +488,7 @@ test("whole and all four STL/3MF exports preserve physical balcony air and exact
     assert.deepEqual(threemf.positions, mesh.positions);
     assert.deepEqual(threemf.indices, mesh.indices);
     assert.deepEqual(threemf.faceLayers, mesh.faceLayers);
-    for (const { level, point } of witnesses()) {
+    for (const { elevationM, point } of allSurfaceProbes()) {
       let [x, y] = printedPoint(point);
       if ("col" in mesh) {
         [x, y] = localPoint(mesh, x, y);
@@ -350,7 +508,7 @@ test("whole and all four STL/3MF exports preserve physical balcony air and exact
             Math.abs(actual[at].top - expectedIntervals[at].top) < 0.00001,
           );
         }
-        assert.equal(includes(actual, toZ(level.elevationM) - 0.06), true);
+        assert.equal(includes(actual, toZ(elevationM) - 0.06), true);
       }
     }
   }
@@ -380,7 +538,7 @@ test("worker preview uses the same balcony triangles and voids as the printable 
   assert.ok(
     Math.abs(assertClosedSolid(restored) - assertClosedSolid(model)) < 0.00001,
   );
-  for (const { point } of witnesses()) {
+  for (const { point } of allSurfaceProbes()) {
     const [x, y] = printedPoint(point);
     assert.deepEqual(intervals(restored, x, y), intervals(model, x, y));
   }

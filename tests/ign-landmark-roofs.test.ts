@@ -185,10 +185,13 @@ test("landmark enrichment shares the import vertex budget with existing primary 
     type: "way",
     id: 999,
     groundElevation: 520,
-    roofSurfaces: Array.from({ length: 20 }, (): RoofSurface => ({
-      outer: ring,
-      holes: [],
-    })),
+    roofSurfaces: Array.from(
+      { length: 20 },
+      (): RoofSurface => ({
+        outer: ring,
+        holes: [],
+      }),
+    ),
     tags: {
       building: "yes",
       "printmap:source_id": "native/near-import-budget",
@@ -206,6 +209,54 @@ test("landmark enrichment shares the import vertex budget with existing primary 
   assert.equal(result.elements[0], primary);
   assert.ok(result.warnings.some((warning) => warning.includes("budgets")));
   validateRoofData(result.elements);
+});
+
+test("progressive refinement charges total LiDAR budget net of the coarse roofs being replaced", async (t) => {
+  t.mock.method(Date, "now", () => 1_000_000);
+  const coarse = elements.map((element) => ({
+    ...element,
+    tags: {
+      ...element.tags,
+      "printmap:roof_reconstruction": "lidar",
+      "printmap:roof_resolution_m": "4",
+    },
+    groundElevation: 520,
+    roofSurfaces: [
+      {
+        outer: element.geometry!.map((point) => ({ ...point, elevation: 540 })),
+        holes: [],
+      },
+    ],
+  }));
+  const source = JSON.stringify(coarse);
+  const result = await enrichIGNLandmarkRoofs(
+    coarse,
+    bbox,
+    new AbortController().signal,
+    {
+      grids,
+      allowCoarseLidar: true,
+      maxTotalLidarTriangles: 5194,
+    },
+  );
+  assert.equal(result.buildingCount, 2);
+  assert.equal(result.triangleCount, 5194);
+  assert.deepEqual(result.attempts, []);
+  assert.equal(JSON.stringify(coarse), source);
+  const tooSmall = await enrichIGNLandmarkRoofs(
+    coarse,
+    bbox,
+    new AbortController().signal,
+    {
+      grids,
+      allowCoarseLidar: true,
+      maxTotalLidarTriangles: 1,
+    },
+  );
+  assert.equal(tooSmall.buildingCount, 0);
+  assert.equal(tooSmall.attempts.length, 2);
+  assert.ok(tooSmall.attempts.every((entry) => entry.outcome === "budget"));
+  assert.equal(tooSmall.elements[0], coarse[0]);
 });
 
 test("landmark CPU deadline and cancellation are observed before publishing geometry", async () => {

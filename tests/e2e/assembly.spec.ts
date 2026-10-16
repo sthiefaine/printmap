@@ -258,6 +258,263 @@ async function loadPlate(page: Page, cached = false) {
   await ready(page);
 }
 
+test("progressive five-building refinement shows the base, preserves completed batches and resumes after reload", async ({
+  page,
+}) => {
+  const ids = [82001, 82002, 82003, 82004, 82005];
+  const source = "E2E · toiture LiDAR synthétique, aucun relevé réel";
+  let collections = 0;
+  let phase: "hold" | "save-then-outage" | "finish" = "hold";
+  let releaseInitial!: () => void;
+  let settleInitial!: () => void;
+  const initialSettled = new Promise<void>((resolve) => {
+    settleInitial = resolve;
+  });
+  const batches: number[][] = [];
+  const requests: Array<{ completed: number; terrain: string }> = [];
+  let active = 0,
+    maximumActive = 0;
+  const refinedIds = (data: MapDataResponse) =>
+    data.osmData.elements
+      .filter(
+        (element) => element.tags?.["printmap:roof_refinement"] === "landmark",
+      )
+      .map((element) => element.id);
+  const nextBatch = (previous: MapDataResponse) => {
+    const data = structuredClone(previous);
+    const selected = ids
+      .filter((id) => !refinedIds(data).includes(id))
+      .slice(0, 2);
+    for (const element of data.osmData.elements) {
+      if (!selected.includes(element.id)) continue;
+      const height = Number(element.tags!.height);
+      element.groundElevation = 100;
+      element.roofSurfaces = [
+        {
+          outer: element.geometry!.map((point) => ({
+            ...point,
+            elevation: 100 + height,
+          })),
+          holes: [],
+        },
+      ];
+      element.roofSource = source;
+      element.tags = {
+        ...element.tags,
+        "printmap:roof_reconstruction": "lidar",
+        "printmap:roof_refinement": "landmark",
+        "printmap:roof_resolution_m": "1",
+        "printmap:height_source": source,
+      };
+    }
+    const completed = refinedIds(data).length;
+    data.report.sources = [...new Set([...data.report.sources, source])];
+    data.report.landmarkRoofBuildingCount = completed;
+    data.report.lidarRoofBuildingCount = completed;
+    data.report.lidarRoofSurfaceCount = completed;
+    data.report.lidarRoofResolutionM = 1;
+    data.report.lidarRoofMinResolutionM = 1;
+    data.report.landmarkRefinement = {
+      version: 1,
+      updatedAt: "2026-10-16T13:00:00.000Z",
+      completed,
+      remaining: ids.length - completed,
+      failed: 0,
+      limited: 0,
+      attempts: [],
+    };
+    return { data, selected };
+  };
+  await page.route("**/api/map-data", async (route) => {
+    collections++;
+    const bbox = bboxFrom(route);
+    const data = plateData(bbox, "Cinq édifices synthétiques");
+    data.osmData.elements = data.osmData.elements.filter(
+      (element) => !element.tags?.building,
+    );
+    const starts = [
+      [0.12, 0.15],
+      [0.43, 0.15],
+      [0.73, 0.15],
+      [0.43, 0.68],
+      [0.73, 0.68],
+    ];
+    for (const [index, id] of ids.entries()) {
+      const [x, y] = starts[index];
+      data.osmData.elements.push({
+        type: "way",
+        id,
+        tags: {
+          building: "church",
+          name: `Édifice synthétique ${index + 1}`,
+          height: String(12 + index * 2),
+        },
+        geometry: [
+          [x, y],
+          [x + 0.1, y],
+          [x + 0.1, y + 0.12],
+          [x, y + 0.12],
+          [x, y],
+        ].map(([u, v]) => ({
+          lon: bbox[1] + u * (bbox[3] - bbox[1]),
+          lat: bbox[0] + v * (bbox[2] - bbox[0]),
+        })),
+      });
+    }
+    data.report.buildingCount = ids.length;
+    data.report.elementCount = data.osmData.elements.length;
+    data.report.landmarkRefinement = {
+      version: 1,
+      updatedAt: data.report.fetchedAt,
+      completed: 0,
+      remaining: ids.length,
+      failed: 0,
+      limited: 0,
+      attempts: [],
+    };
+    await route.fulfill({ json: data });
+  });
+  await page.route("**/api/refine-buildings", async (route) => {
+    active++;
+    maximumActive = Math.max(maximumActive, active);
+    try {
+      const { data } = route.request().postDataJSON() as {
+        data: MapDataResponse;
+      };
+      requests.push({
+        completed: refinedIds(data).length,
+        terrain: JSON.stringify(data.elevationGrid),
+      });
+      if (phase === "hold") {
+        await new Promise<void>((resolve) => {
+          releaseInitial = resolve;
+        });
+        await route
+          .fulfill({ json: nextBatch(data).data })
+          .catch(() => undefined);
+        settleInitial();
+        return;
+      }
+      if (phase === "save-then-outage" && batches.length === 1) {
+        await route.fulfill({
+          status: 503,
+          json: { error: "Détails synthétiques temporairement indisponibles" },
+        });
+        return;
+      }
+      const next = nextBatch(data);
+      batches.push(next.selected);
+      await route.fulfill({ json: next.data });
+    } finally {
+      active--;
+    }
+  });
+
+  await createAssembly(page);
+  await page
+    .getByRole("button", {
+      name: "Charger et construire cette plaque",
+      exact: true,
+    })
+    .click();
+  await expect.poll(() => requests.length).toBe(1);
+  // The first optional network batch is suspended, yet the real worker has
+  // already built a base whose report and scene are visible.
+  await expect(page.locator(".scene-view canvas")).toBeVisible();
+  await expect(page.locator(".quality-report summary")).toContainText(
+    "5 bâtiments",
+  );
+  await page.getByRole("button", { name: "Annuler", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  releaseInitial();
+  await initialSettled;
+  assert145mm(stlMesh((await download(page, "Télécharger le STL")).bytes));
+  const baseline = (await manifest(page)).content.project;
+  const baseData = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  ).data as MapDataResponse;
+  expect(refinedIds(baseData)).toEqual([]);
+  expect(baseData.report.landmarkRefinement?.remaining).toBe(5);
+
+  const refine = page.getByRole("button", {
+    name: "Affiner les édifices remarquables",
+    exact: true,
+  });
+  phase = "save-then-outage";
+  await refine.click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Détails synthétiques temporairement indisponibles" }),
+  ).toBeVisible();
+  await expect(refine).toBeEnabled();
+  const partial = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  ).data as MapDataResponse;
+  expect(refinedIds(partial)).toEqual(ids.slice(0, 2));
+  expect(partial.report.landmarkRefinement).toMatchObject({
+    completed: 2,
+    remaining: 3,
+  });
+  expect(partial.elevationGrid).toEqual(baseData.elevationGrid);
+  expect(partial.report.fetchedAt).toBe(baseData.report.fetchedAt);
+  expect((await manifest(page)).content.project).toEqual(baseline);
+
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Construire cette plaque", exact: true }),
+  ).toBeEnabled();
+  const restored = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  ).data as MapDataResponse;
+  expect(restored).toEqual(partial);
+  await loadPlate(page, true);
+  expect(collections).toBe(1);
+  expect(requests).toHaveLength(3);
+  phase = "finish";
+  await refine.click();
+  await expect.poll(() => batches.length).toBe(3);
+  await expect(refine).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Télécharger le STL", exact: true }),
+  ).toBeEnabled();
+  const finished = JSON.parse(
+    (
+      await download(page, "Enregistrer les données de cette plaque")
+    ).bytes.toString(),
+  ).data as MapDataResponse;
+  expect(batches.map((batch) => batch.length)).toEqual([2, 2, 1]);
+  expect(batches.flat()).toEqual(ids);
+  expect(requests.map((request) => request.completed)).toEqual([0, 0, 2, 2, 4]);
+  expect(maximumActive).toBe(1);
+  expect(collections).toBe(1);
+  expect(finished.report.landmarkRefinement).toMatchObject({
+    completed: 5,
+    remaining: 0,
+    failed: 0,
+    limited: 0,
+  });
+  expect(finished.elevationGrid).toEqual(baseData.elevationGrid);
+  expect(
+    requests.every(
+      (request) => request.terrain === JSON.stringify(baseData.elevationGrid),
+    ),
+  ).toBe(true);
+  expect((await manifest(page)).content.project).toEqual(baseline);
+  await expect(page.locator(".quality-report summary")).toContainText(
+    "5 LiDAR",
+  );
+  assert145mm(stlMesh((await download(page, "Télécharger le STL")).bytes));
+});
+
 test("refreshing one cached plate preserves the last data on network failure, then updates sources without moving the assembly", async ({
   page,
 }) => {

@@ -39,6 +39,8 @@ export interface ArbreBlancModel {
   observedLevelCount: number;
   retainedLevelCount: number;
   terraceCount: number;
+  /** Exterior surveyed roof patches retained as slabs at their native heights. */
+  municipalTerraceCount: number;
   inferredConnectionCount: number;
   omittedFragmentCount: number;
   slabThicknessMm: number;
@@ -355,12 +357,31 @@ export function makeArbreBlanc(
         let inferred = false;
         const overlap = arena.keep(part.intersect(core));
         if (overlap.area() <= 0.000001) {
-          const pair = nearestPair(part.toPolygons(), coreRings);
+          let pair = nearestPair(part.toPolygons(), coreRings);
           if (pair.distance > maximumGap + 0.000001) {
             omittedFragmentCount++;
             continue;
           }
-          const length = Math.max(pair.distance, 0.000001);
+          if (pair.distance === 0) {
+            // Tangent contours have no direction vector. Aim at a point just
+            // inside the already occupied core instead of manufacturing a
+            // zero-area tongue. The admissible exterior gap was checked above;
+            // this five-micron inset changes only the internal overlap.
+            const interior = arena.keep(core.offset(-0.005, "Miter"));
+            if (interior.isEmpty()) {
+              omittedFragmentCount++;
+              continue;
+            }
+            pair = nearestPair(part.toPolygons(), interior.toPolygons());
+            if (!Number.isFinite(pair.distance) || pair.distance === 0) {
+              omittedFragmentCount++;
+              continue;
+            }
+          }
+          // A nonzero vector must stay unit length, even for a nanometre-scale
+          // gap. Clamping its divisor shrank the whole tongue and discarded a
+          // genuine municipal terrace at the browser's exact print scale.
+          const length = pair.distance;
           const ux = (pair.to[0] - pair.from[0]) / length,
             uy = (pair.to[1] - pair.from[1]) / length;
           const halfWidth = Math.min(
@@ -427,9 +448,28 @@ export function makeArbreBlanc(
       );
       if (addPlate(shape, level.elevationM)) retainedLevelCount++;
     }
-    // The 2020 roof panels describe the core's height field. Outside the core,
-    // use only the more recent observed 2021 levels: superimposing the two
-    // epochs would create duplicate, slightly displaced terrace slabs.
+    // Aerial laser occlusion leaves real terrace tips unseen, particularly on
+    // lower storeys. The municipal survey supplies additional horizontal tops:
+    // keep their exact outlines and heights as slabs rather than discarding
+    // them or extruding them to the foundation. The same finite attachment,
+    // printable-area and final closed-boundary checks apply to both sources.
+    // Nearby tops from the two epochs may merge into a slightly thicker slab;
+    // they are not claimed as two independently observed balconies.
+    const exteriorTerraces = new Map<number, CrossSection[]>();
+    for (const surface of surfaces) {
+      const elevation = surface.outer[0].elevation;
+      if (elevation > bodyTopElevationM) continue;
+      const shape = arena.keep(
+        arena.keep(section(surface).intersect(footprint)).subtract(core),
+      );
+      const parts = exteriorTerraces.get(elevation) ?? [];
+      parts.push(shape);
+      exteriorTerraces.set(elevation, parts);
+    }
+    const beforeMunicipalTerraces = terraceCount;
+    for (const [elevation, shapes] of exteriorTerraces)
+      addPlate(arena.keep(cad.CrossSection.union(shapes)), elevation);
+    const municipalTerraceCount = terraceCount - beforeMunicipalTerraces;
     const native = arena.keep(
       arena.keep(cad.Manifold.union(solids)).translate(origin),
     );
@@ -491,6 +531,7 @@ export function makeArbreBlanc(
       observedLevelCount: observed.levels.length,
       retainedLevelCount,
       terraceCount,
+      municipalTerraceCount,
       inferredConnectionCount,
       omittedFragmentCount,
       slabThicknessMm,

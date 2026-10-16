@@ -27,6 +27,7 @@ import {
 } from "./use-scene-store";
 import { useMapStore } from "./use-map-store";
 import { useAppStore } from "./use-app-store";
+import { refineLandmarkQueue } from "@/lib/data/refinement-client";
 
 const ACTIVE = "printmap-assembly-active-v1";
 const LAST = "printmap-assembly-last-v1";
@@ -81,6 +82,42 @@ function installSettings(project: AssemblyProject) {
     modelSettings: structuredClone(project.settings),
   });
 }
+
+async function persistRefinement(
+  project: AssemblyProject,
+  cell: AssemblyCell,
+  data: MapDataResponse,
+  signal: AbortSignal,
+  id: number,
+) {
+  let stored = false;
+  try {
+    await saveAssemblyCell(project.id, cell, data, signal);
+    stored = true;
+  } catch {
+    signal.throwIfAborted();
+  }
+  if (id !== sequence)
+    throw new DOMException("Préparation annulée.", "AbortError");
+  useAssemblyStore.setState({
+    cached: stored
+      ? [...new Set([...useAssemblyStore.getState().cached, cellKey(cell)])]
+      : useAssemblyStore
+          .getState()
+          .cached.filter((key) => key !== cellKey(cell)),
+    transient: stored
+      ? null
+      : { projectId: project.id, key: cellKey(cell), data },
+  });
+}
+
+const refinementNotice = (
+  progress?: MapDataResponse["report"]["landmarkRefinement"],
+  inMemory = false,
+) =>
+  progress
+    ? `Détails de cette plaque : ${progress.completed} édifice(s) affiné(s), ${progress.remaining} en attente. ${inMemory ? "Les détails reçus restent en mémoire : enregistrez les données de la plaque avant de fermer." : "Les lots terminés sont sauvegardés."}`
+    : "Recherche des édifices nommés à affiner sur cette plaque…";
 interface AssemblyState {
   project: AssemblyProject | null;
   lastProject: AssemblyProject | null;
@@ -97,6 +134,7 @@ interface AssemblyState {
   select: (cell: AssemblyCell) => Promise<void>;
   add: (direction: "north" | "south" | "east" | "west") => Promise<void>;
   load: (options?: { refresh?: boolean }) => Promise<void>;
+  refine: () => Promise<void>;
   cancel: () => void;
   importCell: (input: unknown) => Promise<void>;
   cellBackup: () => Promise<string>;
@@ -295,6 +333,8 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
     );
     try {
       let cacheIssue = false;
+      let collected = false;
+      let refinementIssue = "";
       let data: MapDataResponse | null = null;
       const transient = get().transient;
       if (
@@ -328,6 +368,7 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
             result.error || "Collecte de cette plaque impossible. Réessayez.",
           );
         data = validateAssemblyData(result, assemblyCellBbox(original, cell));
+        collected = true;
       } else
         data = validateAssemblyData(data, assemblyCellBbox(original, cell));
       if (id !== sequence || signal.aborted) return;
@@ -391,6 +432,42 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
           "Données de cette plaque conservées dans ce navigateur. Construction en cours…",
       });
       clearTimeout(timeout);
+      if (collected && data.report.landmarkRefinement?.remaining) {
+        // The usable base reaches the viewer before optional local surveys.
+        // A large queue must not hold the first model behind network requests.
+        installSettings(project);
+        await useMapStore.getState().openAssemblyCell(
+          snapshot(project, cell, data),
+          {
+            originLat: project.origin.lat,
+            elevationDatumM: project.elevationDatumM!,
+          },
+          true,
+        );
+        if (id !== sequence || signal.aborted) return;
+        if (useMapStore.getState().status === "done")
+          refreshPreview = useMapStore.getState().model;
+        try {
+          data = await refineLandmarkQueue(
+            data,
+            assemblyCellBbox(project, cell),
+            signal,
+            {
+              onBatch: async (batch) => {
+                await persistRefinement(project, cell, batch, signal, id);
+                data = batch;
+              },
+              onProgress: (progress) =>
+                set({ notice: refinementNotice(progress, !!get().transient) }),
+            },
+          );
+        } catch (error) {
+          signal.throwIfAborted();
+          refinementIssue =
+            error instanceof Error ? error.message : "Affinement interrompu.";
+        }
+      }
+      if (id !== sequence || signal.aborted) return;
       installSettings(project);
       await useMapStore.getState().openAssemblyCell(
         snapshot(project, cell, data),
@@ -402,9 +479,11 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       );
       if (id === sequence)
         set({
+          error: refinementIssue || null,
           notice:
             useMapStore.getState().status === "done"
-              ? cacheIssue && !stored
+              ? (cacheIssue && !stored) ||
+                get().transient?.key === cellKey(cell)
                 ? "Plaque prête. Stockage local indisponible : enregistrez les données de cette plaque avant d’en changer."
                 : "Plaque prête. Vous pouvez l’exporter ou en choisir une autre."
               : !stored
@@ -439,6 +518,85 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       }
     }
   },
+  refine: async () => {
+    const project = get().project;
+    if (!project) return;
+    const cell = project.activeCell ?? project.cells[0];
+    const previousModel = useMapStore.getState().model;
+    stop();
+    refreshPreview = previousModel;
+    const id = sequence,
+      controller = new AbortController();
+    pending = controller;
+    const signal = controller.signal;
+    set({ busy: true, error: null, notice: refinementNotice() });
+    let data: MapDataResponse | null = null;
+    let issue = "";
+    try {
+      const transient = get().transient;
+      data =
+        transient?.projectId === project.id && transient.key === cellKey(cell)
+          ? transient.data
+          : await readAssemblyCell(project.id, cell);
+      signal.throwIfAborted();
+      if (!data)
+        throw new Error("Chargez d’abord les données de cette plaque.");
+      try {
+        data = await refineLandmarkQueue(
+          data,
+          assemblyCellBbox(project, cell),
+          signal,
+          {
+            retry: true,
+            onBatch: async (batch) => {
+              await persistRefinement(project, cell, batch, signal, id);
+              data = batch;
+            },
+            onProgress: (progress) =>
+              set({ notice: refinementNotice(progress, !!get().transient) }),
+          },
+        );
+      } catch (error) {
+        signal.throwIfAborted();
+        issue =
+          error instanceof Error ? error.message : "Affinement interrompu.";
+      }
+      if (id !== sequence || signal.aborted) return;
+      installSettings(project);
+      set({ notice: "Détails sauvegardés. Construction de la plaque…" });
+      await useMapStore.getState().openAssemblyCell(
+        snapshot(project, cell, data),
+        {
+          originLat: project.origin.lat,
+          elevationDatumM: project.elevationDatumM!,
+        },
+        true,
+      );
+      if (id === sequence) {
+        const progress = data.report.landmarkRefinement;
+        set({
+          error: issue || null,
+          notice: progress
+            ? `${progress.completed} édifice(s) affiné(s) · ${progress.remaining} en attente · ${progress.failed} relevé(s) indisponible(s) ou non exploitable(s) · ${progress.limited} limité(s) par la géométrie. ${get().transient?.key === cellKey(cell) ? "Stockage local indisponible : les détails restent en mémoire. Enregistrez les données de cette plaque avant de fermer ou d’en changer." : "Les autres plaques sont conservées."}`
+            : "Plaque reconstruite depuis les données disponibles.",
+        });
+      }
+    } catch (error) {
+      if (id === sequence) {
+        if (previousModel && useMapStore.getState().model === previousModel)
+          useMapStore.setState({ status: "done" });
+        set({
+          error:
+            error instanceof Error ? error.message : "Affinement interrompu.",
+        });
+      }
+    } finally {
+      if (id === sequence) {
+        refreshPreview = null;
+        set({ busy: false });
+      }
+    }
+  },
   cancel: () => {
     const previousModel = refreshPreview;
     stop();
@@ -446,7 +604,8 @@ export const useAssemblyStore = create<AssemblyState>((set, get) => ({
       useMapStore.setState({ status: "done" });
     set({
       busy: false,
-      notice: "Préparation annulée. Les autres plaques sont conservées.",
+      notice:
+        "Préparation annulée. Les lots déjà sauvegardés et les autres plaques sont conservés. « Construire cette plaque » applique les détails enregistrés.",
     });
   },
   importCell: async (input) => {

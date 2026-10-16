@@ -16,7 +16,9 @@ const LANDMARK_REPRESENTATIONS: Record<
   "surveyed-roof": "Toiture 3D mesurée · façades simplifiées",
   "lidar-roof": "Toiture LiDAR reconstruite · façades simplifiées",
   "reconstructed-balconies":
-    "Plateaux LiDAR · noyau, raccords et épaisseur reconstitués",
+    "Terrasses LiDAR et municipales · noyau, raccords et épaisseur reconstitués",
+  "reconstructed-bridge":
+    "Tablier reconstitué · profil supérieur mesuré ou estimé, épaisseur estimée",
   mixed: "Plusieurs parties · niveaux de détail différents",
   "osm-roof": "Forme de toiture renseignée · dimensions estimées",
   footprint: "Volume simplifié · empreinte et hauteur",
@@ -253,7 +255,7 @@ export function Scene3D() {
         {landmarks?.length ? (
           <div className="landmark-view">
             <label>
-              Explorer les bâtiments remarquables
+              Explorer les bâtiments et ouvrages remarquables
               <select
                 aria-label="Voir un monument"
                 value={selectedLandmark ? landmarkId : ""}

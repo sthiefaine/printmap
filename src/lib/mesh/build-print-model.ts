@@ -22,6 +22,8 @@ import {
   makeMeasuredRoofFallbackFootprint,
 } from "./measured-solid";
 import { makeSurveyedArch } from "./bridge-solid";
+import { makeBeamBridge } from "./beam-bridge";
+import { verifiedBridgeDeckProfile } from "../data/bridge-deck-profile";
 import { makeMeasuredBridgeApproach } from "./measured-bridge-approach";
 import { removeNumericalShells } from "./retain-shells";
 import { openEdgeContacts } from "./open-edge-contacts";
@@ -1315,6 +1317,121 @@ export async function buildPrintModel(
     }
     onProgress(28, "Construction des routes et des espaces naturels");
     let supportedStructures = 0;
+    // A beam deck belongs at its upper road level. Painting the same footprint
+    // onto bare-earth terrain instead follows the river bed and hides the road.
+    // Prepare only supported decks, so an unavailable profile keeps the ordinary
+    // terrain fallback without suppressing the mapped road.
+    const beamBridges = new Map<
+      (typeof parsed.bridges)[number],
+      {
+        beam: NonNullable<ReturnType<typeof makeBeamBridge>>;
+        source: string;
+        measured: boolean;
+        sourceUrls: string[];
+      }
+    >();
+    if (settings.features.piers.enabled && terrain.gridVertices.length) {
+      for (const bridge of parsed.bridges) {
+        if (!/^(beam|slab)$/i.test(bridge.tags["bridge:structure"] ?? ""))
+          continue;
+        const section = footprint(
+          bridge.polygon,
+          minFeatureMm * minFeatureMm,
+          true,
+        );
+        if (
+          !section ||
+          arena.keep(section.offset(-minFeatureMm / 2, "Miter")).isEmpty()
+        )
+          continue;
+        const contains = (point: Point2D) =>
+          pointInPolygon(...point, bridge.polygon.outer) &&
+          !bridge.polygon.holes.some((ring) => pointInPolygon(...point, ring));
+        const carried = parsed.roads
+          .filter((road) => road.isBridge && road.polyline.some(contains))
+          .sort(
+            (a, b) =>
+              b.polyline
+                .slice(1)
+                .reduce(
+                  (n, p, i) =>
+                    n +
+                    Math.hypot(
+                      p[0] - b.polyline[i][0],
+                      p[1] - b.polyline[i][1],
+                    ),
+                  0,
+                ) -
+              a.polyline
+                .slice(1)
+                .reduce(
+                  (n, p, i) =>
+                    n +
+                    Math.hypot(
+                      p[0] - a.polyline[i][0],
+                      p[1] - a.polyline[i][1],
+                    ),
+                  0,
+                ),
+          );
+        const axis = carried[0]?.polyline;
+        if (!axis || axis.length < 2) continue;
+        const verified = input.elevationGrid?.source?.includes("IGN")
+          ? verifiedBridgeDeckProfile(bridge.sourceId, input.osmData.elements)
+          : null;
+        const thickness = Math.max(0.12, Math.min(0.3, minFeatureMm / 2));
+        const profile = verified
+          ? verified.points.map((point) => ({
+              point: projection
+                .project(point.lon, point.lat)
+                .map((value) => value * sf) as Point2D,
+              z:
+                settings.base.basePlateThicknessMm +
+                (point.elevationM - elevationDatumM) *
+                  sf *
+                  settings.base.elevationExaggeration,
+            }))
+          : [axis[0], axis.at(-1)!].map((point) => ({
+              point,
+              z: terrain.surfaceAt(...point),
+            }));
+        if (!verified) {
+          // Both mapped ends must stand above a genuine terrain depression. This
+          // is only a declared bank-to-bank estimate, never a measured arch or
+          // an automatic bridge above an ordinary flat street.
+          const middle: Point2D = [
+            (axis[0][0] + axis.at(-1)![0]) / 2,
+            (axis[0][1] + axis.at(-1)![1]) / 2,
+          ];
+          if (
+            Math.min(...profile.map((point) => point.z)) -
+              terrain.surfaceAt(...middle) <=
+            thickness + 0.12
+          )
+            continue;
+        }
+        const beam = makeBeamBridge(cad, arena, {
+          footprint: section,
+          clip,
+          profile,
+          thicknessMm: thickness,
+          terrainSolid: terrain.solid,
+          terrainMaxZ: terrain.maxZ,
+        });
+        if (beam)
+          beamBridges.set(bridge, {
+            beam,
+            measured: !!verified,
+            source:
+              verified?.source ??
+              "interpolation du MNT aux deux rives cartographiées",
+            sourceUrls: verified?.requests ?? [],
+          });
+      }
+    }
+    const beamFootprint = combine(
+      [...beamBridges.values()].map((item) => item.beam.footprint),
+    );
     const stairs: StairFlight[] = [];
     if (settings.features.roads.enabled) {
       const roads: CrossSection[] = [];
@@ -1401,12 +1518,14 @@ export async function buildPrintModel(
           }
           unavailableStairs++;
         }
-        const section = corridor(
+        let section = corridor(
           road.polyline,
           road.halfWidth * settings.features.roads.widthMultiplier,
         );
+        if (section && road.isBridge && beamFootprint)
+          section = arena.keep(section.subtract(beamFootprint));
         if (section) {
-          roads.push(section);
+          if (!section.isEmpty()) roads.push(section);
           stats.roadCount++;
           if (
             road.isBridge &&
@@ -1526,7 +1645,9 @@ export async function buildPrintModel(
         }
       }
       for (const bridge of parsed.bridges) {
-        const section = footprint(bridge.polygon);
+        const preparedBeam = beamBridges.get(bridge);
+        const section =
+          preparedBeam?.beam.footprint ?? footprint(bridge.polygon);
         if (!section) {
           stats.discardedFeatures++;
           continue;
@@ -1537,6 +1658,66 @@ export async function buildPrintModel(
           !arena.keep(section.intersect(aqueductFootprint)).isEmpty()
         )
           continue;
+        if (preparedBeam) {
+          const { beam } = preparedBeam;
+          base = arena.keep(base.subtract(beam.aboveDeck));
+          let bridgeSolid = beam.solid;
+          if (settings.features.roads.enabled) {
+            const shapes = parsed.roads
+              .filter((road) => road.isBridge && roadIncluded(road, input))
+              .flatMap((road) => {
+                const shape = corridor(
+                  road.polyline,
+                  road.halfWidth * settings.features.roads.widthMultiplier,
+                );
+                return shape
+                  ? [arena.keep(shape.intersect(beam.footprint))]
+                  : [];
+              });
+            const roadSection = combine(shapes);
+            if (roadSection && !roadSection.isEmpty()) {
+              // Partition the native deck itself, as with terrain colours.
+              // Subtracting a translated skin reintroduces coincident films at
+              // profile joints and assigns some road faces to the structure.
+              // Both retained parts are subsets of the same solid: the micron
+              // palette overlap changes neither its envelope nor its altitude.
+              const prism = arena.keep(roadSection.extrude(terrain.maxZ + 10));
+              const [inside, outside] = beam.solid.split(prism);
+              arena.keep(inside);
+              arena.keep(outside);
+              const overlapping = arena.keep(
+                arena
+                  .keep(roadSection.offset(0.001, "Miter"))
+                  .intersect(beam.footprint),
+              );
+              const roadVolume = arena.keep(
+                beam.solid.intersect(
+                  arena.keep(overlapping.extrude(terrain.maxZ + 10)),
+                ),
+              );
+              bridgeSolid = outside;
+              solids.push(tag(roadVolume, "roads"));
+            }
+          }
+          solids.push(tag(bridgeSolid, "buildings"));
+          stats.reconstructedBridgeCount++;
+          if (bridge.tags.name && landmarks.length < 100) {
+            const bounds = beam.solid.boundingBox();
+            landmarks.push({
+              id: bridge.sourceId,
+              name: bridge.tags.name,
+              min: bounds.min as [number, number, number],
+              max: bounds.max as [number, number, number],
+              source: preparedBeam.source,
+              representation: "reconstructed-bridge",
+            });
+          }
+          warnings.push(
+            `${bridge.tags.name ?? "Pont"} : tablier à poutres reconstitué dans son emprise cartographiée. Profil supérieur ${preparedBeam.measured ? "interpolé entre les pixels du MNS IGN 0,5 m" : "estimé entre les deux rives du MNT"} ; sous-face et épaisseur ${beam.inferredThicknessMm.toFixed(2)} mm adaptées à l’impression, non relevées. Aucun pilier ni voûte inventés. Vérifiez les supports des surplombs dans le trancheur. ${preparedBeam.measured ? "Les passerelles très basses peuvent perdre leur vide sous le tablier à cette échelle." : "Cette estimation ne constitue pas un relevé architectural."}`,
+          );
+          derivedSources.push(preparedBeam.source, ...preparedBeam.sourceUrls);
+          continue;
+        }
         const contains = (point: Point2D) =>
           pointInPolygon(...point, bridge.polygon.outer) &&
           !bridge.polygon.holes.some((ring) => pointInPolygon(...point, ring));
@@ -1698,17 +1879,32 @@ export async function buildPrintModel(
           }
           solids.push(tag(bridgeSolid, "buildings"));
           stats.reconstructedBridgeCount++;
+          if (bridge.tags.name && landmarks.length < 100) {
+            const bounds = arch.solid.boundingBox();
+            landmarks.push({
+              id: bridge.sourceId,
+              name: bridge.tags.name,
+              min: bounds.min as [number, number, number],
+              max: bounds.max as [number, number, number],
+              source:
+                bridge.tags["printmap:bridge_deck_source"] ??
+                bridge.tags["printmap:structure_source"] ??
+                "Dimensions documentées et raccords MNT estimés",
+              representation: "reconstructed-bridge",
+            });
+          }
           warnings.push(
             `${bridge.tags.name ?? "Pont"} : voûte reconstituée à partir de la portée (${span} m) et du passage (${clearance} m) documentés. Courbure elliptique approchée ; couronne minimale ${crownThickness} mm. Sol du boulevard et raccords estimés depuis ${approach!.sampleCount} points du terrain hors pont, pente ${approach!.slopePercent.toFixed(2)} %, correction limitée au passage et à ses accès. ${surveyedDeck != null ? `Cote du tablier IGN ${surveyedDeck} m, incertitude ${bridge.tags["printmap:bridge_deck_uncertainty"] ?? "non renseignée"} m.` : "Cote du tablier estimée depuis le relief."}`,
           );
         } else {
-          laySurface(section, 0, "piers");
+          // An unknown architectural profile cannot justify a coloured slab on
+          // the river bed. Retain the mapped carried road and its honest warning.
           missingBridges++;
         }
       }
       if (missingBridges)
         warnings.push(
-          `${missingBridges} pont(s) ou aqueduc(s) sont représentés par leur emprise au sol : les données ne fournissent pas de voûtes reconstructibles. Le contour ne représente pas leur volume architectural.`,
+          `${missingBridges} pont(s) ou aqueduc(s) restent sans volume architectural : les données ne fournissent pas de voûtes documentées ni de profil de tablier raccordable au terrain. Les voies cartographiées gardent le niveau du terrain.`,
         );
     }
     if (settings.features.buildings.enabled) {
@@ -2085,7 +2281,7 @@ export async function buildPrintModel(
             "Arbre Blanc · enveloppe de toiture Montpellier Méditerranée Métropole 2020 et noyau OpenStreetMap · ODbL · volume du noyau, raccords et épaisseurs reconstitués",
           );
           warnings.push(
-            `Arbre Blanc : ${balconies.retainedLevelCount} niveaux LiDAR visibles conservés sur ${balconies.observedLevelCount}. Le volume du noyau est reconstitué jusqu’au dernier plateau visible, avec le couronnement municipal au-dessus ; ${balconies.inferredConnectionCount} raccord(s) estimé(s), épaisseur de dalle adaptée à ${balconies.slabThicknessMm.toFixed(2)} mm. Les parties masquées et les sous-faces ne sont pas mesurées. Vérifiez les supports sous les balcons dans votre logiciel d’impression.`,
+            `Arbre Blanc : ${balconies.retainedLevelCount} niveaux LiDAR visibles conservés sur ${balconies.observedLevelCount}, complétés par ${balconies.municipalTerraceCount} pièce(s) de terrasses municipales à leurs cotes natives. Des surfaces proches issues de deux époques peuvent fusionner en une dalle plus épaisse ; ce nombre ne compte pas des balcons distincts. Le volume du noyau est reconstitué jusqu’au dernier plateau visible, avec le couronnement municipal au-dessus ; ${balconies.inferredConnectionCount} raccord(s) estimé(s), épaisseur de dalle adaptée à ${balconies.slabThicknessMm.toFixed(2)} mm. Les parties masquées et les sous-faces ne sont pas mesurées. Vérifiez les supports sous les balcons dans votre logiciel d’impression.`,
           );
           if (balconies.omittedFragmentCount)
             warnings.push(

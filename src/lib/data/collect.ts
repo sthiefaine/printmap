@@ -14,6 +14,7 @@ import { saintEtienneRoofAcquisitionBbox } from "./saint-etienne-areas";
 import {
   enrichIGNLandmarkRoofs,
   fetchIGNLandmarkRoofGrids,
+  landmarkRefinementProgress,
 } from "./ign-landmark-roofs";
 import {
   fetchCRAIGBuildings,
@@ -351,6 +352,7 @@ export async function collectMapData(
       lidarRoofResolutionM,
       lidarRoofMinResolutionM,
       landmarkRoofBuildingCount,
+      landmarkRefinement: landmarkRefinementProgress(elements, bbox),
       municipalStructureCount,
       pointLandmarkCount: pointLandmarks.pointLandmarkCount,
       ...(roofYears.length === 1 ? { lod2Year: roofYears[0] } : {}),

@@ -1,12 +1,16 @@
 "use client";
 import { useMapStore } from "@/store/use-map-store";
 import { useSceneStore } from "@/store/use-scene-store";
+import { useAssemblyStore } from "@/store/use-assembly-store";
 export function LoadingOverlay() {
   const status = useMapStore((s) => s.status);
   const error = useMapStore((s) => s.error);
   const progress = useMapStore((s) => s.progress);
   const label = useMapStore((s) => s.progressLabel);
-  const cancel = useMapStore((s) => s.cancel);
+  const cancelModel = useMapStore((s) => s.cancel);
+  const assemblyBusy = useAssemblyStore((s) => s.busy);
+  const cancelAssembly = useAssemblyStore((s) => s.cancel);
+  const cancel = assemblyBusy ? cancelAssembly : cancelModel;
   const generate = useMapStore((s) => s.generate);
   const rebuild = useMapStore((s) => s.rebuild);
   const hasData = useMapStore((s) => !!s.osmData);

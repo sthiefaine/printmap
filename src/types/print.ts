@@ -50,6 +50,7 @@ export interface PrintedLandmark {
     | "surveyed-roof"
     | "lidar-roof"
     | "reconstructed-balconies"
+    | "reconstructed-bridge"
     | "mixed"
     | "osm-roof"
     | "footprint";

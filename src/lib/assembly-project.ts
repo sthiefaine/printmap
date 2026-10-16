@@ -462,6 +462,38 @@ export function validateAssemblyData(
   validateImportedElements(input.osmData.elements);
   validateRoofData(input.osmData.elements);
   const report = input.report;
+  if (report.landmarkRefinement !== undefined) {
+    const queue = report.landmarkRefinement;
+    if (
+      !record(queue) ||
+      queue.version !== 1 ||
+      typeof queue.updatedAt !== "string" ||
+      !Number.isFinite(Date.parse(queue.updatedAt)) ||
+      ![queue.remaining, queue.completed, queue.failed, queue.limited].every(
+        (value) =>
+          finite(value) &&
+          Number.isInteger(value) &&
+          value >= 0 &&
+          value <= 15000,
+      ) ||
+      !Array.isArray(queue.attempts) ||
+      queue.attempts.length > 15000 ||
+      queue.attempts.some(
+        (entry: unknown) =>
+          !record(entry) ||
+          typeof entry.id !== "string" ||
+          !/^(way|relation)\/-?\d{1,16}$/.test(entry.id) ||
+          !["unavailable", "invalid", "budget"].includes(
+            entry.outcome as string,
+          ) ||
+          typeof entry.reason !== "string" ||
+          entry.reason.length > 1000,
+      ) ||
+      new Set(queue.attempts.map((entry: { id: string }) => entry.id)).size !==
+        queue.attempts.length
+    )
+      throw new Error("Progression des détails de la plaque invalide.");
+  }
   if (
     !stringList(report.sources) ||
     !stringList(report.warnings) ||

@@ -84,17 +84,19 @@ export function QualityReport() {
         {model.stats.reconstructedBalconyBuildingCount ? (
           <p>
             <strong>Arbre Blanc · balcons reconstitués</strong> · plateaux
-            visibles dans le LiDAR IGN, toiture du noyau issue du relevé
-            municipal. Le volume du noyau, les raccords et les épaisseurs sont
-            estimés. Le relevé aérien reste incomplet ; les 193 balcons ne sont
-            pas tous relevés. Vérifiez les surplombs et les supports dans votre
-            logiciel d’impression.
+            visibles dans le LiDAR IGN, complétés par les terrasses et le
+            couronnement du relevé municipal. Le volume du noyau, les raccords
+            et les épaisseurs sont estimés. Le relevé aérien reste incomplet ;
+            les 193 balcons ne sont pas tous relevés. Vérifiez les surplombs et
+            les supports dans votre logiciel d’impression.
           </p>
         ) : null}
         {model.stats.reconstructedBridgeCount > 0 ? (
           <p>
-            <strong>Ponts reconstruits depuis des dimensions</strong> ·{" "}
-            {model.stats.reconstructedBridgeCount} ouvrage
+            <strong>
+              Ponts reconstruits depuis des dimensions ou altitudes
+            </strong>{" "}
+            · {model.stats.reconstructedBridgeCount} ouvrage
             {model.stats.reconstructedBridgeCount > 1 ? "s" : ""} au profil
             approché. Cette reconstruction ne remplace pas un relevé 3D complet.
           </p>

@@ -1,4 +1,10 @@
-import type { BBox, LatLon, OverpassElement, RoofSurface } from "@/types/osm";
+import type {
+  BBox,
+  LatLon,
+  OverpassElement,
+  RoofSurface,
+  LandmarkRefinementProgress,
+} from "@/types/osm";
 import {
   elementPolygons,
   type GeographicPolygon,
@@ -193,10 +199,11 @@ function localRefinementBbox(
   }
 }
 
-function candidates(
+export function landmarkRefinementCandidates(
   elements: OverpassElement[],
   bbox: BBox,
   availableGrids?: ReadonlyMap<string, IGNRoofGrid>,
+  options: { allowCoarseLidar?: boolean; skipIds?: ReadonlySet<string> } = {},
 ) {
   const ways = new Map(
     elements.filter((element) => element.type === "way").map((e) => [e.id, e]),
@@ -207,7 +214,12 @@ function candidates(
   const selected = elements.filter((element) => {
     if (
       !nameOf(element) ||
-      element.roofSurfaces?.length ||
+      (element.roofSurfaces?.length &&
+        !(
+          options.allowCoarseLidar &&
+          element.tags?.["printmap:roof_reconstruction"] === "lidar" &&
+          element.tags?.["printmap:roof_refinement"] !== "landmark"
+        )) ||
       element.measuredSolid ||
       !element.tags?.building ||
       element.tags.building === "no" ||
@@ -218,7 +230,7 @@ function candidates(
     const key = keyOf(element);
     if (seen.has(key)) return false;
     // A local refinement must remain small and native even in a huge project.
-    // Keep the original two-acquisition/8192-triangle/4-second budgets unchanged.
+    // Bound each acquisition, not the number of landmarks in a project.
     const local = localRefinementBbox(element, ways, bbox);
     if (!local) return false;
     localBounds.set(key, local);
@@ -234,7 +246,12 @@ function candidates(
         (e) =>
           e.type === "relation" &&
           (selectedRelations.has(e) ||
-            e.roofSurfaces?.length ||
+            (e.roofSurfaces?.length &&
+              !(
+                options.allowCoarseLidar &&
+                e.tags?.["printmap:roof_reconstruction"] === "lidar" &&
+                e.tags?.["printmap:roof_refinement"] !== "landmark"
+              )) ||
             e.measuredSolid),
       )
       .flatMap((e) =>
@@ -245,7 +262,11 @@ function candidates(
     parseLengthMeters(element.tags?.height) ??
     (Number(element.tags?.["building:levels"]) || 0) * 3;
   const prioritized = selected
-    .filter((e) => e.type !== "way" || !memberWays.has(e.id))
+    .filter(
+      (e) =>
+        (e.type !== "way" || !memberWays.has(e.id)) &&
+        !options.skipIds?.has(keyOf(e)),
+    )
     .sort(
       (a, b) =>
         Number(availableGrids?.has(keyOf(b)) ?? false) -
@@ -254,22 +275,65 @@ function candidates(
         height(b) - height(a) ||
         keyOf(a).localeCompare(keyOf(b)),
     );
-  return { selected: prioritized.slice(0, 2), ways, localBounds };
+  return { selected: prioritized, ways, localBounds };
 }
 
-/** Start after OSM arrives, in parallel with the remaining providers. At most
- * two named civic landmarks, in any metropolitan French city; retain surveys. */
+/** Recompute progress from source geometry; caller-provided counts are not trusted. */
+export function landmarkRefinementProgress(
+  elements: OverpassElement[],
+  bbox: BBox,
+  previous?: LandmarkRefinementProgress,
+  retry = false,
+): LandmarkRefinementProgress {
+  const eligible = landmarkRefinementCandidates(elements, bbox, undefined, {
+    allowCoarseLidar: true,
+  }).selected;
+  const ids = new Set(eligible.map(keyOf));
+  const attempts = (previous?.attempts ?? []).filter(
+    (entry) => ids.has(entry.id) && !(retry && entry.outcome !== "budget"),
+  );
+  const attempted = new Set(attempts.map((entry) => entry.id));
+  const completed = new Set(
+    elements
+      .filter(
+        (element) =>
+          element.roofSurfaces?.length &&
+          element.tags?.["printmap:roof_reconstruction"] === "lidar" &&
+          element.tags?.["printmap:roof_refinement"] === "landmark",
+      )
+      .map(keyOf),
+  ).size;
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    remaining: eligible.filter((element) => !attempted.has(keyOf(element)))
+      .length,
+    completed,
+    failed: attempts.filter((entry) => entry.outcome !== "budget").length,
+    limited: attempts.filter((entry) => entry.outcome === "budget").length,
+    attempts,
+  };
+}
+
+/** Fetch two named civic landmarks per batch, in any metropolitan French city.
+ * A persisted project queue continues with subsequent batches; retain surveys. */
 export async function fetchIGNLandmarkRoofGrids(
   elements: OverpassElement[],
   bbox: BBox,
   signal: AbortSignal,
+  options: { allowCoarseLidar?: boolean; skipIds?: ReadonlySet<string> } = {},
 ): Promise<IGNLandmarkRoofGrids> {
   signal.throwIfAborted();
-  const { selected, localBounds } = candidates(elements, bbox);
+  const { selected, localBounds } = landmarkRefinementCandidates(
+    elements,
+    bbox,
+    undefined,
+    options,
+  );
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(25000)]);
   const result: IGNLandmarkRoofGrids = { grids: new Map(), warnings: [] };
   await Promise.all(
-    selected.map(async (element) => {
+    selected.slice(0, 2).map(async (element) => {
       try {
         const localBbox = localBounds.get(keyOf(element))!;
         const grid = await fetchIGNRoofGrid(localBbox, deadline);
@@ -294,10 +358,20 @@ export async function enrichIGNLandmarkRoofs(
   elements: OverpassElement[],
   bbox: BBox,
   signal: AbortSignal,
-  options: { grids?: Map<string, IGNRoofGrid>; cpuBudgetMs?: number } = {},
-): Promise<IGNRoofEnrichment> {
+  options: {
+    grids?: Map<string, IGNRoofGrid>;
+    cpuBudgetMs?: number;
+    allowCoarseLidar?: boolean;
+    skipIds?: ReadonlySet<string>;
+    maxTotalLidarTriangles?: number;
+  } = {},
+): Promise<
+  IGNRoofEnrichment & { attempts: LandmarkRefinementProgress["attempts"] }
+> {
   signal.throwIfAborted();
-  const result: IGNRoofEnrichment = {
+  const result: IGNRoofEnrichment & {
+    attempts: LandmarkRefinementProgress["attempts"];
+  } = {
     elements,
     buildingCount: 0,
     surfaceCount: 0,
@@ -305,8 +379,16 @@ export async function enrichIGNLandmarkRoofs(
     resolutionM: null,
     sources: [],
     warnings: [],
+    attempts: [],
   };
-  const { selected, ways } = candidates(elements, bbox, options.grids);
+  const candidates = landmarkRefinementCandidates(
+    elements,
+    bbox,
+    options.grids,
+    options,
+  );
+  const selected = candidates.selected.slice(0, 2),
+    ways = candidates.ways;
   if (!selected.length) return result;
   const cpuBudgetMs = Math.max(0, Math.min(4000, options.cpuBudgetMs ?? 4000));
   if (!cpuBudgetMs) {
@@ -317,7 +399,7 @@ export async function enrichIGNLandmarkRoofs(
   }
   const acquisition = options.grids
     ? { grids: options.grids, warnings: [] }
-    : await fetchIGNLandmarkRoofGrids(elements, bbox, signal);
+    : await fetchIGNLandmarkRoofGrids(elements, bbox, signal, options);
   result.warnings.push(...acquisition.warnings);
   const stop = Date.now() + cpuBudgetMs;
   let importVertices = 0,
@@ -329,6 +411,29 @@ export async function enrichIGNLandmarkRoofs(
       vertexCount(element.roofSurfaces ?? []) +
       vertexCount(element.measuredSolid?.surfaces ?? []);
   }
+  const trianglesOf = (element: OverpassElement) =>
+    (element.roofSurfaces ?? []).reduce(
+      (sum, surface) =>
+        sum +
+        surface.outer.length +
+        surface.holes.reduce((n, ring) => n + ring.length, 0) +
+        surface.holes.length -
+        3,
+      0,
+    );
+  let lidarTriangles = elements.reduce(
+    (sum, element) =>
+      sum +
+      (element.tags?.["printmap:roof_reconstruction"] === "lidar"
+        ? trianglesOf(element)
+        : 0),
+    0,
+  );
+  const attempt = (
+    element: OverpassElement,
+    outcome: LandmarkRefinementProgress["attempts"][number]["outcome"],
+    reason: string,
+  ) => result.attempts.push({ id: keyOf(element), outcome, reason });
   const enriched = new Map<OverpassElement, OverpassElement>();
   for (const element of selected) {
     await new Promise<void>((resolve) => setImmediate(resolve));
@@ -340,8 +445,20 @@ export async function enrichIGNLandmarkRoofs(
       break;
     }
     const native = acquisition.grids.get(keyOf(element));
-    if (!native) continue;
+    if (!native) {
+      attempt(
+        element,
+        "unavailable",
+        "Relevé local indisponible ou délai de collecte dépassé.",
+      );
+      continue;
+    }
     if (native.resolutionM !== 0.5) {
+      attempt(
+        element,
+        "unavailable",
+        "Source locale au pas natif de 0,5 m indisponible.",
+      );
       result.warnings.push(
         `${nameOf(element)} : le relevé local au pas natif de 0,5 m est absent ; les données précédentes sont conservées.`,
       );
@@ -358,23 +475,47 @@ export async function enrichIGNLandmarkRoofs(
     await new Promise<void>((resolve) => setImmediate(resolve));
     signal.throwIfAborted();
     if (Date.now() >= stop) {
+      attempt(
+        element,
+        "unavailable",
+        "La reconstruction de cet édifice a dépassé le temps du lot. Une nouvelle tentative reste possible.",
+      );
       result.warnings.push(
         "Affinement LiDAR des repères interrompu à la limite du temps CPU disponible ; les données précédentes sont conservées.",
       );
       break;
     }
     if (!roof) {
+      attempt(
+        element,
+        "invalid",
+        "La source ne satisfait pas les contrôles de reconstruction.",
+      );
       result.warnings.push(
         `${nameOf(element)} : la surface LiDAR locale ne satisfait pas les contrôles de reconstruction ; les données précédentes sont conservées.`,
       );
       continue;
     }
     const vertices = vertexCount(roof.surfaces);
+    const previousVertices = vertexCount(element.roofSurfaces ?? []);
+    const previousTriangles =
+      element.tags?.["printmap:roof_reconstruction"] === "lidar"
+        ? trianglesOf(element)
+        : 0;
+    const existing = !!element.roofSurfaces?.length;
     if (
       result.triangleCount + roof.triangleCount > 8192 ||
-      importVertices + vertices > MAX_ROOF_VERTICES ||
-      importBuildings + 1 > MAX_ROOF_BUILDINGS
+      importVertices - previousVertices + vertices > MAX_ROOF_VERTICES ||
+      importBuildings + (existing ? 0 : 1) > MAX_ROOF_BUILDINGS ||
+      (options.maxTotalLidarTriangles != null &&
+        lidarTriangles - previousTriangles + roof.triangleCount >
+          options.maxTotalLidarTriangles)
     ) {
+      attempt(
+        element,
+        "budget",
+        "Limite de géométrie de cette plaque atteinte ; les surfaces précédentes restent conservées.",
+      );
       result.warnings.push(
         `${nameOf(element)} : affinement LiDAR non ajouté pour respecter les budgets de géométrie et d’import du projet ; les données précédentes sont conservées.`,
       );
@@ -398,8 +539,9 @@ export async function enrichIGNLandmarkRoofs(
         ),
       },
     });
-    importVertices += vertices;
-    importBuildings++;
+    importVertices += vertices - previousVertices;
+    importBuildings += existing ? 0 : 1;
+    lidarTriangles += roof.triangleCount - previousTriangles;
     result.buildingCount++;
     result.surfaceCount += roof.surfaces.length;
     result.triangleCount += roof.triangleCount;

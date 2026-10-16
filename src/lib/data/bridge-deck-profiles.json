@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "source": "IGN · LiDAR HD · MNS et MNT natifs 0,5 m",
+  "verticalDatum": "IGN69",
+  "licence": {
+    "name": "Licence Ouverte Etalab 2.0",
+    "url": "https://www.etalab.gouv.fr/licence-ouverte-open-licence/"
+  },
+  "retrievedAt": "2026-10-16",
+  "sampling": "Pixel MNS 0,5 m contenant le point sur la chaussée OSM ; profil interpolé, sous-face et épaisseur non mesurées. Le MNT distingue le dessus du sol sous le tablier.",
+  "requests": [
+    "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&STYLES=normal&CRS=EPSG%3A2154&LAYERS=IGNF_LIDAR-HD_MNS_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93&BBOX=772390.75%2C6278971.25%2C772522.25%2C6279062.75&WIDTH=263&HEIGHT=183&FORMAT=image%2Fx-bil%3Bbits%3D32",
+    "https://data.geopf.fr/wms-r/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&STYLES=normal&CRS=EPSG%3A2154&LAYERS=IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93&BBOX=772390.75%2C6278971.25%2C772522.25%2C6279062.75&WIDTH=263&HEIGHT=183&FORMAT=image%2Fx-bil%3Bbits%3D32"
+  ],
+  "bridges": [
+    {
+      "osmWayId": 661170739,
+      "carriedWayId": 22918012,
+      "name": "Pont Juvénal",
+      "bounds": [
+        43.6062077,
+        3.8966061,
+        43.6064859,
+        3.8978038
+      ],
+      "profile": [
+        {
+          "lon": 3.8977873,
+          "lat": 43.6062786,
+          "elevationM": 15.673103332519531,
+          "bareEarthM": 15.670974731445312
+        },
+        {
+          "lon": 3.89774381,
+          "lat": 43.606288320000004,
+          "elevationM": 15.820442199707031,
+          "bareEarthM": 14.414060592651367
+        },
+        {
+          "lon": 3.89770032,
+          "lat": 43.606298040000006,
+          "elevationM": 15.942205429077148,
+          "bareEarthM": 14.019603729248047
+        },
+        {
+          "lon": 3.89765683,
+          "lat": 43.60630776,
+          "elevationM": 15.998346328735352,
+          "bareEarthM": 13.570368766784668
+        },
+        {
+          "lon": 3.89761334,
+          "lat": 43.60631748,
+          "elevationM": 16.066720962524414,
+          "bareEarthM": 12.595725059509277
+        },
+        {
+          "lon": 3.89756985,
+          "lat": 43.6063272,
+          "elevationM": 16.153696060180664,
+          "bareEarthM": 10.867959976196289
+        },
+        {
+          "lon": 3.89752636,
+          "lat": 43.606336920000004,
+          "elevationM": 16.213512420654297,
+          "bareEarthM": 9.969219207763672
+        },
+        {
+          "lon": 3.89748287,
+          "lat": 43.606346640000005,
+          "elevationM": 16.325092315673828,
+          "bareEarthM": 9.726005554199219
+        },
+        {
+          "lon": 3.89743938,
+          "lat": 43.60635636,
+          "elevationM": 16.397459030151367,
+          "bareEarthM": 9.508546829223633
+        },
+        {
+          "lon": 3.89739589,
+          "lat": 43.60636608,
+          "elevationM": 16.44499969482422,
+          "bareEarthM": 9.28311538696289
+        },
+        {
+          "lon": 3.8973524,
+          "lat": 43.6063758,
+          "elevationM": 16.502052307128906,
+          "bareEarthM": 9.113945007324219
+        },
+        {
+          "lon": 3.89731627,
+          "lat": 43.60638005,
+          "elevationM": 16.519367218017578,
+          "bareEarthM": 9.109663963317871
+        },
+        {
+          "lon": 3.89728014,
+          "lat": 43.6063843,
+          "elevationM": 16.507978439331055,
+          "bareEarthM": 9.093047142028809
+        },
+        {
+          "lon": 3.89724401,
+          "lat": 43.606388550000005,
+          "elevationM": 16.54828643798828,
+          "bareEarthM": 9.11052131652832
+        },
+        {
+          "lon": 3.89720788,
+          "lat": 43.6063928,
+          "elevationM": 16.567028045654297,
+          "bareEarthM": 9.11037540435791
+        },
+        {
+          "lon": 3.89717175,
+          "lat": 43.60639705,
+          "elevationM": 16.53827476501465,
+          "bareEarthM": 9.052412986755371
+        },
+        {
+          "lon": 3.8971356200000002,
+          "lat": 43.6064013,
+          "elevationM": 16.5340633392334,
+          "bareEarthM": 9.136292457580566
+        },
+        {
+          "lon": 3.89709949,
+          "lat": 43.60640555,
+          "elevationM": 16.51593017578125,
+          "bareEarthM": 9.093708038330078
+        },
+        {
+          "lon": 3.89706336,
+          "lat": 43.6064098,
+          "elevationM": 16.49728775024414,
+          "bareEarthM": 9.09459114074707
+        },
+        {
+          "lon": 3.89702723,
+          "lat": 43.60641405,
+          "elevationM": 16.478130340576172,
+          "bareEarthM": 9.09000015258789
+        },
+        {
+          "lon": 3.8969911,
+          "lat": 43.6064183,
+          "elevationM": 16.44279670715332,
+          "bareEarthM": 9.060068130493164
+        },
+        {
+          "lon": 3.89695295,
+          "lat": 43.60641806,
+          "elevationM": 16.441234588623047,
+          "bareEarthM": 9.269668579101562
+        },
+        {
+          "lon": 3.8969148000000002,
+          "lat": 43.606417820000004,
+          "elevationM": 16.357189178466797,
+          "bareEarthM": 9.518385887145996
+        },
+        {
+          "lon": 3.8968766500000003,
+          "lat": 43.60641758,
+          "elevationM": 16.302183151245117,
+          "bareEarthM": 9.831256866455078
+        },
+        {
+          "lon": 3.8968385000000003,
+          "lat": 43.60641734,
+          "elevationM": 16.202133178710938,
+          "bareEarthM": 9.982009887695312
+        },
+        {
+          "lon": 3.8968003500000004,
+          "lat": 43.6064171,
+          "elevationM": 16.140687942504883,
+          "bareEarthM": 10.208942413330078
+        },
+        {
+          "lon": 3.8967622,
+          "lat": 43.60641686,
+          "elevationM": 16.056303024291992,
+          "bareEarthM": 10.217598915100098
+        },
+        {
+          "lon": 3.89672405,
+          "lat": 43.606416620000005,
+          "elevationM": 15.97510814666748,
+          "bareEarthM": 10.160560607910156
+        },
+        {
+          "lon": 3.8966859,
+          "lat": 43.60641638,
+          "elevationM": 15.895486831665039,
+          "bareEarthM": 10.053793907165527
+        },
+        {
+          "lon": 3.89664775,
+          "lat": 43.60641614,
+          "elevationM": 15.831007957458496,
+          "bareEarthM": 15.831007957458496
+        },
+        {
+          "lon": 3.8966096,
+          "lat": 43.6064159,
+          "elevationM": 15.713000297546387,
+          "bareEarthM": 15.713000297546387
+        }
+      ]
+    },
+    {
+      "osmWayId": 661170808,
+      "carriedWayId": 142176812,
+      "name": "Passerelle Aphrodite",
+      "bounds": [
+        43.6067085,
+        3.8968256,
+        43.6068008,
+        3.8974384
+      ],
+      "profile": [
+        {
+          "lon": 3.8968291,
+          "lat": 43.6067804,
+          "elevationM": 9.720000267028809,
+          "bareEarthM": 9.720000267028809
+        },
+        {
+          "lon": 3.89688968,
+          "lat": 43.606775559999996,
+          "elevationM": 9.713208198547363,
+          "bareEarthM": 9.070627212524414
+        },
+        {
+          "lon": 3.89695026,
+          "lat": 43.60677072,
+          "elevationM": 9.727753639221191,
+          "bareEarthM": 9.062666893005371
+        },
+        {
+          "lon": 3.89701084,
+          "lat": 43.60676588,
+          "elevationM": 9.729204177856445,
+          "bareEarthM": 9.127575874328613
+        },
+        {
+          "lon": 3.89707142,
+          "lat": 43.60676104,
+          "elevationM": 9.702998161315918,
+          "bareEarthM": 9.161247253417969
+        },
+        {
+          "lon": 3.897132,
+          "lat": 43.6067562,
+          "elevationM": 9.713555335998535,
+          "bareEarthM": 9.127696990966797
+        },
+        {
+          "lon": 3.89719258,
+          "lat": 43.60675136,
+          "elevationM": 9.685308456420898,
+          "bareEarthM": 9.122459411621094
+        },
+        {
+          "lon": 3.89725316,
+          "lat": 43.60674652,
+          "elevationM": 9.688963890075684,
+          "bareEarthM": 9.125521659851074
+        },
+        {
+          "lon": 3.89731374,
+          "lat": 43.60674168,
+          "elevationM": 9.701736450195312,
+          "bareEarthM": 9.083123207092285
+        },
+        {
+          "lon": 3.89737432,
+          "lat": 43.60673684,
+          "elevationM": 9.698216438293457,
+          "bareEarthM": 9.110092163085938
+        },
+        {
+          "lon": 3.8974349,
+          "lat": 43.606732,
+          "elevationM": 9.696834564208984,
+          "bareEarthM": 9.696834564208984
+        }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { useMapStore } from "@/store/use-map-store";
 import { useAppStore } from "@/store/use-app-store";
 import {
   createAssemblyProject,
+  assemblyCellBbox,
   cellKey,
   cellLabel,
 } from "@/lib/assembly-project";
@@ -13,6 +14,7 @@ import { downloadBlob } from "@/lib/export/download";
 import { exportToSTL } from "@/lib/export/stl-export";
 import { create3MFBuffer } from "@/lib/export/threemf-export";
 import { validateExportLayout } from "@/lib/export/validate-layout";
+import { isMetropolitanFrance } from "@/lib/data/bbox";
 
 export function AssemblyStart() {
   const bbox = useMapStore((s) => s.bbox);
@@ -164,6 +166,8 @@ export function AssemblyPanel() {
   const planPersistent = useAssemblyStore((s) => s.planPersistent);
   const model = useMapStore((s) => s.model);
   const status = useMapStore((s) => s.status);
+  const refinement = useMapStore((s) => s.report?.landmarkRefinement);
+  const elements = useMapStore((s) => s.osmData?.elements);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const active = project.activeCell ?? project.cells[0];
@@ -370,6 +374,62 @@ export function AssemblyPanel() {
               Recherche les sources disponibles aujourd’hui pour cette plaque.
               Le plan, l’échelle et les raccords du terrain restent fixes.
             </p>
+            {isMetropolitanFrance(assemblyCellBbox(project, active)) ? (
+              <>
+                <button
+                  className="button button-secondary button-full"
+                  disabled={busy || exporting}
+                  onClick={() => void useAssemblyStore.getState().refine()}
+                >
+                  Affiner les édifices remarquables
+                </button>
+                <p className="field-hint">
+                  Recherche tous les édifices nommés éligibles de cette plaque,
+                  par petits lots sauvegardés. Les toitures municipales et le
+                  terrain sont conservés. Les parties masquées et les façades
+                  dépendent des relevés disponibles.
+                </p>
+                {refinement ? (
+                  <p className="field-hint" role="status">
+                    {refinement.completed} affiné(s) · {refinement.remaining} en
+                    attente · {refinement.failed} indisponible(s) ou non
+                    exploitable(s) · {refinement.limited} limité(s) par la
+                    géométrie.
+                  </p>
+                ) : null}
+                {refinement?.attempts.length ? (
+                  <details className="advanced-settings">
+                    <summary>
+                      Édifices dont les détails restent incomplets
+                    </summary>
+                    <ul>
+                      {refinement.attempts.slice(0, 12).map((attempt) => {
+                        const element = elements?.find(
+                          (entry) => `${entry.type}/${entry.id}` === attempt.id,
+                        );
+                        return (
+                          <li key={attempt.id}>
+                            <strong>
+                              {element?.tags?.name ||
+                                element?.tags?.official_name ||
+                                "Édifice nommé"}
+                            </strong>{" "}
+                            : {attempt.reason}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {refinement.attempts.length > 12 ? (
+                      <p className="field-hint">
+                        Et {refinement.attempts.length - 12} autre(s)
+                        édifice(s). Les raisons sont conservées dans le fichier
+                        de données de la plaque.
+                      </p>
+                    ) : null}
+                  </details>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : null}
         {busy && status !== "processing" ? (
