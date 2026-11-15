@@ -14,3 +14,40 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The image Coolify builds on the server: prove here that it builds on
+  # Linux and that the container serves the app before it reaches main.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t printmap:ci .
+      - name: Start the container
+        run: |
+          docker run -d --name printmap -p 3000:3000 printmap:ci
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:3000/ && exit 0
+            sleep 2
+          done
+          echo "the container never answered:" && docker logs printmap && exit 1
+      - name: Check what the browser needs
+        run: |
+          curl -sf http://localhost:3000/ | grep -q "PrintMap"
+          test "$(curl -sf -o /dev/null -w '%{size_download}' http://localhost:3000/manifold.wasm)" -gt 100000
+          curl -sf -o /dev/null http://localhost:3000/maplibre/maplibre-gl-worker.mjs
+          # A rejected zone proves the API route runs, without calling any
+          # outside service.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"bbox":[0,0,0,0]}' http://localhost:3000/api/map-data)" = 400
+      - name: Check the native image library on Alpine
+        run: docker exec printmap node -e "require('sharp'); console.log('sharp ok')"
+      - name: Wait for the health check
+        run: |
+          for i in $(seq 1 30); do
+            test "$(docker inspect -f '{{.State.Health.Status}}' printmap)" = healthy && exit 0
+            sleep 2
+          done
+          docker inspect -f '{{json .State.Health}}' printmap && exit 1
+      - name: Container log on failure
+        if: failure()
+        run: docker logs printmap

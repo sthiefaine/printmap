@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.github
+.claude
+.cache
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+*.tsbuildinfo
+artifacts
+test-results
+tests

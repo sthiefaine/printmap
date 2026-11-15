@@ -171,10 +171,11 @@ export async function fetchElevation(
     }
   }
 
-  // Outside France use a complete DEM mosaic instead of depending on a long
-  // series of point-API requests. Keep an operator's configured API primary.
+  // Without IGN coverage use a complete DEM mosaic instead of a long series
+  // of point-API requests. This includes neighbouring countries that fall
+  // inside the rectangle used to recognise France (Geneva, Brussels, Turin…).
+  // Keep an operator's configured API primary.
   if (
-    !isMetropolitanFrance(bbox) &&
     !process.env.OPEN_METEO_ELEVATION_URL &&
     !process.env.OPEN_METEO_API_KEY
   ) {

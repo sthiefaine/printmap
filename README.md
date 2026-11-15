@@ -56,6 +56,7 @@ src/lib/model/     features.ts  OSM → formes 2D en mm
                    settings.ts  réglages et calcul de la grille
 src/lib/export/    STL, 3MF, ZIP, plan d’assemblage
 src/components/    carte, panneau de réglages, aperçu 3D
+Dockerfile         image de production
 ```
 
 Chaque couche est construite en 2D (unions exactes, suppression de ce qui est plus fin que la buse), extrudée, puis fusionnée par le moteur [Manifold](https://github.com/elalish/manifold) : le résultat est fermé par construction, quelle que soit la ville. La découpe en plaques coupe ce solide par des plans.
@@ -76,6 +77,22 @@ npm run city -- 43.6065,3.8700,43.6155,3.8824 --cols 2 --rows 2 --out artifacts/
 ```
 
 Options : `--bed 220`, `--size 300` (taille précise), `--relief`, `--verbose`.
+
+## Déployer
+
+Le `Dockerfile` produit une image autonome (Node 22 Alpine, port 3000, utilisateur non privilégié, healthcheck sur `/`). Avec Coolify : nouvelle ressource depuis le dépôt GitHub, type de build **Dockerfile**, port **3000**. Aucune variable d’environnement, base de données ni volume n’est nécessaire ; le conteneur a besoin d’un accès Internet sortant pour collecter les données.
+
+Essayer l’image en local :
+
+```bash
+docker build -t printmap .
+```
+
+```bash
+docker run --rm -p 3000:3000 printmap
+```
+
+Si un proxy coupe les requêtes longues, lui laisser au moins 60 s : la collecte d’une zone peut en prendre 25 quand Overpass est lent.
 
 ## Limites connues
 

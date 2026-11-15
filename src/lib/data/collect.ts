@@ -77,7 +77,8 @@ export async function collectMapData(
     sources.push(
       `IGN BD TOPO (hauteurs de ${enriched.enriched + enriched.added} bâtiments)`,
     );
-  } else if (france)
+  } else if (france && (!ign || ign.warnings.length))
+    // No building at all usually means a neighbouring country, not an outage.
     warnings.push(
       "Hauteurs IGN indisponibles : hauteurs OSM ou estimées selon le type de bâtiment.",
     );
