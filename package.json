@@ -1,6 +1,6 @@
 {
   "name": "printmap",
-  "version": "1.0.0",
+  "version": "4.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,10 +11,8 @@
     "prebuild": "node scripts/setup-wasm.mjs",
     "postinstall": "node scripts/setup-wasm.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "check:plates": "node scripts/check-plate-math.mjs",
     "test": "tsx --test tests/*.test.ts",
-    "test:e2e": "playwright test",
-    "smoke:live": "tsx scripts/smoke-live.ts"
+    "city": "tsx scripts/build-city.ts"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
@@ -36,8 +34,6 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@chenglou/freerange": "0.0.5",
-    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

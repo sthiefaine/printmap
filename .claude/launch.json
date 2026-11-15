@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "printmap-dev",
+      "runtimeExecutable": "/bin/zsh",
+      "runtimeArgs": ["-c", "export PATH=$HOME/.nvm/versions/node/v22.14.0/bin:$PATH && npm run dev"],
+      "port": 3000
+    }
+  ]
+}

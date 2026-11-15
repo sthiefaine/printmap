@@ -3,23 +3,6 @@ export interface LatLon {
   lon: number;
 }
 
-/** Measured roof polygons: horizontal position in WGS84, altitude in metres IGN69. */
-export interface RoofSurface {
-  outer: Array<LatLon & { elevation: number }>;
-  holes: Array<Array<LatLon & { elevation: number }>>;
-}
-
-/** Complete measured boundary; includes the underside of arches and overhangs. */
-export interface MeasuredSurface extends RoofSurface {
-  kind: "roof" | "wall" | "ground" | "outerCeiling" | "outerFloor" | "closure";
-}
-
-export interface MeasuredSolid {
-  surfaces: MeasuredSurface[];
-  source: string;
-  year: number;
-}
-
 export interface OverpassResponse {
   elements: OverpassElement[];
   osm3s?: { timestamp_osm_base?: string };
@@ -30,15 +13,10 @@ export interface OverpassElement {
   type: "way" | "relation" | "node";
   id: number;
   tags?: Record<string, string>;
-  /** Position of an OSM node; it does not imply a printable footprint. */
   lat?: number;
   lon?: number;
   geometry?: LatLon[];
   nodes?: number[];
-  roofSurfaces?: RoofSurface[];
-  groundElevation?: number;
-  roofSource?: string;
-  measuredSolid?: MeasuredSolid;
   members?: Array<{
     type: string;
     ref?: number;
@@ -55,12 +33,14 @@ export interface NominatimResult {
   boundingbox: [string, string, string, string];
 }
 
-export type BBox = [number, number, number, number]; // [south, west, north, east]
+/** [south, west, north, east] in degrees. */
+export type BBox = [number, number, number, number];
 
 export interface ElevationGrid {
   rows: number;
   cols: number;
-  points: number[]; // flat array row-major [e00, e01, ..., e0C, e10, ...]
+  /** Row-major, first row = south edge, first column = west edge. Metres. */
+  points: number[];
   minElev: number;
   maxElev: number;
   south: number;
@@ -72,54 +52,12 @@ export interface ElevationGrid {
   warnings?: string[];
 }
 
-export interface DataReport {
+/** Everything the model builder needs; fetched once, rebuilt as often as wanted. */
+export interface MapData {
+  bbox: BBox;
+  elements: OverpassElement[];
+  elevation: ElevationGrid | null;
   sources: string[];
   warnings: string[];
   fetchedAt: string;
-  areaKm2: number;
-  elementCount: number;
-  buildingCount: number;
-  measuredBuildingCount: number;
-  ignBuildingCount: number;
-  rioBuildingCount?: number;
-  elevationSource: string | null;
-  elevationResolutionM: number | null;
-  osmTimestamp?: string;
-  seaCoverage: "available" | "unavailable";
-  /** Number of public surveyed buildings carrying measured roof surfaces. */
-  lod2BuildingCount?: number;
-  lod2RoofSurfaceCount?: number;
-  lod2Year?: number;
-  lod2SolidCount?: number;
-  /** Roofs reconstructed from a LiDAR surface raster, distinct from surveyed LoD2. */
-  lidarRoofBuildingCount?: number;
-  lidarRoofSurfaceCount?: number;
-  lidarRoofResolutionM?: number | null;
-  lidarRoofMinResolutionM?: number | null;
-  landmarkRoofBuildingCount?: number;
-  /** Persistent progress of optional local surveys; limits apply to each batch. */
-  landmarkRefinement?: LandmarkRefinementProgress;
-  municipalStructureCount?: number;
-  /** Located landmarks whose point data does not provide printable 3D geometry. */
-  pointLandmarkCount?: number;
-}
-
-export interface LandmarkRefinementProgress {
-  version: 1;
-  updatedAt: string;
-  remaining: number;
-  completed: number;
-  failed: number;
-  limited: number;
-  attempts: Array<{
-    id: string;
-    outcome: "unavailable" | "invalid" | "budget";
-    reason: string;
-  }>;
-}
-
-export interface MapDataResponse {
-  osmData: OverpassResponse;
-  elevationGrid: ElevationGrid | null;
-  report: DataReport;
 }

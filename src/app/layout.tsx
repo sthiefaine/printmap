@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "PrintMap — Vos lieux, en volume",
+  title: "PrintMap — votre ville à imprimer en 3D",
   description:
-    "Créez une maquette imprimable de votre ville : bâtiments, routes, jardins et eau, avec nettoyage à l’échelle de l’impression.",
+    "Choisissez une zone sur la carte, obtenez une maquette de ville prête à imprimer en 3D, en une pièce ou découpée en plaques à assembler.",
 };
 export default function RootLayout({
   children,
