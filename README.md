@@ -82,7 +82,7 @@ Options : `--bed 220`, `--size 300` (taille précise), `--relief`, `--verbose`.
 - Les toits sont plats : les bâtiments sont des volumes extrudés à leur hauteur.
 - Hors de France, beaucoup de hauteurs sont estimées d’après le type de bâtiment.
 - Les ponts et tunnels ne sont pas modélisés : les routes suivent le sol, les tronçons souterrains sont omis.
-- L’ancienne version (toitures mesurées, monuments de Montpellier et Saint-Étienne) reste disponible sur la branche `main`.
+- L’ancienne version (toitures mesurées, monuments de Montpellier et Saint-Étienne) reste disponible sous l’étiquette git `ancienne-version`.
 
 ## Attribution
 
