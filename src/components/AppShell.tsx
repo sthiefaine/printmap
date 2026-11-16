@@ -15,6 +15,7 @@ export function AppShell() {
   const progressLabel = useAppStore((s) => s.progressLabel);
   const exploded = useAppStore((s) => s.exploded);
   const angle = useAppStore((s) => s.angle);
+  const refining = useAppStore((s) => s.refining);
   const set = useAppStore((s) => s.set);
   const [hydrated, setHydrated] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
@@ -112,6 +113,19 @@ export function AppShell() {
             Aperçu 3D
           </button>
         </div>
+
+        {refining && !busy ? (
+          <p
+            className="absolute right-4 bottom-4 flex items-center gap-2 rounded-lg bg-black/45 px-3 py-1.5 text-xs text-white backdrop-blur"
+            role="status"
+          >
+            <span
+              className="h-3 w-3 shrink-0 rounded-full border-2 border-white/30 border-t-white"
+              style={{ animation: "spin 0.8s linear infinite" }}
+            />
+            Toits et contours précis en cours de chargement…
+          </p>
+        ) : null}
 
         {busy ? (
           <div

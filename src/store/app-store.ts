@@ -21,6 +21,8 @@ interface AppState {
   view: "map" | "3d";
   exploded: boolean;
   angle: "iso" | "top" | "under";
+  /** The detailed data (roofs, exact outlines) is still being fetched. */
+  refining: boolean;
   /** Map centre, to place quick selections and to reopen where we left. */
   center: { lat: number; lng: number; zoom: number };
   flyTo: { lat: number; lng: number; id: number } | null;
@@ -41,11 +43,17 @@ interface AppState {
 }
 
 let controller: AbortController | null = null;
+let refineController: AbortController | null = null;
 let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
+/** Stops the current collection or build, not the background refinement. */
 const stop = () => {
   clearTimeout(rebuildTimer);
   controller?.abort();
   controller = null;
+};
+const stopRefining = () => {
+  refineController?.abort();
+  refineController = null;
 };
 const cancelled = (error: unknown) =>
   error instanceof DOMException && error.name === "AbortError";
@@ -85,6 +93,38 @@ export const useAppStore = create<AppState>()(
           });
         }
       }
+      /** The first answer came from vector tiles because Overpass was slow.
+       * Keep waiting for it in the background, then rebuild with its roofs,
+       * building parts and exact outlines. */
+      async function refine(bbox: BBox) {
+        const mine = (refineController = new AbortController());
+        set({ refining: true });
+        try {
+          const response = await fetch("/api/map-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bbox, detailed: true }),
+            signal: mine.signal,
+          });
+          const body = (await response
+            .json()
+            .catch(() => null)) as MapData | null;
+          if (mine.signal.aborted || get().bbox !== bbox) return;
+          if (response.ok && body?.detailed) {
+            set({ data: body });
+            stop();
+            const rebuild = (controller = new AbortController());
+            await build(rebuild.signal);
+          }
+        } catch {
+          // The coarser model stays: nothing to report.
+        } finally {
+          if (refineController === mine) {
+            refineController = null;
+            set({ refining: false });
+          }
+        }
+      }
       return {
         bbox: null,
         settings: DEFAULT_SETTINGS,
@@ -97,12 +137,15 @@ export const useAppStore = create<AppState>()(
         view: "map",
         exploded: false,
         angle: "iso",
+        refining: false,
         center: { lat: 43.6109, lng: 3.8763, zoom: 14 },
         flyTo: null,
         drawRequest: 0,
         set: (state) => set(state),
         setBbox: (bbox) => {
           stop();
+          stopRefining();
+          set({ refining: false });
           if (bbox)
             try {
               validateBbox(bbox);
@@ -142,6 +185,8 @@ export const useAppStore = create<AppState>()(
           const { bbox } = get();
           if (!bbox) return;
           stop();
+          stopRefining();
+          set({ refining: false });
           const mine = (controller = new AbortController());
           set({
             status: "fetching",
@@ -174,6 +219,7 @@ export const useAppStore = create<AppState>()(
             return;
           }
           await build(mine.signal);
+          if (!get().data?.detailed && !mine.signal.aborted) void refine(bbox);
         },
         cancel: () => {
           stop();

@@ -26,6 +26,8 @@ export interface ModelSettings {
   reliefScale: number;
   buildings: boolean;
   buildingScale: number;
+  /** Sloped roofs where OpenStreetMap describes their shape. */
+  roofs: boolean;
   roads: boolean;
   roadLevel: RoadLevel;
   roadWidthScale: number;
@@ -56,6 +58,7 @@ export const DEFAULT_SETTINGS: ModelSettings = {
   reliefScale: 1,
   buildings: true,
   buildingScale: 1,
+  roofs: true,
   roads: true,
   roadLevel: "streets",
   roadWidthScale: 1,

@@ -7,6 +7,16 @@ import type { ElevationGrid, MapData } from "@/types/osm";
 import { bboxDimensions } from "@/lib/data/bbox";
 import { extractFeatures, type Line, type Poly, type Ring } from "./features";
 import {
+  centroid,
+  defaultRoofHeightM,
+  isConvex,
+  orientedBox,
+  roofFrame,
+  roofHullPoints,
+  type OrientedBox,
+} from "./roofs";
+import type { Roof } from "@/lib/osm/building-height";
+import {
   computeLayout,
   tileLabel,
   type LayerId,
@@ -49,6 +59,8 @@ export interface BuiltModel {
   keys: (MeshData & { count: number; thicknessMm: number }) | null;
   stats: {
     buildings: number;
+    /** Buildings given a sloped roof from OpenStreetMap tags. */
+    roofs: number;
     estimatedHeights: number;
     triangles: number;
     volumeCm3: number;
@@ -82,6 +94,8 @@ const MIN_BUILDING_MM = 0.6;
 const LABEL_DEPTH_MM = 0.4;
 /** Outline deviation allowed when removing vertices: invisible once printed. */
 const TOLERANCE_MM = 0.05;
+/** A roof lower than this once printed is not worth modelling. */
+const MIN_ROOF_MM = 0.3;
 /** Building tops snap to a usual layer height: fewer, larger solids to fuse. */
 const HEIGHT_STEP_MM = 0.2;
 
@@ -349,6 +363,7 @@ export async function buildModel(
     // ── Buildings ─────────────────────────────────────────────────────────
     onProgress(0.15, "Bâtiments");
     let buildingCount = 0,
+      roofCount = 0,
       estimatedHeights = 0,
       tallest = 0;
     let footprints: CrossSection | null = null;
@@ -381,6 +396,14 @@ export async function buildModel(
         : null;
       const scale = Math.min(5, Math.max(0.2, settings.buildingScale));
       const groups = new Map<number, Ring[]>();
+      const roofJobs: Array<{
+        poly: Poly;
+        roof: Roof;
+        box: OrientedBox;
+        /** Top of the walls above the base, as snapped for their group. */
+        top: number;
+        height: number;
+      }> = [];
       for (const b of features.buildings) {
         const [x0, y0, x1, y1] = bounds(b.poly.outer);
         if (x1 < 0 || y1 < 0 || x0 > W || y0 > D) continue;
@@ -401,7 +424,29 @@ export async function buildModel(
           const covered = keep(shape.intersect(parts)).area();
           if (covered > 0.7 * shape.area()) continue;
         }
-        const height = Math.max(MIN_BUILDING_MM, b.heightM * k * scale);
+        // Walls and roof: an OSM height reaches the roof top, an IGN height
+        // stops at the gutter, an estimate only describes the walls.
+        let wallM = b.heightM,
+          roofMm = 0,
+          box: OrientedBox | null = null;
+        if (settings.roofs && b.roof) {
+          box = orientedBox(b.poly.outer);
+          let roofM =
+            b.roof.heightM ?? defaultRoofHeightM(b.roof.shape, (2 * box.b) / k);
+          if (b.eaveM != null) wallM = b.eaveM;
+          else if (b.includesRoof) {
+            roofM = Math.min(roofM, b.heightM * 0.6);
+            wallM = b.heightM - roofM;
+          }
+          roofMm = roofM * k * scale;
+          // Too low to show, or too narrow for its walls to be sure to
+          // survive the nozzle-width clean-up: keep a plain block.
+          if (roofMm < MIN_ROOF_MM || 2 * box.b < 1.25 * minFeature) {
+            roofMm = 0;
+            wallM = b.heightM;
+          }
+        }
+        const height = Math.max(MIN_BUILDING_MM, wallM * k * scale);
         let top = height;
         if (relief) {
           let sum = 0,
@@ -420,6 +465,14 @@ export async function buildModel(
         let contours = groups.get(key);
         if (!contours) groups.set(key, (contours = []));
         pushPoly(contours, b.poly);
+        if (roofMm && box)
+          roofJobs.push({
+            poly: b.poly,
+            roof: b.roof!,
+            box,
+            top: key * HEIGHT_STEP_MM,
+            height: roofMm,
+          });
         buildingCount++;
         if (b.estimated) estimatedHeights++;
       }
@@ -453,6 +506,62 @@ export async function buildModel(
               ? keep(shape.extrude(base + top))
               : keep(keep(shape.extrude(top)).translate(0, 0, base)),
           );
+        }
+        // Each roof is a convex volume over the footprint's bounding box,
+        // trimmed to the footprint: closed whatever the outline looks like.
+        for (const job of roofJobs) {
+          const own: Ring[] = [];
+          pushPoly(own, job.poly);
+          const shape = region(own);
+          if (!shape) continue;
+          const h = job.height;
+          const outer = job.poly.outer;
+          const whole =
+            !job.poly.holes.length &&
+            shape.area() > 0.98 * Math.abs(signedArea(outer));
+          let solid: Manifold;
+          if (
+            (job.roof.shape === "cone" || job.roof.shape === "pyramidal") &&
+            whole &&
+            isConvex(outer)
+          ) {
+            // Every side rises to a point above the centre, as on a turret.
+            const [gx, gy] = centroid(outer);
+            solid = keep(
+              keep(
+                keep(shape.translate(-gx, -gy)).extrude(h, 0, 0, [0, 0]),
+              ).translate(gx, gy, 0),
+            );
+          } else {
+            const frame = roofFrame(job.box, job.roof);
+            const points = roofHullPoints(
+              frame,
+              job.roof.shape === "cone" ? "pyramidal" : job.roof.shape,
+              h,
+            );
+            const volume = points
+              ? keep(Manifold.hull(points))
+              : keep(
+                  keep(
+                    keep(
+                      keep(Manifold.sphere(1, 32)).scale([
+                        frame.ar,
+                        frame.bs,
+                        h,
+                      ]),
+                    ).rotate(
+                      0,
+                      0,
+                      (Math.atan2(frame.ry, frame.rx) * 180) / Math.PI,
+                    ),
+                  ).translate(frame.cx, frame.cy, 0),
+                );
+            solid = keep(volume.intersect(keep(shape.extrude(h))));
+          }
+          if (solid.isEmpty()) continue;
+          solids.push(keep(solid.translate(0, 0, base + job.top)));
+          tallest = Math.max(tallest, job.top + h);
+          roofCount++;
         }
       }
       if (solids.length) {
@@ -714,6 +823,7 @@ export async function buildModel(
       keys,
       stats: {
         buildings: buildingCount,
+        roofs: roofCount,
         estimatedHeights,
         triangles,
         volumeCm3: whole.volume() / 1000,

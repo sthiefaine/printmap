@@ -292,6 +292,7 @@ export function Panel() {
   const model = useAppStore((s) => s.model);
   const status = useAppStore((s) => s.status);
   const error = useAppStore((s) => s.error);
+  const refining = useAppStore((s) => s.refining);
   const patch = useAppStore((s) => s.patch);
   const store = useAppStore.getState;
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
@@ -554,6 +555,21 @@ export function Panel() {
               format={(v) => (v === 1 ? "réelle" : `× ${fr(v, 1)}`)}
               onChange={set("buildingScale")}
             />
+            <label className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-green"
+                checked={settings.roofs}
+                onChange={(event) => patch({ roofs: event.target.checked })}
+              />
+              <span>
+                Toits en pente
+                <span className="block text-xs text-muted">
+                  Là où OpenStreetMap décrit leur forme ; les autres restent
+                  plats.
+                </span>
+              </span>
+            </label>
           </Layer>
           <Layer layer="roads" enabled={settings.roads} onToggle={set("roads")}>
             <select
@@ -671,6 +687,17 @@ export function Panel() {
                   ? `, dont ${fr(model.stats.estimatedHeights)} de hauteur estimée`
                   : ""}
               </li>
+              {settings.buildings && settings.roofs ? (
+                <li>
+                  {model.stats.roofs
+                    ? `${fr(model.stats.roofs)} toits en pente`
+                    : data.detailed
+                      ? "Aucun toit en pente décrit dans OpenStreetMap ici"
+                      : refining
+                        ? "Toits en pente : données détaillées en cours de chargement…"
+                        : "Toits en pente indisponibles : le serveur détaillé d’OpenStreetMap n’a pas répondu"}
+                </li>
+              ) : null}
               {model.keys ? (
                 <li>
                   {model.keys.count} clés papillon de{" "}

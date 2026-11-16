@@ -1,6 +1,11 @@
 import type { BBox, LatLon, OverpassElement } from "@/types/osm";
 import { elementPolygons } from "@/lib/osm/relation-polygons";
-import { buildingHeight, parseLengthMeters } from "@/lib/osm/building-height";
+import {
+  buildingHeight,
+  parseLengthMeters,
+  roofFromTags,
+  type Roof,
+} from "@/lib/osm/building-height";
 import type { RoadLevel } from "./settings";
 
 export type Point = [number, number];
@@ -18,6 +23,11 @@ export interface Building {
   poly: Poly;
   heightM: number;
   estimated: boolean;
+  /** `heightM` reaches the roof top rather than the top of the walls. */
+  includesRoof: boolean;
+  /** Measured wall height (IGN gutter height), when known. */
+  eaveM: number | null;
+  roof: Roof | null;
   part: boolean;
 }
 export interface Features {
@@ -183,12 +193,17 @@ export function extractFeatures(
 
     if (isBuilding(t)) {
       if (isUnderground(t) || t.building === "underground") continue;
-      const { height, estimated } = buildingHeight(t);
+      const { height, estimated, includesRoof } = buildingHeight(t);
+      const roof = roofFromTags(t);
+      const eaveM = parseLengthMeters(t["printmap:eave_height"]);
       for (const poly of polys(el))
         out.buildings.push({
           poly,
           heightM: height,
           estimated,
+          includesRoof,
+          eaveM,
+          roof,
           part: !t.building || t.building === "no",
         });
       continue;

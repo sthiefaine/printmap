@@ -1,4 +1,9 @@
-import type { BBox, MapData, OverpassElement } from "@/types/osm";
+import type {
+  BBox,
+  MapData,
+  OverpassElement,
+  OverpassResponse,
+} from "@/types/osm";
 import { isMetropolitanFrance } from "./bbox";
 import { abortableDelay } from "./request";
 import { fetchOverpass } from "./overpass";
@@ -11,21 +16,42 @@ import { selectComplementaryWater } from "./water-coverage";
  * already downloaded by then, are used instead. */
 const OVERPASS_PATIENCE_MS = 10000;
 
+/** One Overpass query per zone, shared by every request for it and left
+ * running when a request settles for tiles: the app asks again for the
+ * detailed data, and must not start that slow query from scratch. */
+const overpassQueries = new Map<string, Promise<OverpassResponse>>();
+function sharedOverpass(bbox: BBox) {
+  const key = bbox.join(",");
+  let query = overpassQueries.get(key);
+  if (!query) {
+    query = fetchOverpass(bbox, AbortSignal.timeout(60000));
+    overpassQueries.set(key, query);
+    const current = query;
+    const forget = (afterMs: number) =>
+      setTimeout(() => {
+        if (overpassQueries.get(key) === current) overpassQueries.delete(key);
+      }, afterMs).unref?.();
+    current.then(
+      () => forget(120000),
+      () => forget(0),
+    );
+  }
+  return query;
+}
+
 /** OpenStreetMap comes from Overpass when it answers quickly, otherwise from
  * vector tiles of the same data. Heights, relief and sea are bonuses with
  * short deadlines: a slow service never blocks or fails the model. */
 export async function collectMapData(
   bbox: BBox,
   signal: AbortSignal,
+  /** Wait for Overpass as long as it takes instead of settling for tiles. */
+  insistOnDetail = false,
 ): Promise<MapData> {
   const optional = (ms: number) =>
     AbortSignal.any([signal, AbortSignal.timeout(ms)]);
   const france = isMetropolitanFrance(bbox);
-  const giveUp = new AbortController();
-  const overpass = fetchOverpass(
-    bbox,
-    AbortSignal.any([signal, giveUp.signal]),
-  ).then(
+  const overpass = sharedOverpass(bbox).then(
     (value) => ({ value }),
     (error: unknown) => ({ error }),
   );
@@ -41,18 +67,25 @@ export async function collectMapData(
 
   const tiles = await tilesPending;
   signal.throwIfAborted();
-  const osm = await (tiles
-    ? Promise.race([
-        overpass,
-        abortableDelay(OVERPASS_PATIENCE_MS, signal).then(() => null),
-      ])
-    : overpass);
+  const aborted = new Promise<never>((_, reject) =>
+    signal.addEventListener("abort", () => reject(signal.reason), {
+      once: true,
+    }),
+  );
+  aborted.catch(() => {});
+  const osm = await Promise.race([
+    overpass,
+    aborted,
+    ...(tiles && !insistOnDetail
+      ? [abortableDelay(OVERPASS_PATIENCE_MS, signal).then(() => null)]
+      : []),
+  ]);
   signal.throwIfAborted();
-  giveUp.abort();
 
   const sources: string[] = [];
   const warnings: string[] = [];
   let elements: OverpassElement[];
+  const detailed = !!osm && "value" in osm;
   if (osm && "value" in osm) {
     elements = osm.value.elements;
     sources.push("OpenStreetMap · Overpass (données détaillées)");
@@ -98,5 +131,6 @@ export async function collectMapData(
     sources,
     warnings,
     fetchedAt: new Date().toISOString(),
+    detailed,
   };
 }

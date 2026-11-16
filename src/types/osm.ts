@@ -60,4 +60,7 @@ export interface MapData {
   sources: string[];
   warnings: string[];
   fetchedAt: string;
+  /** From Overpass: exact outlines, roof shapes and building parts. False
+   * when the faster vector tiles had to stand in. */
+  detailed: boolean;
 }

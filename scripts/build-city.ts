@@ -45,6 +45,7 @@ const settings: ModelSettings = {
   bedWidthMm: Number(option("bed") ?? DEFAULT_SETTINGS.bedWidthMm),
   bedDepthMm: Number(option("bed") ?? DEFAULT_SETTINGS.bedDepthMm),
   relief: flag("relief"),
+  roofs: !flag("no-roofs"),
   ...(option("size")
     ? { sizeMode: "custom" as const, longSideMm: Number(option("size")) }
     : {}),
@@ -59,7 +60,7 @@ console.log(
   `Construction : ${((Date.now() - started) / 1000).toFixed(1)} s · ${layout.widthMm.toFixed(1)} × ${layout.depthMm.toFixed(1)} × ${model.heightMm.toFixed(1)} mm · 1:${Math.round(layout.scale)}`,
 );
 console.log(
-  `${layout.cols} × ${layout.rows} plaques de ${layout.tileWidthMm.toFixed(1)} × ${layout.tileDepthMm.toFixed(1)} mm · ${stats.buildings} bâtiments (${stats.estimatedHeights} hauteurs estimées) · ${stats.triangles} triangles · ${stats.volumeCm3.toFixed(1)} cm³`,
+  `${layout.cols} × ${layout.rows} plaques de ${layout.tileWidthMm.toFixed(1)} × ${layout.tileDepthMm.toFixed(1)} mm · ${stats.buildings} bâtiments (${stats.roofs} toits en pente, ${stats.estimatedHeights} hauteurs estimées) · ${stats.triangles} triangles · ${stats.volumeCm3.toFixed(1)} cm³`,
 );
 for (const warning of model.warnings) console.log(" !", warning);
 let defects = 0;

@@ -20,7 +20,7 @@ Ouvrir [localhost:3000](http://localhost:3000). Aucune clé d’API n’est néc
    - *Remplir des plaques* : choisir colonnes × rangées, la maquette prend la plus grande taille possible ;
    - *Taille précise* : donner le grand côté en mm, la grille nécessaire est calculée.
    Les plaques sont toutes de la même taille ; le plan et l’échelle s’affichent avant de générer.
-3. **Contenu** — bâtiments, routes, eau, espaces verts, relief, épaisseur du socle. Chaque surface peut être gravée, à niveau ou en relief. Tout changement reconstruit la maquette sans retélécharger les données.
+3. **Contenu** — bâtiments (avec toits en pente quand ils sont décrits), routes, eau, espaces verts, relief, épaisseur du socle. Chaque surface peut être gravée, à niveau ou en relief. Tout changement reconstruit la maquette sans retélécharger les données.
 4. **Générer**, vérifier dans l’aperçu 3D (perspective, dessus, dessous, plaques écartées), puis **exporter**.
 
 ## Fichiers produits
@@ -40,10 +40,12 @@ Tout est en millimètres, Z vers le haut, dessous à Z = 0 ; aucun support n’e
 
 | Source | Rôle |
 | --- | --- |
-| OpenStreetMap via Overpass | bâtiments, routes, eau, espaces verts, au contour exact |
+| OpenStreetMap via Overpass | bâtiments, routes, eau, espaces verts, au contour exact ; formes de toit et parties de bâtiments |
 | OpenStreetMap via tuiles OpenFreeMap | mêmes données à ~0,5 m, utilisées quand Overpass met plus de 10 s à répondre ; mer et grands lacs |
 | IGN BD TOPO (France) | hauteurs des bâtiments |
 | IGN LiDAR HD / RGE ALTI (France), Mapzen Terrain Tiles (monde) | relief |
+
+Quand Overpass tarde, la maquette s’affiche d’abord à partir des tuiles, puis se reconstruit toute seule dès que les données détaillées arrivent (toits, contours exacts).
 
 Seul OpenStreetMap est indispensable : une source secondaire lente ou absente est signalée, sans bloquer la maquette. Les sources réellement utilisées sont listées sous « Cette maquette ».
 
@@ -53,6 +55,7 @@ Seul OpenStreetMap est indispensable : une source secondaire lente ou absente es
 src/lib/data/      collecte (Overpass, tuiles, IGN, relief)
 src/lib/model/     features.ts  OSM → formes 2D en mm
                    build.ts     formes → solides (Manifold/WASM), découpe, clés
+                   roofs.ts     géométrie des toits (deux pans, quatre pans, pyramide, appentis)
                    settings.ts  réglages et calcul de la grille
 src/lib/export/    STL, 3MF, ZIP, plan d’assemblage
 src/components/    carte, panneau de réglages, aperçu 3D
@@ -76,7 +79,7 @@ Construire une maquette sans navigateur, avec contrôle de fermeture de chaque p
 npm run city -- 43.6065,3.8700,43.6155,3.8824 --cols 2 --rows 2 --out artifacts/essai
 ```
 
-Options : `--bed 220`, `--size 300` (taille précise), `--relief`, `--verbose`.
+Options : `--bed 256`, `--size 300` (taille précise), `--relief`, `--no-roofs`, `--verbose`.
 
 ## Déployer
 
@@ -96,7 +99,8 @@ Si un proxy coupe les requêtes longues, lui laisser au moins 60 s : la collecte
 
 ## Limites connues
 
-- Les toits sont plats : les bâtiments sont des volumes extrudés à leur hauteur.
+- Les toits ne sont en pente que là où OpenStreetMap décrit leur forme (`roof:shape`) : fréquent en Allemagne, rare en France, où la plupart restent plats. Les très petits éléments (moins de ~1 mm une fois imprimés) restent des blocs.
+- Les parties de bâtiments en surplomb (`min_height`) partent du sol, pour rester imprimables sans supports.
 - Hors de France, beaucoup de hauteurs sont estimées d’après le type de bâtiment.
 - Les ponts et tunnels ne sont pas modélisés : les routes suivent le sol, les tronçons souterrains sont omis.
 - L’ancienne version (toitures mesurées, monuments de Montpellier et Saint-Étienne) reste disponible sous l’étiquette git `ancienne-version`.

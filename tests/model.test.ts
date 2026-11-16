@@ -10,6 +10,8 @@ import {
   type ModelSettings,
 } from "@/lib/model/settings";
 import { exportModel, stlBytes } from "@/lib/export/files";
+import { roofFromTags } from "@/lib/osm/building-height";
+import { orientedBox } from "@/lib/model/roofs";
 
 // About 500 m × 400 m near Montpellier.
 const SOUTH = 43.6,
@@ -88,6 +90,7 @@ function sampleData(relief: boolean): MapData {
     sources: [],
     warnings: [],
     fetchedAt: "2026-01-01T00:00:00Z",
+    detailed: true,
   };
 }
 
@@ -276,4 +279,198 @@ test("exports: STL size matches its triangles, several plates give a ZIP", async
   });
   const zip = await exportModel(four, DEFAULT_SETTINGS, "stl", "ville");
   assert.equal(zip.filename, "ville-2x2-stl.zip");
+});
+
+// ── Roofs ────────────────────────────────────────────────────────────────
+function roofData(elements: OverpassElement[]): MapData {
+  return { ...sampleData(false), elements };
+}
+/** 60 m × 40 m, long side east-west. */
+const hall = (tags: Record<string, string>) =>
+  way({ building: "yes", height: "15", ...tags }, box(0.1, 0.1, 0.22, 0.2));
+const roofSettings = settings({ roads: false, water: false, green: false });
+
+test("roof tags: shapes, heights and directions", () => {
+  assert.equal(roofFromTags({ "roof:shape": "flat" }), null);
+  assert.equal(roofFromTags({ building: "yes" }), null);
+  assert.deepEqual(
+    roofFromTags({ "roof:shape": "gabled", "roof:height": "3,5" }),
+    {
+      shape: "gabled",
+      heightM: 3.5,
+      direction: null,
+      across: false,
+    },
+  );
+  const mansard = roofFromTags({
+    "roof:shape": "mansard",
+    "roof:levels": "2",
+    "roof:direction": "NE",
+    "roof:orientation": "across",
+  });
+  assert.deepEqual(mansard, {
+    shape: "hipped",
+    heightM: 6,
+    direction: 45,
+    across: true,
+  });
+  assert.equal(
+    roofFromTags({ "roof:shape": "dome", "roof:direction": "270" })?.direction,
+    270,
+  );
+});
+
+test("oriented box follows a rotated footprint", () => {
+  // 10 × 4 rectangle turned by 30°.
+  const c = Math.cos(Math.PI / 6),
+    s = Math.sin(Math.PI / 6);
+  const ring = [
+    [-5, -2],
+    [5, -2],
+    [5, 2],
+    [-5, 2],
+  ].map(([x, y]) => [x * c - y * s + 7, x * s + y * c + 3] as [number, number]);
+  const found = orientedBox(ring);
+  assert.ok(Math.abs(found.a - 5) < 1e-9 && Math.abs(found.b - 2) < 1e-9);
+  assert.ok(Math.abs(found.cx - 7) < 1e-9 && Math.abs(found.cy - 3) < 1e-9);
+  assert.ok(Math.abs(Math.abs(found.ux * c + found.uy * s) - 1) < 1e-9);
+});
+
+test("gabled roof: closed, as tall as tagged, and lighter than a block", async () => {
+  const elements = [hall({ "roof:shape": "gabled", "roof:height": "5" })];
+  const roofed = await buildModel({
+    data: roofData(elements),
+    settings: roofSettings,
+  });
+  const block = await buildModel({
+    data: roofData(elements),
+    settings: { ...roofSettings, roofs: false },
+  });
+  const k = roofed.layout.mmPerM;
+  assert.equal(roofed.stats.roofs, 1);
+  assert.equal(block.stats.roofs, 0);
+  assertWatertight(roofed.tiles[0].solid, "gabled");
+  for (const part of roofed.tiles[0].parts) assertWatertight(part, part.layer);
+  // OSM height reaches the ridge: 10 m of wall and 5 m of roof.
+  assert.ok(Math.abs(roofed.heightMm - (3 + 15 * k)) < 0.11);
+  assert.ok(Math.abs(block.heightMm - (3 + 15 * k)) < 0.11);
+  // A gable removes half of the roof's bounding volume.
+  const removed = block.tiles[0].volumeMm3 - roofed.tiles[0].volumeMm3;
+  const half = (60 * k * 40 * k * 5 * k) / 2;
+  assert.ok(Math.abs(removed - half) < 0.12 * half, `${removed} vs ${half}`);
+});
+
+test("every roof shape gives a closed solid on any footprint", async () => {
+  const circle = (cx: number, cy: number, r: number) => {
+    const ring = Array.from({ length: 16 }, (_, i) =>
+      at(
+        cx + r * Math.cos((i / 16) * 2 * Math.PI),
+        cy + r * 1.25 * Math.sin((i / 16) * 2 * Math.PI),
+      ),
+    );
+    return [...ring, ring[0]];
+  };
+  const lShape = [
+    at(0.5, 0.5),
+    at(0.7, 0.5),
+    at(0.7, 0.6),
+    at(0.6, 0.6),
+    at(0.6, 0.8),
+    at(0.5, 0.8),
+    at(0.5, 0.5),
+  ];
+  for (const shape of [
+    "gabled",
+    "hipped",
+    "pyramidal",
+    "skillion",
+    "dome",
+    "cone",
+    "gambrel",
+    "onion",
+  ]) {
+    const elements = [
+      hall({ "roof:shape": shape, "roof:height": "6" }),
+      way({ building: "yes", height: "14", "roof:shape": shape }, lShape),
+      way(
+        { building: "yes", height: "20", "roof:shape": shape },
+        circle(0.35, 0.6, 0.05),
+      ),
+      // Cut by the edge of the model.
+      way(
+        { building: "yes", height: "12", "roof:shape": shape },
+        box(0.9, 0.3, 1.1, 0.45),
+      ),
+      // Courtyard.
+      {
+        type: "relation" as const,
+        id: nextId++,
+        tags: {
+          type: "multipolygon",
+          building: "yes",
+          height: "16",
+          "roof:shape": shape,
+        },
+        members: [
+          { type: "way", role: "outer", geometry: box(0.1, 0.5, 0.3, 0.9) },
+          { type: "way", role: "inner", geometry: box(0.15, 0.6, 0.25, 0.8) },
+        ],
+      },
+    ];
+    for (const relief of [false, true]) {
+      const model = await buildModel({
+        data: { ...roofData(elements), elevation: sampleData(true).elevation },
+        settings: { ...roofSettings, relief, cols: 2, rows: 2 },
+      });
+      assert.equal(model.stats.roofs, 5, shape);
+      for (const tile of model.tiles) {
+        assertWatertight(tile.solid, `${shape} ${tile.label}`);
+        for (const part of tile.parts)
+          assertWatertight(part, `${shape} ${tile.label} ${part.layer}`);
+      }
+    }
+  }
+});
+
+test("a single-pitch roof rises away from the way it faces", async () => {
+  // Faces south: the high edge is the northern one.
+  const model = await buildModel({
+    data: roofData([
+      hall({
+        "roof:shape": "skillion",
+        "roof:height": "5",
+        "roof:direction": "180",
+      }),
+    ]),
+    settings: roofSettings,
+  });
+  const { positions } = model.tiles[0].solid;
+  const north = 0.2 * model.layout.depthMm,
+    south = 0.1 * model.layout.depthMm;
+  let ridge = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    if (positions[i + 2] < model.heightMm - 1e-3) continue;
+    ridge++;
+    assert.ok(
+      Math.abs(positions[i + 1] - north) < 0.05,
+      "high edge on the north side",
+    );
+    assert.ok(Math.abs(positions[i + 1] - south) > 1);
+  }
+  assert.ok(ridge >= 2);
+});
+
+test("a measured gutter height keeps the walls and adds the roof on top", async () => {
+  const model = await buildModel({
+    data: roofData([
+      hall({
+        "roof:shape": "hipped",
+        "roof:height": "4",
+        height: "16",
+        "printmap:eave_height": "12",
+      }),
+    ]),
+    settings: roofSettings,
+  });
+  assert.ok(Math.abs(model.heightMm - (3 + 16 * model.layout.mmPerM)) < 0.11);
 });
